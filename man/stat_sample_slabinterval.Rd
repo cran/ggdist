@@ -203,7 +203,7 @@ normalization (this should probably only be used with functions whose values are
 of the slab at each x / y value of the slab (depending on \code{orientation}).}
 }
 \value{
-A \link[ggplot2:Stat]{ggplot2::Stat} representing a slab or combined slab+interval geometry which can
+A \link[ggplot2:ggplot2-ggproto]{ggplot2::Stat} representing a slab or combined slab+interval geometry which can
 be added to a \code{\link[=ggplot]{ggplot()}} object.
 }
 \description{
@@ -247,6 +247,8 @@ These stats support the following aesthetics:
 }
 In addition, in their default configuration (paired with \code{\link[=geom_slabinterval]{geom_slabinterval()}}) the following aesthetics are supported by the underlying geom:
 \itemize{
+\item \code{x}
+\item \code{y}
 \item \code{datatype}
 \item \code{alpha}
 \item \code{colour}
@@ -268,10 +270,8 @@ In addition, in their default configuration (paired with \code{\link[=geom_slabi
 \item \code{slab_fill}
 \item \code{slab_alpha}
 \item \code{slab_linetype}
-\item \code{y}
 \item \code{ymin}
 \item \code{ymax}
-\item \code{x}
 \item \code{xmin}
 \item \code{xmax}
 \item \code{width}

@@ -62,7 +62,7 @@ m_ABC %>%
 ## ---------------------------------------------------------------------------------------------------------------------
 ABC %>%
   data_grid(condition) %>%
-  augment(m_ABC, newdata = .) %>%
+  augment(m_ABC, newdata = ., se_fit = TRUE) %>%
   ggplot(aes(y = condition)) +
   stat_dist_halfeye(
     aes(dist = "student_t", arg1 = df.residual(m_ABC), arg2 = .fitted, arg3 = .se.fit), 
@@ -75,7 +75,7 @@ ABC %>%
 ## ---------------------------------------------------------------------------------------------------------------------
 ABC %>%
   data_grid(condition) %>%
-  augment(m_ABC, newdata = .) %>%
+  augment(m_ABC, newdata = ., se_fit = TRUE) %>%
   ggplot(aes(y = condition)) +
   stat_dist_gradientinterval(
     aes(dist = "student_t", arg1 = df.residual(m_ABC), arg2 = .fitted, arg3 = .se.fit), 
@@ -85,7 +85,7 @@ ABC %>%
 ## ---------------------------------------------------------------------------------------------------------------------
 ABC %>%
   data_grid(condition) %>%
-  augment(m_ABC, newdata = .) %>%
+  augment(m_ABC, newdata = ., se_fit = TRUE) %>%
   ggplot(aes(y = condition)) +
   stat_dist_ccdfinterval(
     aes(dist = "student_t", arg1 = df.residual(m_ABC), arg2 = .fitted, arg3 = .se.fit)
@@ -94,7 +94,7 @@ ABC %>%
 ## ---------------------------------------------------------------------------------------------------------------------
 ABC %>%
   data_grid(condition) %>%
-  augment(m_ABC, newdata = .) %>%
+  augment(m_ABC, newdata = ., se_fit = TRUE) %>%
   ggplot(aes(y = condition)) +
   stat_dist_dots(
     quantiles = 100,
@@ -108,7 +108,7 @@ m_mpg = lm(mpg ~ hp * cyl, data = mtcars)
 mtcars %>%
   group_by(cyl) %>%
   data_grid(hp = seq_range(hp, n = 101)) %>%
-  augment(m_mpg, newdata = .) %>%
+  augment(m_mpg, newdata = ., se_fit = TRUE) %>%
   ggplot(aes(x = hp, fill = ordered(cyl), color = ordered(cyl))) +
   stat_dist_lineribbon(
     aes(dist = "student_t", arg1 = df.residual(m_mpg), arg2 = .fitted, arg3 = .se.fit), 

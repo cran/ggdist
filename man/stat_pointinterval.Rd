@@ -107,7 +107,7 @@ the default plot specification, e.g. \code{\link[ggplot2:borders]{borders()}}.}
 \item{fun.args}{Deprecated. Use \code{interval_args} instead.}
 }
 \value{
-A \link[ggplot2:Stat]{ggplot2::Stat} representing a point+multiple uncertainty interval geometry which can
+A \link[ggplot2:ggplot2-ggproto]{ggplot2::Stat} representing a point+multiple uncertainty interval geometry which can
 be added to a \code{\link[=ggplot]{ggplot()}} object.
 }
 \description{
@@ -131,6 +131,8 @@ These stats support the following aesthetics:
 }
 In addition, in their default configuration (paired with \code{\link[=geom_pointinterval]{geom_pointinterval()}}) the following aesthetics are supported by the underlying geom:
 \itemize{
+\item \code{x}
+\item \code{y}
 \item \code{datatype}
 \item \code{alpha}
 \item \code{colour}
@@ -152,10 +154,8 @@ In addition, in their default configuration (paired with \code{\link[=geom_point
 \item \code{slab_fill}
 \item \code{slab_alpha}
 \item \code{slab_linetype}
-\item \code{y}
 \item \code{ymin}
 \item \code{ymax}
-\item \code{x}
 \item \code{xmin}
 \item \code{xmax}
 \item \code{width}
@@ -176,11 +176,11 @@ library(ggplot2)
 data(RankCorr_u_tau, package = "ggdist")
 
 RankCorr_u_tau \%>\%
-  ggplot(aes(y = i, x = u_tau)) +
+  ggplot(aes(y = factor(i), x = u_tau)) +
   stat_pointinterval(.width = c(.66, .95))
 
 RankCorr_u_tau \%>\%
-  ggplot(aes(x = i, y = u_tau)) +
+  ggplot(aes(x = factor(i), y = u_tau)) +
   stat_pointinterval(.width = c(.66, .95))
 
 }

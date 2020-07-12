@@ -199,7 +199,7 @@ depending on the value of \code{orientation}. See the \code{\link[=point_interva
 more information.}
 }
 \value{
-A \link[ggplot2:Geom]{ggplot2::Geom} or \link[ggplot2:Stat]{ggplot2::Stat} representing a dotplot or combined dotplot+interval geometry which can
+A \link[ggplot2:ggplot2-ggproto]{ggplot2::Geom} or \link[ggplot2:ggplot2-ggproto]{ggplot2::Stat} representing a dotplot or combined dotplot+interval geometry which can
 be added to a \code{\link[=ggplot]{ggplot()}} object.
 }
 \description{
@@ -242,6 +242,8 @@ These stats support the following aesthetics:
 }
 In addition, in their default configuration (paired with \code{\link[=geom_dotsinterval]{geom_dotsinterval()}}) the following aesthetics are supported by the underlying geom:
 \itemize{
+\item \code{x}
+\item \code{y}
 \item \code{slab_shape}
 \item \code{datatype}
 \item \code{alpha}
@@ -264,10 +266,8 @@ In addition, in their default configuration (paired with \code{\link[=geom_dotsi
 \item \code{slab_fill}
 \item \code{slab_alpha}
 \item \code{slab_linetype}
-\item \code{y}
 \item \code{ymin}
 \item \code{ymax}
-\item \code{x}
 \item \code{xmin}
 \item \code{xmax}
 \item \code{width}
@@ -301,14 +301,14 @@ RankCorr_u_tau \%>\%
 # stat_dots can summarize quantiles, creating quantile dotplots
 
 RankCorr_u_tau \%>\%
-  ggplot(aes(x = u_tau, y = i)) +
+  ggplot(aes(x = u_tau, y = factor(i))) +
   stat_dots(quantiles = 100)
 
 # color and fill aesthetics can be mapped within the geom
 # dotsinterval adds an interval
 
 RankCorr_u_tau \%>\%
-  ggplot(aes(x = u_tau, y = i, fill = stat(x > 6))) +
+  ggplot(aes(x = u_tau, y = factor(i), fill = stat(x > 6))) +
   stat_dotsinterval(quantiles = 100)
 
 }

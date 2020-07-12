@@ -4,6 +4,7 @@
 ###############################################################################
 
 library(dplyr)
+library(distributional)
 
 context("stat_dist_")
 
@@ -175,6 +176,59 @@ test_that("orientation detection works properly on stat_dist", {
 
   vdiffr::expect_doppelganger("stat_dist with main axis of x",
     ggplot(data.frame(), aes(x = "a", dist = "norm")) + stat_dist_slabinterval(n = 10)
+  )
+
+})
+
+test_that("auto-grouping works on stat_dist", {
+  skip_if_not_installed("vdiffr")
+  skip_if_not_installed("svglite")
+
+  p = data.frame(
+    dist = c("norm", "norm"),
+    x = c(1,2)
+  ) %>% ggplot(aes(dist = dist, arg1 = x, y = 0))
+
+  vdiffr::expect_doppelganger("stat_dist with no grouping",
+    p + stat_dist_slab(alpha = 0.5, n = 10)
+  )
+
+})
+
+test_that("pdf and cdf aesthetics work", {
+  skip_if_not_installed("vdiffr")
+  skip_if_not_installed("svglite")
+
+  p = tribble(
+    ~dist, ~args,
+    "norm", list(0, 1),
+    "t", list(3)
+  ) %>%
+    ggplot(aes(dist = dist, args = args, fill = dist, thickness = stat(pdf), slab_alpha = stat(cdf))) +
+    scale_slab_alpha_continuous(range = c(0,1))
+
+  vdiffr::expect_doppelganger("pdf and cdf on a slabinterval",
+    p + stat_dist_slabinterval(aes(x = dist), n = 20, p_limits = c(0.01, 0.99))
+  )
+})
+
+test_that("distributional objects work", {
+  skip_if_not_installed("vdiffr")
+  skip_if_not_installed("svglite")
+
+  p = tribble(
+    ~name, ~dist,
+    "norm", dist_normal(0, 1.5),
+    "t", dist_student_t(3)
+  ) %>%
+    ggplot(aes(x = name, dist = dist))
+
+  vdiffr::expect_doppelganger("distributional objects in stat_dist_halfeye",
+    p + stat_dist_halfeye(n = 20)
+  )
+
+  vdiffr::expect_doppelganger("distributional objects in stat_dist_ccdfinterval",
+    p + stat_dist_ccdfinterval(n = 20)
   )
 
 })

@@ -12,10 +12,26 @@
 
 <meta name="author" content="Matthew Kay" />
 
-<meta name="date" content="2020-06-10" />
+<meta name="date" content="2020-07-11" />
 
 <title>Frequentist uncertainty visualization</title>
 
+<script>// Hide empty <a> tag within highlighted CodeBlock for screen reader accessibility (see https://github.com/jgm/pandoc/issues/6352#issuecomment-626106786) -->
+// v0.0.1
+// Written by JooYoung Seo (jooyoung@psu.edu) and Atsushi Yasumoto on June 1st, 2020.
+
+document.addEventListener('DOMContentLoaded', function() {
+  const codeList = document.getElementsByClassName("sourceCode");
+  for (var i = 0; i < codeList.length; i++) {
+    var linkList = codeList[i].getElementsByTagName('a');
+    for (var j = 0; j < linkList.length; j++) {
+      if (linkList[j].innerHTML === "") {
+        linkList[j].setAttribute('aria-hidden', 'true');
+      }
+    }
+  }
+});
+</script>
 
 
 <style type="text/css">code{white-space: pre;}</style>
@@ -303,7 +319,7 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 <h1 class="title toc-ignore">Frequentist uncertainty visualization</h1>
 <h4 class="author">Matthew Kay</h4>
-<h4 class="date">2020-06-10</h4>
+<h4 class="date">2020-07-11</h4>
 
 
 <div id="TOC">
@@ -461,12 +477,12 @@ img {
 <ul>
 <li><span class="math inline">\(\nu\)</span>: <em>degrees of freedom</em>, equal to <code>df.residual(m_ABC)</code></li>
 <li><span class="math inline">\(\hat\mu_c\)</span>: <em>location</em>, equal to the point estimate of the mean in condition <span class="math inline">\(c\)</span> (<code>.fitted</code> column from <code>broom::augment()</code>)</li>
-<li><span class="math inline">\(\sigma_{\hat\mu_c}\)</span>: <em>scale</em>, equal to the standard error of the mean in condition <span class="math inline">\(c\)</span> (<code>.se.fit</code> column from <code>broom::augment()</code>)</li>
+<li><span class="math inline">\(\sigma_{\hat\mu_c}\)</span>: <em>scale</em>, equal to the standard error of the mean in condition <span class="math inline">\(c\)</span> (<code>.se.fit</code> column from <code>broom::augment(..., se_fit = TRUE)</code>)</li>
 </ul>
 <p>Putting everything together, we have:</p>
 <div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1"></a>ABC <span class="op">%&gt;%</span></span>
 <span id="cb9-2"><a href="#cb9-2"></a><span class="st">  </span><span class="kw">data_grid</span>(condition) <span class="op">%&gt;%</span></span>
-<span id="cb9-3"><a href="#cb9-3"></a><span class="st">  </span><span class="kw">augment</span>(m_ABC, <span class="dt">newdata =</span> .) <span class="op">%&gt;%</span></span>
+<span id="cb9-3"><a href="#cb9-3"></a><span class="st">  </span><span class="kw">augment</span>(m_ABC, <span class="dt">newdata =</span> ., <span class="dt">se_fit =</span> <span class="ot">TRUE</span>) <span class="op">%&gt;%</span></span>
 <span id="cb9-4"><a href="#cb9-4"></a><span class="st">  </span><span class="kw">ggplot</span>(<span class="kw">aes</span>(<span class="dt">y =</span> condition)) <span class="op">+</span></span>
 <span id="cb9-5"><a href="#cb9-5"></a><span class="st">  </span><span class="kw">stat_dist_halfeye</span>(</span>
 <span id="cb9-6"><a href="#cb9-6"></a>    <span class="kw">aes</span>(<span class="dt">dist =</span> <span class="st">&quot;student_t&quot;</span>, <span class="dt">arg1 =</span> <span class="kw">df.residual</span>(m_ABC), <span class="dt">arg2 =</span> .fitted, <span class="dt">arg3 =</span> .se.fit), </span>
@@ -479,7 +495,7 @@ img {
 <p>Of course, this works with the entire <code>stat_dist_...</code> family. Here are gradient plots instead:</p>
 <div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1"></a>ABC <span class="op">%&gt;%</span></span>
 <span id="cb10-2"><a href="#cb10-2"></a><span class="st">  </span><span class="kw">data_grid</span>(condition) <span class="op">%&gt;%</span></span>
-<span id="cb10-3"><a href="#cb10-3"></a><span class="st">  </span><span class="kw">augment</span>(m_ABC, <span class="dt">newdata =</span> .) <span class="op">%&gt;%</span></span>
+<span id="cb10-3"><a href="#cb10-3"></a><span class="st">  </span><span class="kw">augment</span>(m_ABC, <span class="dt">newdata =</span> ., <span class="dt">se_fit =</span> <span class="ot">TRUE</span>) <span class="op">%&gt;%</span></span>
 <span id="cb10-4"><a href="#cb10-4"></a><span class="st">  </span><span class="kw">ggplot</span>(<span class="kw">aes</span>(<span class="dt">y =</span> condition)) <span class="op">+</span></span>
 <span id="cb10-5"><a href="#cb10-5"></a><span class="st">  </span><span class="kw">stat_dist_gradientinterval</span>(</span>
 <span id="cb10-6"><a href="#cb10-6"></a>    <span class="kw">aes</span>(<span class="dt">dist =</span> <span class="st">&quot;student_t&quot;</span>, <span class="dt">arg1 =</span> <span class="kw">df.residual</span>(m_ABC), <span class="dt">arg2 =</span> .fitted, <span class="dt">arg3 =</span> .se.fit), </span>
@@ -489,7 +505,7 @@ img {
 <p>Or complementary cumulative distribution function (CCDF) bar plots:</p>
 <div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1"></a>ABC <span class="op">%&gt;%</span></span>
 <span id="cb11-2"><a href="#cb11-2"></a><span class="st">  </span><span class="kw">data_grid</span>(condition) <span class="op">%&gt;%</span></span>
-<span id="cb11-3"><a href="#cb11-3"></a><span class="st">  </span><span class="kw">augment</span>(m_ABC, <span class="dt">newdata =</span> .) <span class="op">%&gt;%</span></span>
+<span id="cb11-3"><a href="#cb11-3"></a><span class="st">  </span><span class="kw">augment</span>(m_ABC, <span class="dt">newdata =</span> ., <span class="dt">se_fit =</span> <span class="ot">TRUE</span>) <span class="op">%&gt;%</span></span>
 <span id="cb11-4"><a href="#cb11-4"></a><span class="st">  </span><span class="kw">ggplot</span>(<span class="kw">aes</span>(<span class="dt">y =</span> condition)) <span class="op">+</span></span>
 <span id="cb11-5"><a href="#cb11-5"></a><span class="st">  </span><span class="kw">stat_dist_ccdfinterval</span>(</span>
 <span id="cb11-6"><a href="#cb11-6"></a>    <span class="kw">aes</span>(<span class="dt">dist =</span> <span class="st">&quot;student_t&quot;</span>, <span class="dt">arg1 =</span> <span class="kw">df.residual</span>(m_ABC), <span class="dt">arg2 =</span> .fitted, <span class="dt">arg3 =</span> .se.fit)</span>
@@ -498,7 +514,7 @@ img {
 <p>We can also create quantile dotplots by using the <code>dots</code> family of geoms. Quantile dotplots show quantiles from a distribution (in this case, the sampling distribution), employing a <em>frequency framing</em> approach to uncertainty communication that can be easier for people to interpret (<a href="https://doi.org/10.1145/2858036.2858558">Kay et al. 2016</a>, <a href="https://doi.org/10.1145/3173574.3173718">Fernandes et al. 2018</a>):</p>
 <div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1"></a>ABC <span class="op">%&gt;%</span></span>
 <span id="cb12-2"><a href="#cb12-2"></a><span class="st">  </span><span class="kw">data_grid</span>(condition) <span class="op">%&gt;%</span></span>
-<span id="cb12-3"><a href="#cb12-3"></a><span class="st">  </span><span class="kw">augment</span>(m_ABC, <span class="dt">newdata =</span> .) <span class="op">%&gt;%</span></span>
+<span id="cb12-3"><a href="#cb12-3"></a><span class="st">  </span><span class="kw">augment</span>(m_ABC, <span class="dt">newdata =</span> ., <span class="dt">se_fit =</span> <span class="ot">TRUE</span>) <span class="op">%&gt;%</span></span>
 <span id="cb12-4"><a href="#cb12-4"></a><span class="st">  </span><span class="kw">ggplot</span>(<span class="kw">aes</span>(<span class="dt">y =</span> condition)) <span class="op">+</span></span>
 <span id="cb12-5"><a href="#cb12-5"></a><span class="st">  </span><span class="kw">stat_dist_dots</span>(</span>
 <span id="cb12-6"><a href="#cb12-6"></a>    <span class="dt">quantiles =</span> <span class="dv">100</span>,</span>
@@ -515,7 +531,7 @@ img {
 <div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1"></a>mtcars <span class="op">%&gt;%</span></span>
 <span id="cb14-2"><a href="#cb14-2"></a><span class="st">  </span><span class="kw">group_by</span>(cyl) <span class="op">%&gt;%</span></span>
 <span id="cb14-3"><a href="#cb14-3"></a><span class="st">  </span><span class="kw">data_grid</span>(<span class="dt">hp =</span> <span class="kw">seq_range</span>(hp, <span class="dt">n =</span> <span class="dv">101</span>)) <span class="op">%&gt;%</span></span>
-<span id="cb14-4"><a href="#cb14-4"></a><span class="st">  </span><span class="kw">augment</span>(m_mpg, <span class="dt">newdata =</span> .) <span class="op">%&gt;%</span></span>
+<span id="cb14-4"><a href="#cb14-4"></a><span class="st">  </span><span class="kw">augment</span>(m_mpg, <span class="dt">newdata =</span> ., <span class="dt">se_fit =</span> <span class="ot">TRUE</span>) <span class="op">%&gt;%</span></span>
 <span id="cb14-5"><a href="#cb14-5"></a><span class="st">  </span><span class="kw">ggplot</span>(<span class="kw">aes</span>(<span class="dt">x =</span> hp, <span class="dt">fill =</span> <span class="kw">ordered</span>(cyl), <span class="dt">color =</span> <span class="kw">ordered</span>(cyl))) <span class="op">+</span></span>
 <span id="cb14-6"><a href="#cb14-6"></a><span class="st">  </span><span class="kw">stat_dist_lineribbon</span>(</span>
 <span id="cb14-7"><a href="#cb14-7"></a>    <span class="kw">aes</span>(<span class="dt">dist =</span> <span class="st">&quot;student_t&quot;</span>, <span class="dt">arg1 =</span> <span class="kw">df.residual</span>(m_mpg), <span class="dt">arg2 =</span> .fitted, <span class="dt">arg3 =</span> .se.fit), </span>

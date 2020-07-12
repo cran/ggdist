@@ -192,14 +192,15 @@ of the slab at each x / y value of the slab (depending on \code{orientation}).}
 \item{show_point}{Should the point portion of the geom be drawn? Default \code{TRUE}.}
 }
 \value{
-A \link[ggplot2:Stat]{ggplot2::Stat} representing a slab or combined slab+interval geometry which can
+A \link[ggplot2:ggplot2-ggproto]{ggplot2::Stat} representing a slab or combined slab+interval geometry which can
 be added to a \code{\link[=ggplot]{ggplot()}} object.
 }
 \description{
 Stats for computing distribution functions (densities or CDFs) + intervals for use with
-\code{\link[=geom_slabinterval]{geom_slabinterval()}}. Uses \code{dist} aesthetic to specify a distribution name
-and \code{arg1}, ... \code{arg9} aesthetics (or \code{args} as a list column) to specify distribution
-arguments.
+\code{\link[=geom_slabinterval]{geom_slabinterval()}}. Uses the \code{dist} aesthetic to specify a distribution using
+objects from the \href{https://pkg.mitchelloharawild.com/distributional/}{distributional} package,
+or using distribution names and \code{arg1}, ... \code{arg9} aesthetics (or \code{args} as a list column)
+to specify distribution arguments. See \emph{Details}.
 }
 \details{
 A highly configurable stat for generating a variety of plots that combine a "slab"
@@ -222,17 +223,26 @@ Stats include:
 \item \code{stat_dist_interval}: Interval plots
 }
 
-These stats expect a \code{dist} aesthetic to specify a distribution name
-and \code{arg1}, ... \code{arg9} aesthetics (or \code{args} as a list column) to specify distribution
-arguments. Distribution names should correspond to R functions that have \code{"p"}, \code{"q"}, and
-\code{"d"} functions; e.g. \code{"norm"} is a valid distribution name because R defines the
-\code{\link[=pnorm]{pnorm()}}, \code{\link[=qnorm]{qnorm()}}, and \code{\link[=dnorm]{dnorm()}} functions for Normal distributions.
+These stats expect a \code{dist} aesthetic to specify a distribution. This aesthetic
+can be used in one of two ways:
+\itemize{
+\item \code{dist} can be any distribution object from the \href{https://pkg.mitchelloharawild.com/distributional/}{distributional}
+package, such as \code{\link[=dist_normal]{dist_normal()}}, \code{\link[=dist_beta]{dist_beta()}}, etc. Since these functions are vectorized,
+other columns can be passed directly to them in an \code{\link[=aes]{aes()}} specification; e.g.
+\code{aes(dist = dist_normal(mu, sigma))} will work if \code{mu} and \code{sigma} are columns in the
+input data frame.
+\item \code{dist} can be a character vector giving the distribution name. Then the  \code{arg1}, ... \code{arg9}
+aesthetics (or \code{args} as a list column) specify distribution arguments. Distribution names
+should correspond to R functions that have \code{"p"}, \code{"q"}, and \code{"d"} functions; e.g. \code{"norm"}
+is a valid distribution name because R defines the \code{\link[=pnorm]{pnorm()}}, \code{\link[=qnorm]{qnorm()}}, and \code{\link[=dnorm]{dnorm()}}
+functions for Normal distributions.
 
 See the \code{\link[=parse_dist]{parse_dist()}} function for a useful way to generate \code{dist} and \code{args}
 values from human-readable distribution specs (like \code{"normal(0,1)"}). Such specs are also
 produced by other packages (like the \code{brms::get_prior} function in brms); thus,
 \code{\link[=parse_dist]{parse_dist()}} combined with the stats described here can help you visualize the output
 of those functions.
+}
 }
 \section{Aesthetics}{
 
@@ -258,6 +268,8 @@ These stats support the following aesthetics:
 }
 In addition, in their default configuration (paired with \code{\link[=geom_slabinterval]{geom_slabinterval()}}) the following aesthetics are supported by the underlying geom:
 \itemize{
+\item \code{x}
+\item \code{y}
 \item \code{datatype}
 \item \code{alpha}
 \item \code{colour}
@@ -279,10 +291,8 @@ In addition, in their default configuration (paired with \code{\link[=geom_slabi
 \item \code{slab_fill}
 \item \code{slab_alpha}
 \item \code{slab_linetype}
-\item \code{y}
 \item \code{ymin}
 \item \code{ymax}
-\item \code{x}
 \item \code{xmin}
 \item \code{xmax}
 \item \code{width}
@@ -302,7 +312,10 @@ Learn more about basic ggplot aesthetics in \code{vignette("ggplot2-specs")}.
 For intervals, the point summary from the interval function. Whether it is \code{x} or \code{y} depends on \code{orientation}
 \item \code{xmin} or \code{ymin}: For intervals, the lower end of the interval from the interval function.
 \item \code{xmax} or \code{ymax}: For intervals, the upper end of the interval from the interval function.
-\item \code{f}: For slabs, the output values from the slab function.
+\item \code{f}: For slabs, the output values from the slab function (such as the PDF, CDF, or CCDF),
+determined by \code{slab_type}.
+\item \code{pdf}: For slabs, the probability density function.
+\item \code{cdf}: For slabs, the cumulative distribution function.
 }
 }
 
@@ -310,16 +323,26 @@ For intervals, the point summary from the interval function. Whether it is \code
 
 library(dplyr)
 library(ggplot2)
+library(distributional)
 
-tribble(
+dist_df = tribble(
   ~group, ~subgroup, ~mean, ~sd,
   "a",          "h",     5,   1,
   "b",          "h",     7,   1.5,
   "c",          "h",     8,   1,
   "c",          "i",     9,   1,
   "c",          "j",     7,   1
-) \%>\%
+)
+
+dist_df \%>\%
   ggplot(aes(x = group, dist = "norm", arg1 = mean, arg2 = sd, fill = subgroup)) +
+  stat_dist_eye(position = "dodge")
+
+# Using functions from the distributional package (like dist_normal()) with the
+# dist aesthetic can lead to more compact/expressive specifications
+
+dist_df \%>\%
+  ggplot(aes(x = group, dist = dist_normal(mean, sd), fill = subgroup)) +
   stat_dist_eye(position = "dodge")
 
 # the stat_dist_... family applies a Jacobian adjustment to densities

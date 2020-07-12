@@ -20,15 +20,14 @@ args_from_aes = function(args = list(), ...) {
   c(args_from_dots, args)
 }
 
-#' @importFrom purrr pmap_dfr
 dist_limits_function = function(df, p_limits = c(.001, .999), ...) {
-  pmap_dfr(df, function(dist, ...) {
-    if (is.na(dist)) {
+  pmap_dfr_(df, function(dist, ...) {
+    if (is.null(dist) || any(is.na(dist))) {
       return(data.frame(.lower = NA, .upper = NA))
     }
 
     args = args_from_aes(...)
-    quantile_fun = match.fun(paste0("q", dist))
+    quantile_fun = dist_quantile_fun(dist)
     limits = do.call(quantile_fun, c(list(quote(p_limits)), args))
 
     data.frame(
@@ -54,50 +53,53 @@ transform_pdf = function(f_X, y, trans, g_inverse_at_y = trans$inverse(y), ...) 
   f_X(g_inverse_at_y, ...) * abs(g_inverse_deriv_at_y)
 }
 
-#' @importFrom purrr pmap_dfr
 dist_slab_function = function(
   df, input, slab_type = "pdf", limits = NULL, n = 501, trans = scales::identity_trans(), ...
 ) {
-  pmap_dfr(df, function(dist, ...) {
-    if (is.na(dist)) {
+  pmap_dfr_(df, function(dist, ...) {
+    if (is.null(dist) || any(is.na(dist))) {
       return(data.frame(.input = NA, .value = NA))
     }
 
     args = args_from_aes(...)
-    dist_fun = switch(slab_type,
-      pdf = {
-        pdf = match.fun(paste0("d", dist))
-        if (trans$name == "identity") {
-          pdf
-        } else {
-          # must transform the density according to the scale transformation
-          function(x, ...) transform_pdf(pdf, trans$transform(x), trans, g_inverse_at_y = x, ...)
-        }
-      },
-      cdf = match.fun(paste0("p", dist)),
-      ccdf = {
-        cdf = match.fun(paste0("p", dist));
-        function (...) 1 - cdf(...)
-      }
+
+    #get pdf and cdf functions
+    pdf_fun = if (trans$name == "identity") {
+      dist_pdf(dist)
+    } else {
+      # must transform the density according to the scale transformation
+      function(x, ...) transform_pdf(dist_pdf(dist), trans$transform(x), trans, g_inverse_at_y = x, ...)
+    }
+    cdf_fun = dist_cdf(dist)
+
+    # calculate pdf and cdf
+    pdf = do.call(pdf_fun, c(list(quote(input)), args))
+    cdf = do.call(cdf_fun, c(list(quote(input)), args))
+
+    value = switch(slab_type,
+      pdf = pdf,
+      cdf = cdf,
+      ccdf = 1 - cdf
     )
-    quantile_fun = match.fun(paste0("q", dist))
 
     data.frame(
       .input = input,
-      .value = do.call(dist_fun, c(list(quote(input)), args))
+      .value = value,
+      pdf = pdf,
+      cdf = cdf
     )
   })
 }
 
-#' @importFrom purrr pmap_dfr
+#' @importFrom purrr map_dfr
 dist_interval_function = function(df, .width, trans, ...) {
-  pmap_dfr(df, function(dist, ...) {
-    if (is.na(dist)) {
+  pmap_dfr_(df, function(dist, ...) {
+    if (is.null(dist) || any(is.na(dist))) {
       return(data.frame(.value = NA, .lower = NA, .upper = NA, .width = .width))
     }
 
     args = args_from_aes(...)
-    quantile_fun = match.fun(paste0("q", dist))
+    quantile_fun = dist_quantile_fun(dist)
 
     intervals = map_dfr(.width, function(w) {
       quantile_args = c(list(c(0.5, (1 - w)/2, (1 + w)/2)), args)
@@ -113,14 +115,30 @@ dist_interval_function = function(df, .width, trans, ...) {
 }
 
 
+dist_function = function(dist, prefix, fun) UseMethod("dist_function")
+dist_function.default = function(dist, prefix, fun) {
+  stop("stat_dist_slabinterval does not support objects of type ", deparse0(class(dist)))
+}
+dist_function.character = function(dist, prefix, fun) match.fun(paste0(prefix, dist))
+dist_function.distribution = function(dist, prefix, fun) function(...) fun(dist, ...)
+dist_function.dist_default = dist_function.distribution
+dist_function.rvar = dist_function.distribution
+
+dist_pdf = function(dist) dist_function(dist, "d", density)
+#' @importFrom distributional cdf
+dist_cdf = function(dist) dist_function(dist, "p", cdf)
+dist_quantile_fun = function(dist) dist_function(dist, "q", quantile)
+
+
 # stat_dist_slabinterval --------------------------------------------------
 
 #' Distribution + interval plots (eye plots, half-eye plots, CCDF barplots, etc) for analytical distributions (ggplot stat)
 #'
 #' Stats for computing distribution functions (densities or CDFs) + intervals for use with
-#' [geom_slabinterval()]. Uses `dist` aesthetic to specify a distribution name
-#' and `arg1`, ... `arg9` aesthetics (or `args` as a list column) to specify distribution
-#' arguments.
+#' [geom_slabinterval()]. Uses the `dist` aesthetic to specify a distribution using
+#' objects from the [distributional](https://pkg.mitchelloharawild.com/distributional/) package,
+#' or using distribution names and `arg1`, ... `arg9` aesthetics (or `args` as a list column)
+#' to specify distribution arguments. See *Details*.
 #'
 #' A highly configurable stat for generating a variety of plots that combine a "slab"
 #' that describes a distribution plus an interval. Several "shortcut" stats are provided
@@ -142,17 +160,26 @@ dist_interval_function = function(df, .width, trans, ...) {
 #'   \item `stat_dist_interval`: Interval plots
 #' }
 #'
-#' These stats expect a `dist` aesthetic to specify a distribution name
-#' and `arg1`, ... `arg9` aesthetics (or `args` as a list column) to specify distribution
-#' arguments. Distribution names should correspond to R functions that have `"p"`, `"q"`, and
-#' `"d"` functions; e.g. `"norm"` is a valid distribution name because R defines the
-#' [pnorm()], [qnorm()], and [dnorm()] functions for Normal distributions.
+#' These stats expect a `dist` aesthetic to specify a distribution. This aesthetic
+#' can be used in one of two ways:
 #'
-#' See the [parse_dist()] function for a useful way to generate `dist` and `args`
-#' values from human-readable distribution specs (like `"normal(0,1)"`). Such specs are also
-#' produced by other packages (like the `brms::get_prior` function in brms); thus,
-#' [parse_dist()] combined with the stats described here can help you visualize the output
-#' of those functions.
+#'  - `dist` can be any distribution object from the [distributional](https://pkg.mitchelloharawild.com/distributional/)
+#'    package, such as [dist_normal()], [dist_beta()], etc. Since these functions are vectorized,
+#'    other columns can be passed directly to them in an [aes()] specification; e.g.
+#'    `aes(dist = dist_normal(mu, sigma))` will work if `mu` and `sigma` are columns in the
+#'    input data frame.
+#'
+#'  - `dist` can be a character vector giving the distribution name. Then the  `arg1`, ... `arg9`
+#'    aesthetics (or `args` as a list column) specify distribution arguments. Distribution names
+#'    should correspond to R functions that have `"p"`, `"q"`, and `"d"` functions; e.g. `"norm"`
+#'    is a valid distribution name because R defines the [pnorm()], [qnorm()], and [dnorm()]
+#'    functions for Normal distributions.
+#'
+#'    See the [parse_dist()] function for a useful way to generate `dist` and `args`
+#'    values from human-readable distribution specs (like `"normal(0,1)"`). Such specs are also
+#'    produced by other packages (like the `brms::get_prior` function in brms); thus,
+#'    [parse_dist()] combined with the stats described here can help you visualize the output
+#'    of those functions.
 #'
 #' @eval rd_slabinterval_aesthetics(stat = StatDistSlabinterval)
 #' @section Computed Variables:
@@ -161,7 +188,10 @@ dist_interval_function = function(df, .width, trans, ...) {
 #'     For intervals, the point summary from the interval function. Whether it is `x` or `y` depends on `orientation`
 #'   \item `xmin` or `ymin`: For intervals, the lower end of the interval from the interval function.
 #'   \item `xmax` or `ymax`: For intervals, the upper end of the interval from the interval function.
-#'   \item `f`: For slabs, the output values from the slab function.
+#'   \item `f`: For slabs, the output values from the slab function (such as the PDF, CDF, or CCDF),
+#'     determined by `slab_type`.
+#'   \item `pdf`: For slabs, the probability density function.
+#'   \item `cdf`: For slabs, the cumulative distribution function.
 #' }
 #'
 #' @inheritParams stat_slabinterval
@@ -189,16 +219,26 @@ dist_interval_function = function(df, .width, trans, ...) {
 #'
 #' library(dplyr)
 #' library(ggplot2)
+#' library(distributional)
 #'
-#' tribble(
+#' dist_df = tribble(
 #'   ~group, ~subgroup, ~mean, ~sd,
 #'   "a",          "h",     5,   1,
 #'   "b",          "h",     7,   1.5,
 #'   "c",          "h",     8,   1,
 #'   "c",          "i",     9,   1,
 #'   "c",          "j",     7,   1
-#' ) %>%
+#' )
+#'
+#' dist_df %>%
 #'   ggplot(aes(x = group, dist = "norm", arg1 = mean, arg2 = sd, fill = subgroup)) +
+#'   stat_dist_eye(position = "dodge")
+#'
+#' # Using functions from the distributional package (like dist_normal()) with the
+#' # dist aesthetic can lead to more compact/expressive specifications
+#'
+#' dist_df %>%
+#'   ggplot(aes(x = group, dist = dist_normal(mean, sd), fill = subgroup)) +
 #'   stat_dist_eye(position = "dodge")
 #'
 #' # the stat_dist_... family applies a Jacobian adjustment to densities
@@ -280,7 +320,6 @@ stat_dist_slabinterval = function(
 #' @format NULL
 #' @usage NULL
 #' @export
-#' @importFrom plyr defaults
 StatDistSlabinterval = ggproto("StatDistSlabinterval", StatSlabinterval,
   default_aes = defaults(aes(
     dist = NULL,
@@ -345,15 +384,18 @@ StatDistSlabinterval = ggproto("StatDistSlabinterval", StatSlabinterval,
     data = ggproto_parent(StatSlabinterval, self)$setup_data(data, params)
 
     # ignore unknown distributions (with a warning)
-    data$dist = check_dist_name(data$dist)
+    if (is.character(data$dist) || is.factor(data$dist)) {
+      data$dist = check_dist_name(data$dist)
+    }
 
     if (self$group_by_dist) {
-      # need to treat dist *and* args as grouping variables (else things will break)
-      group_cols = intersect(c("dist", "args", paste0("arg", 1:9), "group"), names(data))
-      # need to do as.character() here because list columns (as in args) won't work
-      # with interaction()
-      group_data = lapply(data[,group_cols], as.character)
-      data$group = as.numeric(interaction(group_data))
+      # Need to group by rows in the data frame to draw correctly, as
+      # each output slab will need to be in its own group.
+      # First check if we are grouped by rows already (in which case leave it)
+      if (length(unique(data$group)) != nrow(data)) {
+        # need to make new groups
+        data$group = seq_len(nrow(data))
+      }
     }
 
     data

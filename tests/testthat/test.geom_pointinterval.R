@@ -29,13 +29,13 @@ test_that("horizontal grouped pointintervals work", {
 
   vdiffr::expect_doppelganger("grouped pointintervals (h, stat)",
     RankCorr_u_tau %>%
-      ggplot(aes(y = i, x = u_tau)) +
+      ggplot(aes(y = factor(i), x = u_tau)) +
       stat_pointinterval(.width = c(.66, .95))
   )
 
   vdiffr::expect_doppelganger("grouped pointintervals (h, stat, mode_hdi)",
     RankCorr_u_tau %>%
-      ggplot(aes(y = i, x = u_tau)) +
+      ggplot(aes(y = factor(i), x = u_tau)) +
       stat_pointinterval(.width = c(.66, .95), point_interval = mode_hdi)
   )
 
@@ -46,11 +46,11 @@ test_that("horizontal grouped pointintervals work", {
 
   vdiffr::expect_doppelganger("grouped pointintervals (h, reverse order)", reverse_plot)
 
-  stat_reverse_plot = RankCorr_u_tau %>%
-    ggplot(aes(y = i, x = u_tau)) +
-    stat_pointinterval(.width = c(.66, .95))
-
-  vdiffr::expect_doppelganger("grouped pointintervals (h, stat, reverse order)", stat_reverse_plot)
+  vdiffr::expect_doppelganger("grouped pointintervals (h, stat, reverse order)",
+    RankCorr_u_tau %>%
+      ggplot(aes(y = factor(i), x = u_tau)) +
+      stat_pointinterval(.width = c(.66, .95))
+  )
 })
 
 test_that("grouped pointintervals work", {
@@ -104,6 +104,27 @@ test_that("orientation detection on pointintervals works", {
 
   vdiffr::expect_doppelganger("horizontal pointinterval orientation detection, dodge",
     p + geom_pointinterval(aes(color = g, x = v, xmin = l, xmax = u), orientation = NA, position = "dodge")
+  )
+
+})
+
+test_that("missing data is handled correctly", {
+  skip_if_not_installed("vdiffr")
+  skip_if_not_installed("svglite")
+
+  p = data.frame(
+    x = c(1,NA,1),
+    xmin = c(NA,0,0),
+    xmax = c(NA,2,2),
+    y = c("a","b",NA)
+  ) %>% ggplot(aes(x=x,xmin=xmin,xmax=xmax, y=y))
+
+  expect_warning(vdiffr::expect_doppelganger("geom_pointinterval na.rm = FALSE",
+    p + geom_pointinterval(na.rm = FALSE)
+  ), "Removed 1 rows containing missing values")
+
+  vdiffr::expect_doppelganger("geom_pointinterval na.rm = TRUE",
+    p + geom_pointinterval(na.rm = TRUE)
   )
 
 })

@@ -16,6 +16,7 @@ if (capabilities("cairo") && Sys.info()[['sysname']] != "Darwin") {
 ## ----setup, message = FALSE, warning = FALSE----------------------------------
 library(dplyr)
 library(tidyr)
+library(distributional)
 library(ggdist)
 library(ggplot2)
 library(cowplot)
@@ -184,9 +185,15 @@ dist_df %>%
   stat_dist_eye(position = "dodge") +
   ggtitle("stat_dist_eye(position = 'dodge')")
 
+## ----dist_eye_dodge_distributional------------------------------------------------------------------------------------
+dist_df %>%
+  ggplot(aes(x = group, dist = dist_normal(mean, sd), fill = subgroup)) +
+  stat_dist_eye(position = "dodge") +
+  ggtitle("stat_dist_eye(position = 'dodge')")
+
 ## ----beta_stacked-----------------------------------------------------------------------------------------------------
 data.frame(alpha = seq(5, 100, length.out = 10)) %>%
-  ggplot(aes(y = alpha, dist = "beta", arg1 = alpha, arg2 = 10)) +
+  ggplot(aes(y = alpha, dist = dist_beta(alpha, 10))) +
   stat_dist_halfeye() +
   labs(
     title = "stat_dist_halfeye()",
@@ -195,7 +202,7 @@ data.frame(alpha = seq(5, 100, length.out = 10)) %>%
 
 ## ----beta_overplotted_slabh-------------------------------------------------------------------------------------------
 data.frame(alpha = seq(5, 100, length.out = 10)) %>%
-  ggplot(aes(y = "", dist = "beta", arg1 = alpha, arg2 = 10, color = alpha)) +
+  ggplot(aes(y = "", dist = dist_beta(alpha, 10), color = alpha)) +
   stat_dist_slab(fill = NA) +
   coord_cartesian(expand = FALSE) +
   scale_color_viridis_c() +
@@ -253,7 +260,8 @@ priors %>%
   )
 
 ## ----dist_halfeyeh_log_scale, fig.width = small_height, fig.height = small_height-------------------------------------
-data.frame(dist = "lnorm") %>% ggplot(aes(y = 0, dist = dist, arg1 = log(10), arg2 = 2*log(10))) +
+data.frame(dist = "lnorm") %>%
+  ggplot(aes(y = 0, dist = dist, arg1 = log(10), arg2 = 2*log(10))) +
   stat_dist_halfeye() +
   scale_x_log10(breaks = 10^seq(-5,7, by = 2))
 
@@ -335,7 +343,7 @@ plot_grid(ncol = 3, align = "hv",
 
 ## ----dist_ccdf_dodge--------------------------------------------------------------------------------------------------
 dist_df %>%
-  ggplot(aes(x = group, dist = "norm", arg1 = mean, arg2 = sd, fill = subgroup)) +
+  ggplot(aes(x = group, dist = dist_normal(mean, sd), fill = subgroup)) +
   stat_dist_ccdfinterval(position = "dodge") +
   expand_limits(y = 0) +
   ggtitle("stat_dist_ccdfinterval(position = 'dodge')") +
@@ -349,7 +357,7 @@ df %>%
 
 ## ----dist_gradient_dodge----------------------------------------------------------------------------------------------
 dist_df %>%
-  ggplot(aes(x = group, dist = "norm", arg1 = mean, arg2 = sd, fill = subgroup)) +
+  ggplot(aes(x = group, dist = dist_normal(mean, sd), fill = subgroup)) +
   stat_dist_gradientinterval(position = "dodge") +
   labs(title = "stat_dist_gradientinterval(position = 'dodge')")
 
@@ -373,7 +381,7 @@ df %>%
 
 ## ----dist_dots_shape_color, fig.width = med_width, fig.height = large_height------------------------------------------
 dist_df %>%
-  ggplot(aes(y = group, dist = "norm", arg1 = mean, arg2 = sd, fill = stat(x < 5), shape = subgroup)) +
+  ggplot(aes(y = group, dist = dist_normal(mean, sd), fill = stat(x < 5), shape = subgroup)) +
   stat_dist_dots(position = "dodge", color = NA) +
   labs(title = "stat_dist_dots(aes(fill = stat(y < 5), shape = subgroup))") +
   # we'll use these shapes since they retain outlines
@@ -381,7 +389,7 @@ dist_df %>%
 
 ## ----dist_dots_violin, fig.width = med_width, fig.height = small_height-----------------------------------------------
 dist_df %>%
-  ggplot(aes(x = group, dist = "norm", arg1 = mean, arg2 = sd, fill = subgroup)) +
+  ggplot(aes(x = group, dist = dist_normal(mean, sd), fill = subgroup)) +
   stat_dist_dotsinterval(position = "dodge", side = "both", slab_color = NA) +
   labs(title = "stat_dist_dotsinterval(side = 'both', slab_color = NA)") 
 
@@ -421,6 +429,18 @@ priors %>%
   ggtitle("stat_dist_eye(aes(slab_alpha = stat(f), fill = stat(x > 1)))") +
   # we'll use a nicer palette than the default for highlighting:
   scale_fill_manual(values = c("gray75", "skyblue"))
+
+## ----correll_gradient, fig.width = med_width, fig.height = small_height/2---------------------------------------------
+priors %>%
+  ggplot(aes(y = dist, dist = dist, args = args)) +
+  stat_dist_gradientinterval(aes(slab_alpha = stat(-pmax(abs(1 - 2*cdf), .95)))) +
+  scale_slab_alpha_continuous(guide = FALSE)
+
+## ----helske_gradient_eye, fig.width = med_width, fig.height = small_height--------------------------------------------
+priors %>%
+  ggplot(aes(y = dist, dist = dist, args = args)) +
+  stat_dist_eye(aes(slab_alpha = stat(-pmax(abs(1 - 2*cdf), .95)))) +
+  scale_slab_alpha_continuous(guide = FALSE)
 
 ## ----reset_options, include=FALSE---------------------------------------------
 options(.old_options)

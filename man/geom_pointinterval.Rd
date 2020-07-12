@@ -110,7 +110,7 @@ to match its common use cases. \code{FALSE} hides all legends, \code{TRUE} shows
 those that are mapped (the default for most geoms).}
 }
 \value{
-A \link[ggplot2:Geom]{ggplot2::Geom} representing a point+multiple uncertainty interval geometry which can
+A \link[ggplot2:ggplot2-ggproto]{ggplot2::Geom} representing a point+multiple uncertainty interval geometry which can
 be added to a \code{\link[=ggplot]{ggplot()}} object.
 }
 \description{
@@ -132,6 +132,8 @@ Specifically, \code{geom_pointinterval} acts as if its default aesthetics are
 
 These geoms support the following aesthetics:
 \itemize{
+\item \code{x}
+\item \code{y}
 \item \code{datatype}
 \item \code{alpha}
 \item \code{colour}
@@ -153,10 +155,8 @@ These geoms support the following aesthetics:
 \item \code{slab_fill}
 \item \code{slab_alpha}
 \item \code{slab_linetype}
-\item \code{y}
 \item \code{ymin}
 \item \code{ymax}
-\item \code{x}
 \item \code{xmin}
 \item \code{xmax}
 \item \code{width}

@@ -151,7 +151,7 @@ makeContent.dots_grob = function(x) {
       convertY(unit(h$point_size, "native"), "points", valueOnly = TRUE) - max(d$stroke) * .stroke/2,
       0.5
     )
-    dlply(d, "bins", function (bin_df) {
+    dlply_(d, "bins", function (bin_df) {
       bin_df[[x]] = bin_df$midpoint
 
       y_offset = seq(0, h$y_spacing * (nrow(bin_df) - 1), length.out = nrow(bin_df))
@@ -188,7 +188,7 @@ makeContent.dots_grob = function(x) {
 # panel drawing function -------------------------------------------------------
 
 draw_slabs_dots = function(self, s_data, panel_params, coord,
-  side, scale, orientation, justification, normalize,
+  side, scale, orientation, justification, normalize, na.rm,
   child_params
 ) {
   define_orientation_variables(orientation)
@@ -213,6 +213,9 @@ draw_slabs_dots = function(self, s_data, panel_params, coord,
     define_orientation_variables(orientation)
   }
   s_data = coord$transform(s_data, panel_params)
+
+  # remove missing values
+  s_data = ggplot2::remove_missing(s_data, na.rm, x, name = "geom_dotsinterval", finite = TRUE)
 
   if (!is.na(child_params$binwidth)) {
     #binwidth is expressed in terms of data coordinates, need to translate into standardized space
@@ -318,17 +321,16 @@ draw_slabs_dots = function(self, s_data, panel_params, coord,
 #' # stat_dots can summarize quantiles, creating quantile dotplots
 #'
 #' RankCorr_u_tau %>%
-#'   ggplot(aes(x = u_tau, y = i)) +
+#'   ggplot(aes(x = u_tau, y = factor(i))) +
 #'   stat_dots(quantiles = 100)
 #'
 #' # color and fill aesthetics can be mapped within the geom
 #' # dotsinterval adds an interval
 #'
 #' RankCorr_u_tau %>%
-#'   ggplot(aes(x = u_tau, y = i, fill = stat(x > 6))) +
+#'   ggplot(aes(x = u_tau, y = factor(i), fill = stat(x > 6))) +
 #'   stat_dotsinterval(quantiles = 100)
 #'
-#' @importFrom plyr dlply
 #' @importFrom rlang %||%
 #' @import grid
 #' @export

@@ -142,7 +142,7 @@ that define both data and aesthetics and shouldn't inherit behaviour from
 the default plot specification, e.g. \code{\link[ggplot2:borders]{borders()}}.}
 }
 \value{
-A \link[ggplot2:Geom]{ggplot2::Geom} representing a slab or combined slab+interval geometry which can
+A \link[ggplot2:ggplot2-ggproto]{ggplot2::Geom} representing a slab or combined slab+interval geometry which can
 be added to a \code{\link[=ggplot]{ggplot()}} object.
 }
 \description{
@@ -195,6 +195,8 @@ Typically, the \verb{geom_*} versions are meant for use with already-summarized 
 
 These geoms support the following aesthetics:
 \itemize{
+\item \code{x}
+\item \code{y}
 \item \code{datatype}
 \item \code{alpha}
 \item \code{colour}
@@ -216,10 +218,8 @@ These geoms support the following aesthetics:
 \item \code{slab_fill}
 \item \code{slab_alpha}
 \item \code{slab_linetype}
-\item \code{y}
 \item \code{ymin}
 \item \code{ymax}
-\item \code{x}
 \item \code{xmin}
 \item \code{xmax}
 \item \code{width}

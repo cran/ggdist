@@ -1,3 +1,12 @@
+# ggdist 2.2.0
+
+* Support for [distributional](https://pkg.mitchelloharawild.com/distributional/), including new
+  examples in `vignette("slabinterval") (#14).
+* `stat_dist_...` geoms now calculate `pdf` and `cdf` columns to allow mashup geoms that involve both 
+  functions, such as Correll-style gradient plots combined with violins, as in Helske *et al.* (#11).
+* `stat_dist_...` geoms should now work with `gganimate` (#15).
+* Examples updated to fix errors introduced by `broom::augment()` defaulting to `se_fit = FALSE`.
+
 # ggdist 2.1.1
 
 * Initial split from tidybayes: ggdist now contains all stats/geoms from tidybayes (except deprecated ones),
