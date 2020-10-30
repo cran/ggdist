@@ -1,7 +1,21 @@
+# ggdist 2.3.0
+
+New features and documentation:
+
+* Add `curve_interval()` for generating curvewise (joint) intervals for curve boxplots (#22)
+* Add `vignette("lineribbon")` describing `geom_lineribbon()`, `stat_lineribbon()`,
+  `stat_dist_lineribbon()`, and `curve_interval()`.
+
+Bug fixes:
+
+* Support `dist` aesthetics that are factors (#25)
+* Fix slab drawing order for overlapping (ggridges-style) slabs (#30)
+* Workaround for changes to {distributional} distribution functions until #31 is fixed.
+
 # ggdist 2.2.0
 
 * Support for [distributional](https://pkg.mitchelloharawild.com/distributional/), including new
-  examples in `vignette("slabinterval") (#14).
+  examples in `vignette("slabinterval")` (#14).
 * `stat_dist_...` geoms now calculate `pdf` and `cdf` columns to allow mashup geoms that involve both 
   functions, such as Correll-style gradient plots combined with violins, as in Helske *et al.* (#11).
 * `stat_dist_...` geoms should now work with `gganimate` (#15).
