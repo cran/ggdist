@@ -207,7 +207,8 @@ data.frame(alpha = seq(5, 100, length.out = 10)) %>%
   coord_cartesian(expand = FALSE) +
   scale_color_viridis_c() +
   labs(
-    title = "stat_dist_slab(fill = NA)",
+    title = "stat_dist_slab()",
+    subtitle = "aes(dist = dist_beta(alpha, 10), color = alpha)",
     x = "Beta(alpha,10) distribution",
     y = NULL
   )
@@ -383,7 +384,7 @@ df %>%
 dist_df %>%
   ggplot(aes(y = group, dist = dist_normal(mean, sd), fill = stat(x < 5), shape = subgroup)) +
   stat_dist_dots(position = "dodge", color = NA) +
-  labs(title = "stat_dist_dots(aes(fill = stat(y < 5), shape = subgroup))") +
+  labs(title = "stat_dist_dots(aes(fill = stat(x < 5), shape = subgroup))") +
   # we'll use these shapes since they retain outlines
   scale_shape_manual(values = c(21,22,23))
 
@@ -441,6 +442,76 @@ priors %>%
   ggplot(aes(y = dist, dist = dist, args = args)) +
   stat_dist_eye(aes(slab_alpha = stat(-pmax(abs(1 - 2*cdf), .95)))) +
   scale_slab_alpha_continuous(guide = FALSE)
+
+## ----halfeye_filled_intervals, fig.width = med_width, fig.height = small_height---------------------------------------
+df %>%
+  ggplot(aes(y = group, x = value)) +
+  stat_halfeye(aes(fill = stat(cut_cdf_qi(cdf)))) +
+  scale_fill_brewer(direction = -1) +
+  labs(
+    title = "stat_halfeye()", 
+    subtitle = "aes(fill = stat(cut_cdf_qi(cdf)))",
+    fill = "Interval"
+  )
+
+## ----halfeye_filled_intervals_2, fig.width = med_width, fig.height = small_height-------------------------------------
+df %>%
+  ggplot(aes(y = group, x = value)) +
+  stat_halfeye(aes(fill = stat(cut_cdf_qi(
+    cdf, 
+    .width = c(.5, .8, .95),
+    labels = scales::percent_format()
+  )))) +
+  scale_fill_brewer(direction = -1, na.translate = FALSE) +
+  labs(
+    title = "stat_halfeye()", 
+    subtitle = "aes(fill = stat(cut_cdf_qi(cdf, .width = c(.5, .8, .95))))",
+    fill = "Interval"
+  )
+
+## ----halfeye_filled_intervals_subgroup, fig.width = med_width, fig.height = small_height------------------------------
+df %>%
+  ggplot(aes(y = group, x = value)) +
+  stat_halfeye(
+    aes(
+      fill = subgroup,
+      fill_ramp = stat(cut_cdf_qi(
+        cdf, 
+        .width = c(.5, .8, .95),
+        labels = scales::percent_format()
+      ))
+    ),
+    position = "dodge",
+  ) +
+  # a range from 1 down to 0.2 ensures the fill goes dark to light inside-out
+  # and doesn't get all the way down to white (0) on the lightest color
+  scale_fill_ramp_discrete(range = c(1, 0.2), na.translate = FALSE) +
+  labs(
+    title = "stat_halfeye()", 
+    subtitle = "aes(fill = subgroup, fill_ramp = stat(cut_cdf_qi(cdf)))",
+    fill_ramp = "Interval"
+  )
+
+## ----dist_interval_color_ramp, fig.width = med_width, fig.height = small_height---------------------------------------
+dist_df %>%
+  ggplot(aes(x = group, dist = dist_normal(mean, sd), color = subgroup)) +
+  stat_dist_interval(aes(color_ramp = stat(level)), position = "dodge") +
+  labs(
+    title = "stat_dist_interval()", 
+    subtitle = "aes(color = subgroup, color_ramp = stat(level))"
+  )
+
+## ----slab_and_pointinterval, fig.width = med_width, fig.height = small_height-----------------------------------------
+df %>%
+  ggplot(aes(fill = group, color = group, x = value)) +
+  stat_slab(alpha = .3) +
+  stat_pointinterval(position = position_dodge(width = .4, preserve = "single")) +
+  labs(
+    title = "stat_slab() and stat_pointinterval()", 
+    subtitle = "with position_dodge() applied to the intervals",
+    y = NULL
+  ) +
+  scale_y_continuous(breaks = NULL)
 
 ## ----reset_options, include=FALSE---------------------------------------------
 options(.old_options)

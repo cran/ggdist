@@ -34,7 +34,7 @@ draw_key_slabinterval_ = function(self, data, params, size) {
 draw_key_slab_ = function(self, data, key_data, params, size) {
   # size is not in this list because if size it set but colour is not then there's nothing to draw,
   # so use size can only occur in cases where colour is alos set (so we can just check colour)
-  if (params$show_slab && any(!is.na(data[,c("fill","alpha","slab_fill","slab_colour","slab_size","slab_linetype","slab_alpha")]))) {
+  if (params$show_slab && any(!is.na(data[,c("fill","fill_ramp","alpha","slab_fill","slab_colour","slab_size","slab_linetype","slab_alpha")]))) {
     s_key_data = self$override_slab_aesthetics(key_data)
 
     if (any(!is.na(data[,c("slab_size","slab_linetype")])) && is.na(s_key_data$colour)) {
@@ -46,7 +46,7 @@ draw_key_slab_ = function(self, data, key_data, params, size) {
 }
 
 draw_key_interval_ = function(self, data, key_data, params, size) {
-  if(params$show_interval && any(!is.na(data[c("colour","alpha","size","linetype","interval_colour","interval_alpha","interval_size","interval_linetype")]))) {
+  if(params$show_interval && any(!is.na(data[c("colour","colour_ramp","alpha","size","linetype","interval_colour","interval_alpha","interval_size","interval_linetype")]))) {
     i_key_data = self$override_interval_aesthetics(key_data, params$interval_size_domain, params$interval_size_range)
     line_key = switch(params$orientation,
       y = ,
@@ -60,7 +60,7 @@ draw_key_interval_ = function(self, data, key_data, params, size) {
 
 draw_key_point_ = function(self, data, key_data, params, size) {
   if(params$show_point && (
-    any(!is.na(data[c("shape","stroke","colour","alpha","size","point_colour","point_fill","point_alpha","point_size")])) ||
+    any(!is.na(data[c("shape","stroke","colour","colour_ramp","alpha","size","point_colour","point_fill","point_alpha","point_size")])) ||
       # only draw point for `fill` aesthetic if a shape that has a fill colour is used
       (!is.na(data$fill) && length(intersect(data$shape, c(21:25))) > 0) ||
       (!is.na(data$point_fill) && length(intersect(data$shape, c(21:25))) > 0)

@@ -28,6 +28,7 @@ theme_set(theme_ggdist())
 .old_options = options(width = 120)
 
 ## ----df---------------------------------------------------------------------------------------------------------------
+set.seed(1234)
 n = 5000
 
 df = tibble(
@@ -77,6 +78,28 @@ df %>%
   stat_lineribbon(.width = c(.66, .95)) +
   scale_fill_brewer()
 
+## ----df_2groups-------------------------------------------------------------------------------------------------------
+df_2groups = rbind(
+  mutate(df, g = "a"),
+  mutate(df, g = "b", y = (y - 2) * 0.5)
+)
+
+## ----stat_lineribbon_2groups_brewer, fig.width = med_width, fig.height = med_height-----------------------------------
+df_2groups %>%
+  ggplot(aes(x = x, y = y, color = g)) +
+  stat_lineribbon() +
+  scale_fill_brewer()
+
+## ----stat_lineribbon_2groups_alpha, fig.width = med_width, fig.height = med_height------------------------------------
+df_2groups %>%
+  ggplot(aes(x = x, y = y, fill = g)) +
+  stat_lineribbon(alpha = 1/4)
+
+## ----stat_lineribbon_2groups_ramp, fig.width = med_width, fig.height = med_height-------------------------------------
+df_2groups %>%
+  ggplot(aes(x = x, y = y, fill = g)) +
+  stat_lineribbon(aes(fill_ramp = stat(level)))
+
 ## ----analytical_df----------------------------------------------------------------------------------------------------
 analytical_df = tibble(
   x = -4:5,
@@ -109,7 +132,7 @@ df %>%
 ## ----pointwise_ribbon, fig.width = med_width, fig.height = med_height-------------------------------------------------
 df %>%
   group_by(x) %>%
-  median_qi(y, .width = c(.5)) %>%
+  median_qi(y, .width = .5) %>%
   ggplot(aes(x = x, y = y)) +
   geom_lineribbon(aes(ymin = .lower, ymax = .upper)) +
   geom_line(aes(group = .draw), alpha=0.15, data = df) +
@@ -119,7 +142,7 @@ df %>%
 ## ----curvewise_ribbon, fig.width = med_width, fig.height = med_height-------------------------------------------------
 df %>%
   group_by(x) %>%
-  curve_interval(y, .width = c(.5)) %>%
+  curve_interval(y, .width = .5) %>%
   ggplot(aes(x = x, y = y)) +
   geom_lineribbon(aes(ymin = .lower, ymax = .upper)) +
   geom_line(aes(group = .draw), alpha=0.15, data = df) +
@@ -157,6 +180,62 @@ curvewise_plot = large_df %>%
 plot_grid(nrow = 2,
   pointwise_plot, curvewise_plot
 )
+
+## ----mtcars_boot------------------------------------------------------------------------------------------------------
+set.seed(1234)
+n = 4000
+mpg = seq(min(mtcars$mpg), max(mtcars$mpg), length.out = 100)
+
+mtcars_boot = tibble(
+  .draw = 1:n,
+  m = map(.draw, ~ loess(
+    hp ~ mpg, 
+    span = 0.9,
+    # this lets us predict outside the range of the data
+    control = loess.control(surface = "direct"), 
+    data = slice_sample(mtcars, prop = 1, replace = TRUE)
+  )),
+  hp = map(m, predict, newdata = tibble(mpg)),
+  mpg = list(mpg)
+) %>%
+  select(-m) %>%
+  unnest(c(hp, mpg))
+
+## ----mtcars_spaghetti, fig.width = med_width, fig.height = med_height-------------------------------------------------
+mtcars_boot %>%
+  filter(.draw < 400) %>%
+  ggplot(aes(x = mpg, y = hp)) +
+  geom_line(aes(group = .draw), alpha = 1/10) +
+  geom_point(data = mtcars) +
+  coord_cartesian(ylim = c(0, 400))
+
+## ----mtcars_point_interval, fig.width = med_width, fig.height = med_height--------------------------------------------
+mtcars_boot %>%
+  ggplot(aes(x = mpg, y = hp)) +
+  stat_lineribbon(.width = c(.5, .7, .9)) +
+  geom_point(data = mtcars) +
+  scale_fill_brewer() +
+  coord_cartesian(ylim = c(0, 400))
+
+## ----mtcars_curve_interval, fig.width = med_width, fig.height = med_height--------------------------------------------
+mtcars_boot %>%
+  group_by(mpg) %>%
+  curve_interval(hp, .width = c(.5, .7, .9)) %>%
+  ggplot(aes(x = mpg, y = hp)) +
+  geom_lineribbon(aes(ymin = .lower, ymax = .upper)) +
+  geom_point(data = mtcars) +
+  scale_fill_brewer() +
+  coord_cartesian(ylim = c(0, 400))
+
+## ----mtcars_curve_interval_bd, fig.width = med_width, fig.height = med_height-----------------------------------------
+mtcars_boot %>%
+  group_by(mpg) %>%
+  curve_interval(hp, .width = c(.5, .7, .9), .interval = "bd-mbd") %>%
+  ggplot(aes(x = mpg, y = hp)) +
+  geom_lineribbon(aes(ymin = .lower, ymax = .upper)) +
+  geom_point(data = mtcars) +
+  scale_fill_brewer() +
+  coord_cartesian(ylim = c(0, 400))
 
 ## ----reset_options, include=FALSE---------------------------------------------
 options(.old_options)

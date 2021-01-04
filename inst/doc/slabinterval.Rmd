@@ -322,7 +322,8 @@ data.frame(alpha = seq(5, 100, length.out = 10)) %>%
   coord_cartesian(expand = FALSE) +
   scale_color_viridis_c() +
   labs(
-    title = "stat_dist_slab(fill = NA)",
+    title = "stat_dist_slab()",
+    subtitle = "aes(dist = dist_beta(alpha, 10), color = alpha)",
     x = "Beta(alpha,10) distribution",
     y = NULL
   )
@@ -519,7 +520,7 @@ plot_grid(ncol = 3, align = "hv",
 
 You can also use `stat_dist_ccdfinterval()` instead if you wish to visualize analytical distributions, just as you can use `stat_dist_eye()`.
 
-By default, `stat_dist_ccdfinterval()` uses the quantiles at `p = 0.001` and `p = 0.999` in the distributions are used to determine their extent. You can change this setting using the `p_limits` parameter, or use `expand_limits()` to ensure a particular value is shown, as before:
+By default, `stat_dist_ccdfinterval()` uses the quantiles at `p = 0.001` and `p = 0.999` of the distributions to determine their extent (unless the lower or upper limit of the distribution's support is finite, in which case that value is used). You can change this setting using the `p_limits` parameter, or use `expand_limits()` to ensure a particular value is shown, as before:
 
 ```{r dist_ccdf_dodge}
 dist_df %>%
@@ -618,7 +619,7 @@ As with other plot types, you can also use `stat_dist_dots()` instead if you wis
 dist_df %>%
   ggplot(aes(y = group, dist = dist_normal(mean, sd), fill = stat(x < 5), shape = subgroup)) +
   stat_dist_dots(position = "dodge", color = NA) +
-  labs(title = "stat_dist_dots(aes(fill = stat(y < 5), shape = subgroup))") +
+  labs(title = "stat_dist_dots(aes(fill = stat(x < 5), shape = subgroup))") +
   # we'll use these shapes since they retain outlines
   scale_shape_manual(values = c(21,22,23))
 ```
@@ -646,7 +647,8 @@ The `slabinterval` family of stats and geoms is designed to be very flexible. Mo
 
 ### Gradients of alpha, color, and fill
 
-Two aesthetics of particular use for creating custom geoms are `slab_alpha`, which changes the alpha transparency of the slab portion of the geom, `slab_color`, which changes its outline color, and `fill`, which changes its fill color. All of these aesthetics can be mapped to variables along the length of the geom (that is, the color does not have to be constant over the entire geom), which allows you to create gradients or to highlight meaningful regions of the data (amongst other things).
+Two aesthetics of particular use for creating custom geoms are `slab_alpha`, which changes the alpha transparency of the slab portion of the geom, `slab_color`, which changes its outline color, and `fill`, which changes its fill color. All of these aesthetics can be mapped to variables along the length of the geom (that is, the color does not have to be constant over the entire geom), which allows you to create gradients or to highlight meaningful regions of the data (amongst other things). You can also employ the ggdist-specific `color_ramp` and `fill_ramp`
+aesthetics to create custom gradients with outline and fill colors, as demonstrated later in this section.
 
 ### CCDF Gradients
 
@@ -661,6 +663,9 @@ df %>%
   coord_cartesian(expand = FALSE) +
   ggtitle("stat_ccdfinterval(aes(slab_alpha = stat(f)), thickness = 1)")
 ```
+
+If this approach were applied to bins in a histogram, where each bin had some uncertainty
+associated with its height, the result would be a so-called *fuzzygram* ([Wilkinson 1992](https://doi.org/10.1177/096228029200100102)).
 
 ### Highlighting and other combinations
 
@@ -703,7 +708,7 @@ priors %>%
 
 ### Mashups with Correll and Gleicher-style gradients
 
-We can also take advantage of the fact that the `stat_dist_...` stats also supply `cdf` and `pdf` aesthetics to create charts make use of both the CDF and the PDF in their aesthetic mappings. For example, we could create [Correll & Gleicher](https://doi.org/10.1109/TVCG.2014.2346298)-style gradient plots by fading the tails outside of the 95% interval in proportion to $|1 - 2F(x)|$ (where $F(x)$ is the CDF):
+We can also take advantage of the fact that all slabinterval stats also supply `cdf` and `pdf` aesthetics to create charts make use of both the CDF and the PDF in their aesthetic mappings. For example, we could create [Correll & Gleicher](https://doi.org/10.1109/TVCG.2014.2346298)-style gradient plots by fading the tails outside of the 95% interval in proportion to $|1 - 2F(x)|$ (where $F(x)$ is the CDF):
 
 ```{r correll_gradient, fig.width = med_width, fig.height = small_height/2}
 priors %>%
@@ -720,6 +725,130 @@ priors %>%
   stat_dist_eye(aes(slab_alpha = stat(-pmax(abs(1 - 2*cdf), .95)))) +
   scale_slab_alpha_continuous(guide = FALSE)
 ```
+
+### Densities filled according to intervals
+
+Another common chart type involves filling in the interior of a halfeye plot
+according to some intervals. We can again use the fact that slabinterval stats
+auto-calculate both the PDF and CDF of a distribution as statistics. We can then
+the `cut_cdf_qi()` function, which labels points in a CDF according to
+which quantile interval they fall into, to determine the fill color:
+
+```{r halfeye_filled_intervals, fig.width = med_width, fig.height = small_height}
+df %>%
+  ggplot(aes(y = group, x = value)) +
+  stat_halfeye(aes(fill = stat(cut_cdf_qi(cdf)))) +
+  scale_fill_brewer(direction = -1) +
+  labs(
+    title = "stat_halfeye()", 
+    subtitle = "aes(fill = stat(cut_cdf_qi(cdf)))",
+    fill = "Interval"
+  )
+```
+
+Like `point_interval()`, `cut_cdf_qi()` takes a `.width` parameter to define the intervals,
+with a default of `c(.66, .95, 1)`. The final `1` is necessary to show the full
+density, to cut off the tails of the density you can omit it.
+Like ggplot scales, `cut_cdf_qi()` also takes a `labels` parameter to define the labels of
+the intervals (or to provide a function to define the labels, such as a
+formatting function like `scales::percent_format()`). Let's modify the intervals to 
+show the 50%, 80%, and 95% intervals, omitting the tails of the density and
+reformatting the interval labels to use percentages. We can also use
+`na.translate = FALSE` to drop the unnecessary `NA` level from the fill scale:
+
+```{r halfeye_filled_intervals_2, fig.width = med_width, fig.height = small_height}
+df %>%
+  ggplot(aes(y = group, x = value)) +
+  stat_halfeye(aes(fill = stat(cut_cdf_qi(
+    cdf, 
+    .width = c(.5, .8, .95),
+    labels = scales::percent_format()
+  )))) +
+  scale_fill_brewer(direction = -1, na.translate = FALSE) +
+  labs(
+    title = "stat_halfeye()", 
+    subtitle = "aes(fill = stat(cut_cdf_qi(cdf, .width = c(.5, .8, .95))))",
+    fill = "Interval"
+  )
+```
+
+### Using color ramps for `fill` and `color` aesthetics
+
+`ggdist` supplies `color_ramp` (or `colour_ramp`) and `fill_ramp` aesthetics
+which can be used to vary ("ramp") the outline or fill colors smoothly from a 
+base color (default `"white"`) to whatever color the geometry would otherwise 
+have.
+
+Taking the above example with `cut_cdf_qi()`, we could use the `fill_ramp` aesthetic
+instead of the `fill` aesthetic to set the slab color based on the interval it is in.
+We could then vary the base fill color separately from the interval based on 
+another column in the original data table, such as the `subgroup` column:
+
+```{r halfeye_filled_intervals_subgroup, fig.width = med_width, fig.height = small_height}
+df %>%
+  ggplot(aes(y = group, x = value)) +
+  stat_halfeye(
+    aes(
+      fill = subgroup,
+      fill_ramp = stat(cut_cdf_qi(
+        cdf, 
+        .width = c(.5, .8, .95),
+        labels = scales::percent_format()
+      ))
+    ),
+    position = "dodge",
+  ) +
+  # a range from 1 down to 0.2 ensures the fill goes dark to light inside-out
+  # and doesn't get all the way down to white (0) on the lightest color
+  scale_fill_ramp_discrete(range = c(1, 0.2), na.translate = FALSE) +
+  labs(
+    title = "stat_halfeye()", 
+    subtitle = "aes(fill = subgroup, fill_ramp = stat(cut_cdf_qi(cdf)))",
+    fill_ramp = "Interval"
+  )
+```
+
+We could similarly use the `stat_dist_interval()` (or `stat_interval()`) geometries
+with the `color_ramp` aesthetic to vary subgroup color separately from the
+whiteness of the intervals. Here, `level` is a variable generated by all stats in
+the `stat_dist_...` family which contains the level of the generated intervals,
+as an ordered factor.
+
+```{r dist_interval_color_ramp, fig.width = med_width, fig.height = small_height}
+dist_df %>%
+  ggplot(aes(x = group, dist = dist_normal(mean, sd), color = subgroup)) +
+  stat_dist_interval(aes(color_ramp = stat(level)), position = "dodge") +
+  labs(
+    title = "stat_dist_interval()", 
+    subtitle = "aes(color = subgroup, color_ramp = stat(level))"
+  )
+```
+
+See `help("scale_color_ramp")` for more information on the color ramp aesthetics/scales.
+
+### Independent slabs and intervals in composite plots
+
+Sometimes when constructing composite plots it may be useful to position slab and interval parts of the geometry separately.
+While some relative positioning of these geometries is supported by manipulating the `justification` parameter, if you
+want complete, separate control over positioning of intervals versus slabs, the simplest approach can be to specify those
+geometries separately. 
+
+For example, the following uses a separate specification of a `stat_slab()` and a `stat_pointinterval()` instead of a combined `stat_slabinterval()` in order to use `position_dodge()` on the intervals but not the slabs:
+
+```{r slab_and_pointinterval, fig.width = med_width, fig.height = small_height}
+df %>%
+  ggplot(aes(fill = group, color = group, x = value)) +
+  stat_slab(alpha = .3) +
+  stat_pointinterval(position = position_dodge(width = .4, preserve = "single")) +
+  labs(
+    title = "stat_slab() and stat_pointinterval()", 
+    subtitle = "with position_dodge() applied to the intervals",
+    y = NULL
+  ) +
+  scale_y_continuous(breaks = NULL)
+```
+
+(Thanks to Brenton Wiernik for [this example](https://github.com/mjskay/ggdist/issues/27#issuecomment-725578437).)
 
 
 ```{r reset_options, include=FALSE}

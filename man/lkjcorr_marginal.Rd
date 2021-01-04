@@ -76,12 +76,14 @@ library(dplyr)
 library(ggplot2)
 library(forcats)
 
+theme_set(theme_ggdist())
+
 expand.grid(
   eta = 1:6,
   K = 2:6
 ) \%>\%
   ggplot(aes(y = fct_rev(ordered(eta)), dist = "lkjcorr_marginal", arg1 = K, arg2 = eta)) +
-  stat_dist_slab(p_limits = c(0,1)) +
+  stat_dist_slab() +
   facet_grid(~ paste0(K, "x", K)) +
   labs(
     title = paste0(

@@ -252,6 +252,7 @@ In addition, in their default configuration (paired with \code{\link[=geom_slabi
 \item \code{datatype}
 \item \code{alpha}
 \item \code{colour}
+\item \code{colour_ramp}
 \item \code{linetype}
 \item \code{fill}
 \item \code{shape}
@@ -270,6 +271,7 @@ In addition, in their default configuration (paired with \code{\link[=geom_slabi
 \item \code{slab_fill}
 \item \code{slab_alpha}
 \item \code{slab_linetype}
+\item \code{fill_ramp}
 \item \code{ymin}
 \item \code{ymax}
 \item \code{xmin}
@@ -291,7 +293,10 @@ Learn more about basic ggplot aesthetics in \code{vignette("ggplot2-specs")}.
 For intervals, the point summary from the interval function. Whether it is \code{x} or \code{y} depends on \code{orientation}
 \item \code{xmin} or \code{ymin}: For intervals, the lower end of the interval from the interval function.
 \item \code{xmax} or \code{ymax}: For intervals, the upper end of the interval from the interval function.
-\item \code{f}: For slabs, the output values from the slab function.
+\item \code{f}: For slabs, the output values from the slab function (such as the PDF, CDF, or CCDF),
+determined by \code{slab_type}.
+\item \code{pdf}: For slabs, the probability density function.
+\item \code{cdf}: For slabs, the cumulative distribution function.
 \item \code{n}: For slabs, the number of data points summarized into that slab.
 }
 }

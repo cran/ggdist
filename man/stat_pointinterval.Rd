@@ -136,6 +136,7 @@ In addition, in their default configuration (paired with \code{\link[=geom_point
 \item \code{datatype}
 \item \code{alpha}
 \item \code{colour}
+\item \code{colour_ramp}
 \item \code{linetype}
 \item \code{fill}
 \item \code{shape}
@@ -154,6 +155,7 @@ In addition, in their default configuration (paired with \code{\link[=geom_point
 \item \code{slab_fill}
 \item \code{slab_alpha}
 \item \code{slab_linetype}
+\item \code{fill_ramp}
 \item \code{ymin}
 \item \code{ymax}
 \item \code{xmin}

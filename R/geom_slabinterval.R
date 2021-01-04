@@ -143,6 +143,7 @@ draw_path = function(data, panel_params, coord) {
 override_slab_aesthetics = function(self, s_data) {
   s_data$colour = s_data$slab_colour
   s_data$fill = s_data$slab_fill %||% s_data$fill
+  s_data$fill = apply_colour_ramp(s_data$fill, s_data$fill_ramp)
   s_data$alpha = s_data$slab_alpha %||% s_data$alpha
   s_data$size = s_data$slab_size
   s_data$linetype = s_data$slab_linetype %||% s_data$linetype
@@ -151,6 +152,7 @@ override_slab_aesthetics = function(self, s_data) {
 
 override_point_aesthetics = function(self, p_data, size_domain, size_range, fatten_point) {
   p_data$colour = p_data$point_colour %||% p_data$colour
+  p_data$colour = apply_colour_ramp(p_data$colour, p_data$colour_ramp)
   p_data$fill = p_data$point_fill %||% p_data$fill
   p_data$alpha = p_data$point_alpha %||% p_data$alpha
   p_data$size = p_data$point_size %||% (fatten_point * get_line_size(p_data, size_domain, size_range))
@@ -159,6 +161,7 @@ override_point_aesthetics = function(self, p_data, size_domain, size_range, fatt
 
 override_interval_aesthetics = function(self, i_data, size_domain, size_range) {
   i_data$colour = i_data$interval_colour %||% i_data$colour
+  i_data$colour = apply_colour_ramp(i_data$colour, i_data$colour_ramp)
   i_data$alpha = i_data$interval_alpha %||% i_data$alpha
   i_data$size = get_line_size(i_data, size_domain, size_range)
   i_data$linetype = i_data$interval_linetype %||% i_data$linetype
@@ -259,12 +262,16 @@ get_line_size = function(i_data, size_domain, size_range) {
 #' normalization (this should probably only be used with functions whose values are in \[0,1\], such as CDFs).
 #' @param interval_size_domain The minimum and maximum of the values of the size aesthetic that will be translated into actual
 #' sizes for intervals drawn according to `interval_size_range` (see the documentation for that argument.)
-#' @param interval_size_range This geom scales the raw size aesthetic values when drawing interval and point sizes, as
+#' @param interval_size_range (Deprecated). This geom scales the raw size aesthetic values when drawing interval and point sizes, as
 #' they tend to be too thick when using the default settings of [scale_size_continuous()], which give sizes
 #' with a range of `c(1, 6)`. The `interval_size_domain` value indicates the input domain of raw size values
 #' (typically this should be equal to the value of the `range` argument of the [scale_size_continuous()]
 #' function), and `interval_size_range` indicates the desired output range of the size values (the min and max of
-#' the actual sizes used to draw intervals).
+#' the actual sizes used to draw intervals). Most of the time it is not recommended to change the value of this argument,
+#' as it may result in strange scaling of legends; this argument is a holdover from earlier versions
+#' that did not have size aesthetics targeting the point and interval separately. If you want to adjust the
+#' size of the interval or points separately, you can instead use the `interval_size` or `point_size`
+#' aesthetics; see [scales].
 #' @param fatten_point A multiplicative factor used to adjust the size of the point relative to the size of the
 #' thickest interval line. If you wish to specify point sizes directly, you can also use the `point_size`
 #' aesthetic and [scale_point_size_continuous()] or [scale_point_size_discrete()]; sizes
@@ -404,6 +411,7 @@ GeomSlabinterval = ggproto("GeomSlabinterval", Geom,
 
     # shared point and interval aesthetics
     colour = NULL,
+    colour_ramp = NULL,
 
     # shared slab and interval aesthetics
     linetype = NULL,
@@ -431,7 +439,8 @@ GeomSlabinterval = ggproto("GeomSlabinterval", Geom,
     slab_colour = NULL,       # no fallback
     slab_fill = NULL,         # falls back to fill
     slab_alpha = NULL,        # falls back to alpha
-    slab_linetype = NULL      # falls back to linetype
+    slab_linetype = NULL,     # falls back to linetype
+    fill_ramp = NULL
   ),
 
   # default aesthetics as they will actually be set (here or in the key)
@@ -794,7 +803,9 @@ GeomSlab = ggproto("GeomSlab", GeomSlabinterval,
   override_slab_aesthetics = function(self, s_data) {
     # we define these differently from geom_slabinterval to make this easier to use on its own
     s_data$colour = s_data$slab_colour %||% s_data$colour
+    s_data$colour = apply_colour_ramp(s_data$colour, s_data$colour_ramp)
     s_data$fill = s_data$slab_fill %||% s_data$fill
+    s_data$fill = apply_colour_ramp(s_data$fill, s_data$fill_ramp)
     s_data$alpha = s_data$slab_alpha %||% s_data$alpha
     s_data$size = s_data$slab_size %||% s_data$size
     s_data$linetype = s_data$slab_linetype %||% s_data$linetype

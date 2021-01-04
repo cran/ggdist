@@ -62,7 +62,8 @@
 #' `ggdist` geoms. Can be added to a [ggplot()] object.
 #' @name scales
 #' @author Matthew Kay
-#' @seealso [scale_color_discrete()], [scale_color_continuous()], etc.
+#' @family ggdist scales
+#' @seealso Other ggplot2 scales: [scale_color_discrete()], [scale_color_continuous()], etc.
 #' @examples
 #'
 #' library(dplyr)
@@ -82,7 +83,7 @@
 #'     stroke = 2,
 #'     interval_color = "blue",
 #'     # interval sizes are scaled from [1, 6] onto [0.6, 1.4] by default
-#'     # see the interval_size_range option in help("geom_slabinterval")
+#'     # see the interval_size_range parameter in help("geom_slabinterval")
 #'     interval_size = 8,
 #'     interval_linetype = "dashed",
 #'     interval_alpha = .25,

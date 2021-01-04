@@ -139,6 +139,7 @@ In addition, in their default configuration (paired with \code{\link[=geom_inter
 \item \code{datatype}
 \item \code{alpha}
 \item \code{colour}
+\item \code{colour_ramp}
 \item \code{linetype}
 \item \code{fill}
 \item \code{shape}
@@ -157,6 +158,7 @@ In addition, in their default configuration (paired with \code{\link[=geom_inter
 \item \code{slab_fill}
 \item \code{slab_alpha}
 \item \code{slab_linetype}
+\item \code{fill_ramp}
 \item \code{ymin}
 \item \code{ymax}
 \item \code{xmin}
@@ -175,6 +177,8 @@ Learn more about basic ggplot aesthetics in \code{vignette("ggplot2-specs")}.
 
 library(dplyr)
 library(ggplot2)
+
+theme_set(theme_ggdist())
 
 data(RankCorr_u_tau, package = "ggdist")
 

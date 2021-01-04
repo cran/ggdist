@@ -238,7 +238,7 @@ data.frame(distribution = "Normal(1,2)") \%>\%
     stroke = 2,
     interval_color = "blue",
     # interval sizes are scaled from [1, 6] onto [0.6, 1.4] by default
-    # see the interval_size_range option in help("geom_slabinterval")
+    # see the interval_size_range parameter in help("geom_slabinterval")
     interval_size = 8,
     interval_linetype = "dashed",
     interval_alpha = .25,
@@ -252,8 +252,12 @@ data.frame(distribution = "Normal(1,2)") \%>\%
 
 }
 \seealso{
-\code{\link[=scale_color_discrete]{scale_color_discrete()}}, \code{\link[=scale_color_continuous]{scale_color_continuous()}}, etc.
+Other ggplot2 scales: \code{\link[=scale_color_discrete]{scale_color_discrete()}}, \code{\link[=scale_color_continuous]{scale_color_continuous()}}, etc.
+
+Other ggdist scales: 
+\code{\link{scale_colour_ramp}}
 }
 \author{
 Matthew Kay
 }
+\concept{ggdist scales}
