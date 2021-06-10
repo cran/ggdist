@@ -78,6 +78,18 @@ df %>%
   stat_lineribbon(.width = c(.66, .95)) +
   scale_fill_brewer()
 
+## ----stat_lineribbon_gradient, fig.width = med_width, fig.height = med_height-----------------------------------------
+df %>%
+  ggplot(aes(x = x, y = y)) +
+  stat_lineribbon(aes(fill = stat(.width)), .width = ppoints(50)) +
+  scale_fill_distiller()
+
+## ----stat_lineribbon_gradient_ramp, fig.width = med_width, fig.height = med_height------------------------------------
+df %>%
+  ggplot(aes(x = x, y = y)) +
+  stat_lineribbon(aes(fill_ramp = stat(.width)), .width = ppoints(50), fill = "#2171b5") +
+  scale_fill_ramp_continuous(range = c(1, 0))
+
 ## ----df_2groups-------------------------------------------------------------------------------------------------------
 df_2groups = rbind(
   mutate(df, g = "a"),
@@ -227,7 +239,7 @@ mtcars_boot %>%
   scale_fill_brewer() +
   coord_cartesian(ylim = c(0, 400))
 
-## ----mtcars_curve_interval_bd, fig.width = med_width, fig.height = med_height-----------------------------------------
+## ----mtcars_curve_interval_bd, fig.width = med_width, fig.height = med_height, eval = requireNamespace("fda", quietly = TRUE)----
 mtcars_boot %>%
   group_by(mpg) %>%
   curve_interval(hp, .width = c(.5, .7, .9), .interval = "bd-mbd") %>%

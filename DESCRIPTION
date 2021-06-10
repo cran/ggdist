@@ -1,7 +1,7 @@
 Package: ggdist
 Title: Visualizations of Distributions and Uncertainty
-Version: 2.4.0
-Date: 2021-01-03
+Version: 2.4.1
+Date: 2021-06-10
 Authors@R: c(
         person("Matthew", "Kay", role = c("aut", "cre"), email = "mjskay@northwestern.edu")
     )
@@ -20,10 +20,10 @@ Description: Provides primitives for visualizing distributions using 'ggplot2' t
 Depends: R (>= 3.5.0)
 Imports: tidyselect, dplyr (>= 1.0.0), tidyr (>= 1.0.0), ggplot2 (>=
         3.3.0), purrr (>= 0.2.3), rlang (>= 0.3.0), scales, grid,
-        forcats, HDInterval, tibble, vctrs, fda, distributional (>=
-        0.2.0)
-Suggests: knitr, testthat, vdiffr (>= 0.3.0), svglite, broom (>=
-        0.5.6), modelr, cowplot, covr, gdtools, rmarkdown, png, pkgdown
+        forcats, HDInterval, tibble, vctrs, distributional (>= 0.2.0)
+Suggests: knitr, testthat, vdiffr (>= 1.0.0), svglite, broom (>=
+        0.5.6), modelr, cowplot, covr, gdtools, rmarkdown, png, fda,
+        beeswarm, pkgdown
 License: GPL (>= 3)
 Language: en-US
 BugReports: https://github.com/mjskay/ggdist/issues/new
@@ -38,13 +38,14 @@ Collate: "ggdist-package.R" "util.R" "binning_methods.R"
         "draw_key_slabinterval.R" "geom.R" "geom_slabinterval.R"
         "geom_dotsinterval.R" "geom_interval.R" "geom_lineribbon.R"
         "geom_pointinterval.R" "lkjcorr_marginal.R" "parse_dist.R"
-        "point_interval.R" "scale_colour_ramp.R" "scales.R" "stat.R"
+        "point_interval.R" "scale_colour_ramp.R" "scale_.R" "stat.R"
         "stat_slabinterval.R" "stat_dist_slabinterval.R"
         "stat_sample_slabinterval.R" "stat_dotsinterval.R"
         "stat_pointinterval.R" "stat_interval.R" "stat_lineribbon.R"
-        "student_t.R" "theme_ggdist.R" "tidy_format_translators.R"
+        "student_t.R" "testthat.R" "theme_ggdist.R"
+        "tidy_format_translators.R"
 NeedsCompilation: no
-Packaged: 2021-01-04 15:35:39 UTC; Matthew
+Packaged: 2021-06-10 07:14:46 UTC; matth
 Author: Matthew Kay [aut, cre]
 Repository: CRAN
-Date/Publication: 2021-01-04 21:20:08 UTC
+Date/Publication: 2021-06-10 07:50:02 UTC

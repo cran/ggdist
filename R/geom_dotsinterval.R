@@ -11,7 +11,7 @@
 #' @importFrom dplyr %>% arrange_at group_by_at group_split
 dots_grob = function(data, max_height, x, y,
   name = NULL, gp = gpar(), vp = NULL,
-  dotsize = 1, stackratio = 1, binwidth = NA,
+  dotsize = 1, stackratio = 1, binwidth = NA, layout = "bin",
   side = "topright", orientation = "vertical"
 ) {
   datas = data %>%
@@ -21,7 +21,7 @@ dots_grob = function(data, max_height, x, y,
 
   gTree(
     datas = datas, max_height = max_height, x_ = x, y_ = y,
-    dotsize = dotsize, stackratio = stackratio, binwidth = binwidth,
+    dotsize = dotsize, stackratio = stackratio, binwidth = binwidth, layout = layout,
     side = side, orientation = orientation,
     name = name, gp = gp, vp = vp, cl = "dots_grob"
   )
@@ -44,6 +44,12 @@ makeContent.dots_grob = function(x) {
   stackratio = 1.07 * grob_$stackratio
   dotsize = grob_$dotsize
   bin_width = grob_$binwidth
+  layout = grob_$layout
+
+  # if bin width was specified as a grid::unit, convert it
+  if (is.unit(bin_width)) {
+    bin_width = convertUnit(bin_width, "native", axisFrom = x, typeFrom = "dimension", valueOnly = TRUE)
+  }
 
   # create a specification for a heap of dots, which includes things like
   # what the bins are, what the dot widths are, etc.
@@ -144,32 +150,83 @@ makeContent.dots_grob = function(x) {
   # now, draw all the heaps using the same bin width
   children = do.call(gList, unlist(recursive = FALSE, lapply(datas, function(d) {
     h = heap_spec(d, bin_width = bin_width)
-    h$binning = nudge_bins(h$binning, bin_width)
+    h$binning$bin_midpoints = nudge_bins(h$binning$bin_midpoints, bin_width)
     d$bins = h$binning$bins
     d$midpoint = h$binning$bin_midpoints[h$binning$bins]
     point_fontsize = max(
       convertY(unit(h$point_size, "native"), "points", valueOnly = TRUE) - max(d$stroke) * .stroke/2,
       0.5
     )
-    dlply_(d, "bins", function (bin_df) {
-      bin_df[[x]] = bin_df$midpoint
 
-      y_offset = seq(0, h$y_spacing * (nrow(bin_df) - 1), length.out = nrow(bin_df))
-      switch_side(side, orientation,
-        topright = {
-          y_start = h$y_spacing / 2
-        },
-        bottomleft = {
-          y_offset = - y_offset
-          y_start = - h$y_spacing / 2
-        },
-        both = {
-          y_offset = y_offset - h$y_spacing * (nrow(bin_df) - 1) / 2
-          y_start = 0
+    # determine x positions (for bin/weave) / x and y positions (for swarm)
+    y_start = switch_side(side, orientation,
+      topright = h$y_spacing / 2,
+      bottomleft = - h$y_spacing / 2,
+      both = 0
+    )
+    switch(layout,
+      bin = {
+        d[[x]] = d$midpoint
+      },
+      weave = {
+        # keep original x positions, but re-order within bins so that overlaps
+        # across bins are less likely
+        d = ddply_(d, "bins", function(bin_df) {
+          seq_fun = if (side == "both") seq_interleaved_centered else seq_interleaved
+          bin_df = bin_df[seq_fun(nrow(bin_df)),]
+          bin_df$rows = seq_len(nrow(bin_df))
+          bin_df
+        })
+
+        # nudge values within each row to ensure there are no overlaps
+        # (rows are not well-defined in side = "both" for this to work,
+        # so we skip this step in that case)
+        if (side != "both") {
+          d = ddply_(d, "rows", function(row_df) {
+            row_df[[x]] = nudge_bins(row_df[[x]], bin_width)
+            row_df
+          })
         }
-      )
-      bin_df[[y]] = bin_df[[y]] + y_start + y_offset
+      },
+      swarm = {
+        if (!requireNamespace("beeswarm", quietly = TRUE)) {
+          stop('Using layout = "swarm" with the dots geom requires the `beeswarm` package to be installed.')
+        }
 
+        swarm_xy = beeswarm::swarmy(d[[x]], d[[y]],
+          xsize = h$bin_width, ysize = h$y_spacing,
+          log = "", cex = 1,
+          side = switch_side(side, orientation, topright = 1, bottomleft = -1, both = 0),
+          # priority = "density",
+          compact = TRUE
+        )
+
+        d[[x]] = swarm_xy[["x"]]
+        d[[y]] = swarm_xy[["y"]] + y_start
+      },
+      stop("Unknown layout type for dots: ", deparse0(layout))
+    )
+
+    # determine y positions (for bin/weave)
+    if (layout %in% c("bin", "weave")) {
+      d = ddply_(d, "bins", function(bin_df) {
+        y_offset = seq(0, h$y_spacing * (nrow(bin_df) - 1), length.out = nrow(bin_df))
+        switch_side(side, orientation,
+          topright = {},
+          bottomleft = {
+            y_offset = - y_offset
+          },
+          both = {
+            y_offset = y_offset - h$y_spacing * (nrow(bin_df) - 1) / 2
+          }
+        )
+        bin_df[[y]] = bin_df[[y]] + y_start + y_offset
+        bin_df
+      })
+    }
+
+    # generate grobs
+    dlply_(d, "bins", function(bin_df) {
       pointsGrob(bin_df$x, bin_df$y, pch = bin_df$shape,
         gp = gpar(
           col = alpha(bin_df$colour, bin_df$alpha),
@@ -217,7 +274,7 @@ draw_slabs_dots = function(self, s_data, panel_params, coord,
   # remove missing values
   s_data = ggplot2::remove_missing(s_data, na.rm, x, name = "geom_dotsinterval", finite = TRUE)
 
-  if (!is.na(child_params$binwidth)) {
+  if (!is.na(child_params$binwidth) && !is.unit(child_params$binwidth)) {
     #binwidth is expressed in terms of data coordinates, need to translate into standardized space
     child_params$binwidth = child_params$binwidth / (max(panel_params[[x.range]]) - min(panel_params[[x.range]]))
   }
@@ -228,6 +285,7 @@ draw_slabs_dots = function(self, s_data, panel_params, coord,
       dotsize = child_params$dotsize,
       stackratio = child_params$stackratio,
       binwidth = child_params$binwidth,
+      layout = child_params$layout,
       side = side,
       orientation = orientation
     ))
@@ -282,7 +340,19 @@ draw_slabs_dots = function(self, s_data, panel_params, coord,
 #' @param stackratio The distance between the center of the dots in the same stack relative to the bin height. The
 #' default, `1`, makes dots in the same stack just touch each other.
 #' @param binwidth The bin width to use for drawing the dotplots. The default value, `NA`, will dynamically select
-#' a bin width based on the size of the plot when drawn.
+#' a bin width based on the size of the plot when drawn. If the value is numeric, it is assumed to be in units
+#' of data. The bin width can also be specified using `unit()`, which may be useful if it is desired that
+#' the dots be a certain percentage of the width/height of the viewport (e.g. `unit(0.1, "npc")` would
+#' make dots that are 10% of the viewport size along whichever dimension the dotplot is drawn).
+#' @param layout The layout method used for the dots:
+#'  - `"bin"` (default): places dots on the off-axis at the midpoint of their bins as in the classic Wilkinson dotplot.
+#'    This maintains the alignment of rows and columns in the dotplot.
+#'  - `"weave"`: places dots in the off-axis at their actual positions (modulo overlaps, which are nudged out of
+#'    the way). Maintains the alignment of rows but does not align dots within columns. Does not work well when
+#'    `side = "both"`.
+#'  - `"swarm"`: uses the `"compactswarm"` layout from `beeswarm::beeswarm()`. Does not maintain alignment of rows or
+#'    columns, but can be more compact and neat looking, especially for sample data (as opposed to quantile
+#'    dotplots of theoretical distributions, which may look better with `"bin"` or `"weave"`).
 #' @param quantiles For the `stat_` and `stat_dist_` stats, setting this to a value other than `NA`
 #' will produce a quantile dotplot: that is, a dotplot of quantiles from the sample (for `stat_`) or a dotplot
 #' of quantiles from the distribution (for `stat_dist_`). The value of `quantiles` determines the number
@@ -344,12 +414,15 @@ geom_dotsinterval = function(
   dotsize = 1,
   stackratio = 1,
   binwidth = NA,
+  layout = c("bin", "weave", "swarm"),
 
   na.rm = FALSE,
 
   show.legend = NA,
   inherit.aes = TRUE
 ) {
+  layout = match.arg(layout)
+
   layer(
     mapping = mapping,
     data = data,
@@ -365,6 +438,7 @@ geom_dotsinterval = function(
       dotsize = dotsize,
       stackratio = stackratio,
       binwidth = binwidth,
+      layout = layout,
 
       na.rm = na.rm,
       ...
@@ -396,14 +470,16 @@ GeomDotsinterval = ggproto("GeomDotsinterval", GeomSlabinterval,
   extra_params = c(GeomSlabinterval$extra_params,
     "dotsize",
     "stackratio",
-    "binwidth"
+    "binwidth",
+    "layout"
   ),
 
   default_params = defaults(list(
     normalize = "none",
     dotsize = 1,
     stackratio = 1,
-    binwidth = NA
+    binwidth = NA,
+    layout = "bin"
   ), GeomSlabinterval$default_params),
 
   draw_panel = function(self, data, panel_params, coord,
@@ -423,6 +499,7 @@ GeomDotsinterval = ggproto("GeomDotsinterval", GeomSlabinterval,
     dotsize = self$default_params$dotsize,
     stackratio = self$default_params$stackratio,
     binwidth = self$default_params$binwidth,
+    layout = self$default_params$layout,
 
     child_params = list()
   ) {
@@ -443,7 +520,8 @@ GeomDotsinterval = ggproto("GeomDotsinterval", GeomSlabinterval,
       child_params = list(
         dotsize = dotsize,
         stackratio = stackratio,
-        binwidth = binwidth
+        binwidth = binwidth,
+        layout = layout
       )
     )
   },

@@ -372,7 +372,7 @@ df %>%
 df %>%
   ggplot(aes(x = group, y = value, fill = subgroup, color = subgroup)) +
   stat_dots(position = "dodge") +
-  labs(title = "stat_dots(slab_color = NA)")
+  labs(title = "stat_dots(aes(fill = subgroup, color = subgroup))")
 
 ## ----quantile_dots_dodge, fig.width = med_width, fig.height = small_height--------------------------------------------
 df %>%
@@ -382,17 +382,39 @@ df %>%
 
 ## ----dist_dots_shape_color, fig.width = med_width, fig.height = large_height------------------------------------------
 dist_df %>%
-  ggplot(aes(y = group, dist = dist_normal(mean, sd), fill = stat(x < 5), shape = subgroup)) +
+  filter(group != "c") %>%
+  ggplot(aes(y = group, dist = dist_normal(mean, sd), fill = stat(x < 5), shape = stat(x < 5))) +
   stat_dist_dots(position = "dodge", color = NA) +
-  labs(title = "stat_dist_dots(aes(fill = stat(x < 5), shape = subgroup))") +
-  # we'll use these shapes since they retain outlines
-  scale_shape_manual(values = c(21,22,23))
+  labs(title = "stat_dist_dots(aes(fill and shape = stat(x < 5)))") +
+  geom_vline(xintercept = 5, alpha = 0.25) +
+  scale_x_continuous(breaks = 2:10) +
+  # we'll use these shapes since they have fill and outlines
+  scale_shape_manual(values = c(21,22))
+
+## ----dist_dots_weave, fig.width = med_width, fig.height = large_height------------------------------------------------
+dist_df %>%
+  filter(group != "c") %>%
+  ggplot(aes(y = group, dist = dist_normal(mean, sd), fill = stat(x < 5))) +
+  stat_dist_dots(position = "dodge", color = NA, layout = "weave") +
+  labs(title = 'stat_dist_dots(aes(fill = stat(x < 5)), layout = "weave")') +
+  geom_vline(xintercept = 5, alpha = 0.25) +
+  scale_x_continuous(breaks = 2:10)
 
 ## ----dist_dots_violin, fig.width = med_width, fig.height = small_height-----------------------------------------------
 dist_df %>%
-  ggplot(aes(x = group, dist = dist_normal(mean, sd), fill = subgroup)) +
+  filter(group != "c") %>%
+  ggplot(aes(x = group, dist = dist_normal(mean, sd), fill = group)) +
   stat_dist_dotsinterval(position = "dodge", side = "both", slab_color = NA) +
   labs(title = "stat_dist_dotsinterval(side = 'both', slab_color = NA)") 
+
+## ----dots_swarm, fig.width = med_width, fig.height = large_height-----------------------------------------------------
+df %>%
+  filter(group == "a") %>%
+  ggplot(aes(y = group, x = value, fill = stat(x < 5))) +
+  stat_dots(color = NA, layout = "swarm") +
+  labs(title = 'stat_dots(aes(fill = stat(x < 5)), layout = "swarm")') +
+  geom_vline(xintercept = 5, alpha = 0.25) +
+  scale_x_continuous(breaks = 2:8)
 
 ## ----ccdf_gradient, fig.width = med_width, fig.height = small_height--------------------------------------------------
 df %>%
@@ -442,6 +464,25 @@ priors %>%
   ggplot(aes(y = dist, dist = dist, args = args)) +
   stat_dist_eye(aes(slab_alpha = stat(-pmax(abs(1 - 2*cdf), .95)))) +
   scale_slab_alpha_continuous(guide = FALSE)
+
+## ----tukey_pencils, fig.width = small_height * 1.25, fig.height = small_height----------------------------------------
+dist_df %>%
+  ggplot(aes(x = group, dist = dist_normal(mean, sd), fill = subgroup)) +
+  stat_dist_slab(aes(
+      thickness = stat(pmax(0, abs(1 - 2*cdf) - .95)), 
+      fill_ramp = stat(pmax(0, abs(1 - 2*cdf) - .95))
+    ),
+    side = "both", position = "dodge"
+  ) +
+  labs(
+    title = 'stat_dist_slab(side = "both")', 
+    subtitle = paste0(
+      "aes(fill = subgroup,\n       ",
+      "fill_ramp and thickness = stat(pmax(0, abs(1 - 2*cdf) - .95)))"
+    )
+  ) +
+  guides(fill_ramp = FALSE) +
+  coord_cartesian(expand = FALSE)
 
 ## ----halfeye_filled_intervals, fig.width = med_width, fig.height = small_height---------------------------------------
 df %>%
@@ -500,6 +541,20 @@ dist_df %>%
     title = "stat_dist_interval()", 
     subtitle = "aes(color = subgroup, color_ramp = stat(level))"
   )
+
+## ----halfeye_dotplot, fig.width = med_width, fig.height = small_height------------------------------------------------
+df %>%
+  ggplot(aes(x = group, y = value)) +
+  stat_slab(side = "left", scale = 0.5) +
+  stat_dotsinterval(scale = 0.5) +
+  labs(title = 'stat_halfeye(side = "left") + stat_dotsinterval()')
+
+## ----halfeye_quantile_dotplot, fig.width = med_width, fig.height = small_height---------------------------------------
+df %>%
+  ggplot(aes(x = group, y = value)) +
+  stat_slab(side = "left", scale = 0.5) +
+  stat_dotsinterval(scale = 0.5, quantiles = 100) +
+  labs(title = 'stat_halfeye(side = "left") + stat_dotsinterval(quantiles = 100)')
 
 ## ----slab_and_pointinterval, fig.width = med_width, fig.height = small_height-----------------------------------------
 df %>%

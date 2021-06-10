@@ -175,6 +175,40 @@ df %>%
   scale_fill_brewer()
 ```
 
+### Lineribbon "gradients"
+
+You can also create gradient-like plots with lineribbons by passing a large number
+of probability levels to the `.width` parameter. Calling `ppoints(n)` generates
+`n` values between `0` and `1` (exclusive), which can be used as interval widths.
+We must also override the default `fill` aesthetic to use the `.width` generated
+variable, which is continuous (by default lineribbons map `level` onto the
+`fill` aesthetic, which is a transformation of `.width` into a factor---and produces
+illegible legends when many values are used). This also requires us to use
+a continuous fill scale (e.g. `scale_fill_distiller()`) instead of a discrete one
+(e.g. `scale_fill_brewer()`):
+
+```{r stat_lineribbon_gradient, fig.width = med_width, fig.height = med_height}
+df %>%
+  ggplot(aes(x = x, y = y)) +
+  stat_lineribbon(aes(fill = stat(.width)), .width = ppoints(50)) +
+  scale_fill_distiller()
+```
+
+To get a gradient that ramps down to the background color, you could also use
+the `fill_ramp` aesthetic provided by `ggdist` (see `help("scale_fill_ramp")`).
+It is necessary to invert the range (`range = c(1, 0)`) so that the gradient
+is dark in the middle (rather than the outside):
+
+```{r stat_lineribbon_gradient_ramp, fig.width = med_width, fig.height = med_height}
+df %>%
+  ggplot(aes(x = x, y = y)) +
+  stat_lineribbon(aes(fill_ramp = stat(.width)), .width = ppoints(50), fill = "#2171b5") +
+  scale_fill_ramp_continuous(range = c(1, 0))
+```
+
+If you are using a different background color than `"white"`, pass that color
+to the `from` argument of `scale_fill_ramp_continuous()`.
+
 ### Multiple lineribbons on one plot
 
 One may also want to plot multiple lineribbons on the same plot, perhaps corresponding
@@ -413,7 +447,7 @@ coverage level. You can try different methods to sometimes get improved
 bands; e.g. using the `"bd-mbd"` method per Sun and Genton 
 ([2011](https://doi.org/10.1198/jcgs.2011.09224)) works better on this dataset:
 
-```{r mtcars_curve_interval_bd, fig.width = med_width, fig.height = med_height}
+```{r mtcars_curve_interval_bd, fig.width = med_width, fig.height = med_height, eval = requireNamespace("fda", quietly = TRUE)}
 mtcars_boot %>%
   group_by(mpg) %>%
   curve_interval(hp, .width = c(.5, .7, .9), .interval = "bd-mbd") %>%

@@ -9,8 +9,8 @@ library(distributional)
 context("stat_dist_")
 
 test_that("distribution eye plots work with the args aesthetic", {
-  skip_if_not_installed("vdiffr")
-  skip_if_not_installed("svglite")
+  skip_if_no_vdiffr()
+
 
   p = tribble(
     ~dist, ~args,
@@ -62,8 +62,8 @@ test_that("distribution eye plots work with the args aesthetic", {
 })
 
 test_that("stat fill aesthetic on halfeye works", {
-  skip_if_not_installed("vdiffr")
-  skip_if_not_installed("svglite")
+  skip_if_no_vdiffr()
+
 
   vdiffr::expect_doppelganger("gradient fill/color halfeye",
     data.frame(dist = "norm", mean = 0, sd = 1) %>%
@@ -73,8 +73,8 @@ test_that("stat fill aesthetic on halfeye works", {
 })
 
 test_that("stat_dist_gradientinterval works", {
-  skip_if_not_installed("vdiffr")
-  skip_if_not_installed("svglite")
+  skip_if_no_vdiffr()
+
 
   p = tribble(
     ~dist, ~args,
@@ -93,8 +93,8 @@ test_that("stat_dist_gradientinterval works", {
 })
 
 test_that("stat_dist_pointinterval, interval, and slab work", {
-  skip_if_not_installed("vdiffr")
-  skip_if_not_installed("svglite")
+  skip_if_no_vdiffr()
+
 
   p = tribble(
     ~dist, ~args,
@@ -132,8 +132,8 @@ test_that("density transformation works", {
 })
 
 test_that("scale transformation works", {
-  skip_if_not_installed("vdiffr")
-  skip_if_not_installed("svglite")
+  skip_if_no_vdiffr()
+
 
   # this setup should yield a 95% interval from a little above 1e-3 to a little below 1e+5
   p_log = data.frame(dist = "lnorm") %>%
@@ -157,14 +157,14 @@ test_that("scale transformation works", {
     p_rev + stat_dist_halfeye(n = 100)
   )
 
-  vdiffr::expect_doppelganger("dist_ccdfintervalh reverse scale transform",
+  vdiffr::expect_doppelganger("ccdfinterval reverse scale transform",
     p_rev + stat_dist_ccdfinterval(n = 100)
   )
 })
 
 test_that("orientation detection works properly on stat_dist", {
-  skip_if_not_installed("vdiffr")
-  skip_if_not_installed("svglite")
+  skip_if_no_vdiffr()
+
 
   vdiffr::expect_doppelganger("stat_dist with no main axis",
     ggplot(data.frame(), aes(dist = "norm")) + stat_dist_slabinterval(n = 10)
@@ -181,8 +181,8 @@ test_that("orientation detection works properly on stat_dist", {
 })
 
 test_that("auto-grouping works on stat_dist", {
-  skip_if_not_installed("vdiffr")
-  skip_if_not_installed("svglite")
+  skip_if_no_vdiffr()
+
 
   p = data.frame(
     dist = c("norm", "norm"),
@@ -196,8 +196,8 @@ test_that("auto-grouping works on stat_dist", {
 })
 
 test_that("pdf and cdf aesthetics work", {
-  skip_if_not_installed("vdiffr")
-  skip_if_not_installed("svglite")
+  skip_if_no_vdiffr()
+
 
   p = tribble(
     ~dist, ~args,
@@ -213,8 +213,8 @@ test_that("pdf and cdf aesthetics work", {
 })
 
 test_that("distributional objects work", {
-  skip_if_not_installed("vdiffr")
-  skip_if_not_installed("svglite")
+  skip_if_no_vdiffr()
+
 
   p = tribble(
     ~name, ~dist,
@@ -223,19 +223,27 @@ test_that("distributional objects work", {
   ) %>%
     ggplot(aes(x = name, dist = dist))
 
-  vdiffr::expect_doppelganger("distributional objects in stat_dist_halfeye",
+  vdiffr::expect_doppelganger("dist objects in stat_dist_halfeye",
     p + stat_dist_halfeye(n = 20)
   )
 
-  vdiffr::expect_doppelganger("distributional objects in stat_dist_ccdfinterval",
+  vdiffr::expect_doppelganger("dist objects in stat_dist_ccdfinterval",
     p + stat_dist_ccdfinterval(n = 20)
+  )
+
+  vdiffr::expect_doppelganger("dist_sample",
+    tibble(
+      x = dist_sample(list(qnorm(ppoints(100)), qnorm(ppoints(100), mean = 1)))
+    ) %>%
+      ggplot(aes(dist = x, y = "a")) +
+      stat_dist_slab(fill = NA, color = "black", n = 20)
   )
 
 })
 
 test_that("stat_dist_ works on factor dist names", {
-  skip_if_not_installed("vdiffr")
-  skip_if_not_installed("svglite")
+  skip_if_no_vdiffr()
+
 
   p = data.frame(
     x = factor(c("norm", "norm")),
@@ -250,8 +258,8 @@ test_that("stat_dist_ works on factor dist names", {
 })
 
 test_that("automatic finite limits work", {
-  skip_if_not_installed("vdiffr")
-  skip_if_not_installed("svglite")
+  skip_if_no_vdiffr()
+
 
   # this setup should yield a 95% interval from a little above 1e-3 to a little below 1e+5
   p = data.frame(dist = dist_beta(2,2)) %>%

@@ -8,8 +8,8 @@ library(dplyr)
 context("stat_sample_")
 
 test_that("vanilla stat_slabinterval works", {
-  skip_if_not_installed("vdiffr")
-  skip_if_not_installed("svglite")
+  skip_if_no_vdiffr()
+
 
   set.seed(1234)
   p = tribble(
@@ -27,8 +27,8 @@ test_that("vanilla stat_slabinterval works", {
 })
 
 test_that("gradientinterval works", {
-  skip_if_not_installed("vdiffr")
-  skip_if_not_installed("svglite")
+  skip_if_no_vdiffr()
+
 
   set.seed(1234)
   p = tribble(
@@ -49,8 +49,8 @@ test_that("gradientinterval works", {
 })
 
 test_that("histinterval and slab work", {
-  skip_if_not_installed("vdiffr")
-  skip_if_not_installed("svglite")
+  skip_if_no_vdiffr()
+
 
   set.seed(1234)
   p = tribble(
@@ -78,8 +78,8 @@ test_that("histinterval and slab work", {
 })
 
 test_that("scale transformation works", {
-  skip_if_not_installed("vdiffr")
-  skip_if_not_installed("svglite")
+  skip_if_no_vdiffr()
+
 
 
   p_log = data.frame(x = qlnorm(ppoints(200), log(10), 2 * log(10))) %>%
@@ -101,8 +101,8 @@ test_that("scale transformation works", {
 })
 
 test_that("pdf and cdf aesthetics work", {
-  skip_if_not_installed("vdiffr")
-  skip_if_not_installed("svglite")
+  skip_if_no_vdiffr()
+
 
   p = data.frame(
     x = c("a", "b"),
@@ -113,5 +113,26 @@ test_that("pdf and cdf aesthetics work", {
   vdiffr::expect_doppelganger("pdf and cdf on a sample slabinterval",
     p + stat_sample_slabinterval(aes(fill = x, thickness = stat(pdf), slab_alpha = stat(cdf)), n = 20) + geom_point()
   )
+})
+
+test_that("constant distributions work", {
+  skip_if_no_vdiffr()
+
+
+  p = data.frame(
+    x = c("constant = 1", "normal(2,1)"),
+    # sd of 0 will generate constant dist
+    y = qnorm(ppoints(100), mean = c(1, 2), sd = c(0, 1))
+  ) %>%
+    ggplot(aes(x = x, y = y))
+
+  vdiffr::expect_doppelganger("constant dist on halfeye",
+    p + stat_sample_slabinterval(n = 20)
+  )
+
+  vdiffr::expect_doppelganger("constant dist on ccdf",
+    p + stat_ccdfinterval()
+  )
+
 })
 

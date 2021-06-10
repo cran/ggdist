@@ -595,7 +595,7 @@ Unlike the base `ggplot2::geom_dotplot()` geom, `ggdist::geom_dots()` automatica
 df %>%
   ggplot(aes(x = group, y = value, fill = subgroup, color = subgroup)) +
   stat_dots(position = "dodge") +
-  labs(title = "stat_dots(slab_color = NA)")
+  labs(title = "stat_dots(aes(fill = subgroup, color = subgroup))")
 ```
 
 ### Quantile dotplots
@@ -617,21 +617,69 @@ As with other plot types, you can also use `stat_dist_dots()` instead if you wis
 
 ```{r dist_dots_shape_color, fig.width = med_width, fig.height = large_height}
 dist_df %>%
-  ggplot(aes(y = group, dist = dist_normal(mean, sd), fill = stat(x < 5), shape = subgroup)) +
+  filter(group != "c") %>%
+  ggplot(aes(y = group, dist = dist_normal(mean, sd), fill = stat(x < 5), shape = stat(x < 5))) +
   stat_dist_dots(position = "dodge", color = NA) +
-  labs(title = "stat_dist_dots(aes(fill = stat(x < 5), shape = subgroup))") +
-  # we'll use these shapes since they retain outlines
-  scale_shape_manual(values = c(21,22,23))
+  labs(title = "stat_dist_dots(aes(fill and shape = stat(x < 5)))") +
+  geom_vline(xintercept = 5, alpha = 0.25) +
+  scale_x_continuous(breaks = 2:10) +
+  # we'll use these shapes since they have fill and outlines
+  scale_shape_manual(values = c(21,22))
+```
+
+Notice the default dotplot layout, `"bin"`, can cause dots to be on the wrong
+side of a cutoff when coloring dots within dotplots. Thus it can be useful to use the
+`"weave"` layout, which positions dots at (or very close to) their true positions,
+rather than at bin centers:
+
+```{r dist_dots_weave, fig.width = med_width, fig.height = large_height}
+dist_df %>%
+  filter(group != "c") %>%
+  ggplot(aes(y = group, dist = dist_normal(mean, sd), fill = stat(x < 5))) +
+  stat_dist_dots(position = "dodge", color = NA, layout = "weave") +
+  labs(title = 'stat_dist_dots(aes(fill = stat(x < 5)), layout = "weave")') +
+  geom_vline(xintercept = 5, alpha = 0.25) +
+  scale_x_continuous(breaks = 2:10)
 ```
 
 As with other slabinterval geoms, the `side` argument can also be used to construct violin-style dotplots. This example also shows the use of `dotsinterval` in place of `dots` to construct a combined quantile dotplot violin + interval plot. We also set `slab_color = NA` to turn off the outline on the dots:
 
 ```{r dist_dots_violin, fig.width = med_width, fig.height = small_height}
 dist_df %>%
-  ggplot(aes(x = group, dist = dist_normal(mean, sd), fill = subgroup)) +
+  filter(group != "c") %>%
+  ggplot(aes(x = group, dist = dist_normal(mean, sd), fill = group)) +
   stat_dist_dotsinterval(position = "dodge", side = "both", slab_color = NA) +
   labs(title = "stat_dist_dotsinterval(side = 'both', slab_color = NA)") 
 ```
+
+### Using beeswarm layouts
+
+Finally, while the `"bin"` and `"weave"` layout methods shown above work especially 
+well for quantile dotplots, it can be useful when visualizing sample data
+(especially in large amounts) to employ so-called "beeswarm" plots. Setting
+`layout = "swarm"` will use the `"compactswarm"` layout type from `beeswarm::beeswarm()`,
+which tends to work well on sample data (but not on quantiles):
+
+```{r dots_swarm, fig.width = med_width, fig.height = large_height}
+df %>%
+  filter(group == "a") %>%
+  ggplot(aes(y = group, x = value, fill = stat(x < 5))) +
+  stat_dots(color = NA, layout = "swarm") +
+  labs(title = 'stat_dots(aes(fill = stat(x < 5)), layout = "swarm")') +
+  geom_vline(xintercept = 5, alpha = 0.25) +
+  scale_x_continuous(breaks = 2:8)
+```
+
+Thus there are three layout options with `dots` and `dotsinterval` stats and
+geoms:
+
+- `layout = "bin"`, which maintains neat rows and columns and works well on
+  quantile dotplots.
+- `layout = "weave"`, which maintains neat rows (but not columns) and works well
+  on quantile dotplots when you need to map other aesthetics based on positional 
+  cutoffs.
+- `layout = "swarm"`, which does not maintain rows or columns, and works well
+  when you need a compact layout for sample data (not quantiles).
 
 ### Summing up dotplots: `stat_[dist_]dots[interval]`
 
@@ -639,7 +687,6 @@ All of the above geoms follow the naming scheme `stat_[dist_]dots[interval]`.
 
 * Add `dist_` to the name to get stats for analytical distributions (otherwise it is for sample data).
 * Add `interval` to the name to get the version with a point+interval geom overlaid.
-
 
 ## Custom plots
 
@@ -725,6 +772,35 @@ priors %>%
   stat_dist_eye(aes(slab_alpha = stat(-pmax(abs(1 - 2*cdf), .95)))) +
   scale_slab_alpha_continuous(guide = FALSE)
 ```
+
+A related idea is one from [Tukey](https://doi.org/10.1080/00031305.1986.10475361): rather than
+visually emphasizing where a value is likely, emphasize where it is *unlikely*. While Tukey
+used a visual representation showing both pointwise and simultaneous intervals, for this
+example we will do something a bit different, inverting the faded-tails function from 
+Correll & Gleicher to create bars that "block out" the regions of low likelihood:
+
+```{r tukey_pencils, fig.width = small_height * 1.25, fig.height = small_height}
+dist_df %>%
+  ggplot(aes(x = group, dist = dist_normal(mean, sd), fill = subgroup)) +
+  stat_dist_slab(aes(
+      thickness = stat(pmax(0, abs(1 - 2*cdf) - .95)), 
+      fill_ramp = stat(pmax(0, abs(1 - 2*cdf) - .95))
+    ),
+    side = "both", position = "dodge"
+  ) +
+  labs(
+    title = 'stat_dist_slab(side = "both")', 
+    subtitle = paste0(
+      "aes(fill = subgroup,\n       ",
+      "fill_ramp and thickness = stat(pmax(0, abs(1 - 2*cdf) - .95)))"
+    )
+  ) +
+  guides(fill_ramp = FALSE) +
+  coord_cartesian(expand = FALSE)
+```
+
+Thanks to a tweet from [Jessica Hullman](https://twitter.com/JessicaHullman/status/1366945872630714368?s=20) 
+that inspired the idea.
 
 ### Densities filled according to intervals
 
@@ -826,9 +902,36 @@ dist_df %>%
 
 See `help("scale_color_ramp")` for more information on the color ramp aesthetics/scales.
 
-### Independent slabs and intervals in composite plots
+### Multiple slabs and intervals in composite plots
 
-Sometimes when constructing composite plots it may be useful to position slab and interval parts of the geometry separately.
+Sometimes you may want to include multiple different types of slabs in the same plot
+in order to take advantage of the features each slab type provides. For example,
+people often combine densities with dotplots to show the underlying datapoints that
+go into a density estimate. To use multiple slab geometries together, you can use the
+`side` parameter to change which side of the interval a slab is drawn on and set the
+`scale` parameter to something around `0.5` (by default it is `0.9`) so that the
+two slabs do not overlap:
+
+```{r halfeye_dotplot, fig.width = med_width, fig.height = small_height}
+df %>%
+  ggplot(aes(x = group, y = value)) +
+  stat_slab(side = "left", scale = 0.5) +
+  stat_dotsinterval(scale = 0.5) +
+  labs(title = 'stat_halfeye(side = "left") + stat_dotsinterval()')
+```
+
+In this example, depending on your use case you might prefer a quantile dotplot
+instead of a dotplot of all data points:
+
+```{r halfeye_quantile_dotplot, fig.width = med_width, fig.height = small_height}
+df %>%
+  ggplot(aes(x = group, y = value)) +
+  stat_slab(side = "left", scale = 0.5) +
+  stat_dotsinterval(scale = 0.5, quantiles = 100) +
+  labs(title = 'stat_halfeye(side = "left") + stat_dotsinterval(quantiles = 100)')
+```
+
+When constructing composite plots it may be useful to position slab and interval parts of the geometry separately.
 While some relative positioning of these geometries is supported by manipulating the `justification` parameter, if you
 want complete, separate control over positioning of intervals versus slabs, the simplest approach can be to specify those
 geometries separately. 
