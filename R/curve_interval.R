@@ -8,11 +8,15 @@
 #' Translates draws from distributions in a grouped data frame into a set of point and
 #' interval summaries using a curve boxplot-inspired approach.
 #'
-#' Intervals are calculated by ranking the curves using some measure of *data depth*, then creating
-#' envelopes containing the `.width`% "deepest" curves (for each value of `.width`). Thus, the intervals
-#' are guaranteed to contain *at least* `.width`% of the full curves, but may be conservative (i.e.
-#' they may contain more than `.width`% of the curves). See Mirzargar *et al.* (2014) or
-#' Juul *et al.* (2020) for an accessible introduction to the idea.
+#' Intervals are calculated by ranking the curves using some measure of *data depth*, then
+#' using binary search to find a cutoff `k` such that an envelope containing the `k`% "deepest"
+#' curves also contains `.width`% of the curves, for each value of `.width` (note that `k`
+#' and `.width` are not necessarily the same). This is in contrast to most functional boxplot
+#' or curve boxplot approaches, which tend to simply take the `.width`% deepest curves, and
+#' are generally quite conservative (i.e. they may contain more than `.width`% of the curves).
+#'
+#' See Mirzargar *et al.* (2014) or Juul *et al.* (2020) for an accessible introduction
+#' to data depth and curve boxplots / functional boxplots.
 #'
 #' @param .data Data frame (or grouped data frame as returned by [group_by()])
 #' that contains draws to summarize.
@@ -24,10 +28,11 @@
 #' @param .along Which columns are the input values to the function describing the curve (e.g., the "x"
 #' values). Supports tidyselect syntax, as in `dplyr::select()`. Intervals are calculated jointly with
 #' respect to these variables, conditional on all other grouping variables in the data frame. The default
-#' (`NULL`) causes `curve_interval()` to use all grouping variables in the input data frame, which will
-#' generate the most conservative intervals. However, if you want to calculate intervals for some function
-#' `y = f(x)` conditional on some other variable(s) (say, conditional on a factor `g`), you would group by
-#' `g`, then use `.along = x` to calculate intervals jointly over `x` conditional on `g`.
+#' (`NULL`) causes `curve_interval()` to use all grouping variables in the input data frame as the value
+#' for `.along`, which will generate the most conservative intervals. However, if you want to calculate
+#' intervals for some function `y = f(x)` conditional on some other variable(s) (say, conditional on a
+#' factor `g`), you would group by `g`, then use `.along = x` to calculate intervals jointly over `x`
+#' conditional on `g`.
 #' @param .width vector of probabilities to use that determine the widths of the resulting intervals.
 #' If multiple probabilities are provided, multiple rows per group are generated, each with
 #' a different probability interval (and value of the corresponding `.width` column).
@@ -87,19 +92,17 @@
 #' @examples
 #'
 #' library(dplyr)
-#' library(tidyr)
 #' library(ggplot2)
 #'
 #' # generate a set of curves
 #' k = 11 # number of curves
 #' n = 201
 #' df = tibble(
-#'     .draw = 1:k,
-#'     mean = seq(-5,5, length.out = k),
-#'     x = list(seq(-15,15,length.out = n))
-#'   ) %>%
-#'   unnest(x) %>%
-#'   mutate(y = dnorm(x, mean, 3))
+#'     .draw = rep(1:k, n),
+#'     mean = rep(seq(-5,5, length.out = k), n),
+#'     x = rep(seq(-15,15,length.out = n), each = k),
+#'     y = dnorm(x, mean, 3)
+#'   )
 #'
 #' # see pointwise intervals...
 #' df %>%
@@ -113,17 +116,18 @@
 #'   theme_ggdist()
 #'
 #' # ... compare them to curvewise intervals
-#' df %>%
-#'   group_by(x) %>%
-#'   curve_interval(y, .width = c(.5)) %>%
-#'   ggplot(aes(x = x, y = y)) +
-#'   geom_lineribbon(aes(ymin = .lower, ymax = .upper)) +
-#'   geom_line(aes(group = .draw), alpha=0.15, data = df) +
-#'   scale_fill_brewer() +
-#'   ggtitle("50% curvewise intervals with curve_interval()") +
-#'   theme_ggdist()
+#' if (requireNamespace("posterior", quietly = TRUE)) {
+#'   df %>%
+#'     group_by(x) %>%
+#'     curve_interval(y, .width = c(.5)) %>%
+#'     ggplot(aes(x = x, y = y)) +
+#'     geom_lineribbon(aes(ymin = .lower, ymax = .upper)) +
+#'     geom_line(aes(group = .draw), alpha=0.15, data = df) +
+#'     scale_fill_brewer() +
+#'     ggtitle("50% curvewise intervals with curve_interval()") +
+#'     theme_ggdist()
+#' }
 #'
-#' @importFrom purrr map_dfr map map2 map_dbl map_lgl iwalk
 #' @importFrom dplyr group_vars summarise_at %>% group_split
 #' @importFrom rlang quos quos_auto_name eval_tidy quo_get_expr
 #' @importFrom tidyselect eval_select
@@ -132,11 +136,15 @@ curve_interval = function(.data, ..., .along = NULL, .width = .5,
   .interval = c("mhd", "mbd", "bd", "bd-mbd"), .simple_names = TRUE,
   na.rm = FALSE, .exclude = c(".chain", ".iteration", ".draw", ".row")
 ) {
+  if (!requireNamespace("posterior", quietly = TRUE)) {
+    stop('curve_interval() requires the `posterior` package to be installed.') #nocov
+  }
+
   .interval = match.arg(.interval)
   data = .data    # to avoid conflicts with tidy eval's `.data` pronoun
   col_exprs = quos(..., .named = TRUE)
 
-    # get the grouping variables we will jointly calculate intervals on
+  # get the grouping variables we will jointly calculate intervals on
   .along = enquo(.along)
   if (is.null(quo_get_expr(.along))) {
     .along = group_vars(data)
@@ -157,7 +165,7 @@ curve_interval = function(.data, ..., .along = NULL, .width = .5,
       setdiff(.exclude) %>%
       # have to use quos here because lists of symbols don't work correctly with iwalk() for some reason
       # (the simpler version of this line would be `syms() %>%`)
-      map(~ quo(!!sym(.))) %>%
+      lapply(function(x) quo(!!sym(x))) %>%
       quos_auto_name()
 
     if (length(col_exprs) == 0) {
@@ -183,13 +191,13 @@ curve_interval = function(.data, ..., .along = NULL, .width = .5,
 
     .curve_interval(data, col_name, ".lower", ".upper", .width, .interval, .conditional_groups, na.rm = na.rm)
   } else {
-    iwalk(col_exprs, function(col_expr, col_name) {
+    iwalk_(col_exprs, function(col_expr, col_name) {
       data[[col_name]] <<- eval_tidy(col_expr, data)
     })
 
     # if the values we are going to summarise are not already list columns, make them into list columns
     # (making them list columns first is faster than anything else I've tried)
-    if (!all(map_lgl(data[,names(col_exprs)], is.list))) {
+    if (!all(map_lgl_(data[,names(col_exprs)], is.list))) {
       data = summarise_at(data, names(col_exprs), list)
     }
 
@@ -229,42 +237,91 @@ halfspace_depth = function(x) {
     "mhd"
   )
 
-  map_dfr(dfs, function(d) {
+  map_dfr_(dfs, function(d) {
+
+    # draws x y matrix
+    draws = do.call(cbind, d[[col_name]])
+    y_rvar = posterior::rvar(draws)
 
     if (.interval_internal == "mhd") { #mean halfspace depth
-      # draws x y matrix
-      draws = do.call(cbind, d[[col_name]])
       # draws x depth matrix
       pointwise_depths = apply(draws, 2, halfspace_depth)
       # mean depth of each draw
       draw_depth = rowMeans(pointwise_depths, na.rm = na.rm)
     } else { # band depth using fbplot
       if (!requireNamespace("fda", quietly = TRUE)) {
-        stop(
-          'curve_interval(.interval = "', .interval, '") requires the `fda` package.\n',
-          'Please install the `fda` package or use .interval = "mhd".'
-        )
+        stop0(                                                                           # nocov
+          'curve_interval(.interval = "', .interval, '") requires the `fda` package.\n', # nocov
+          'Please install the `fda` package or use .interval = "mhd".'                   # nocov
+        )                                                                                # nocov
       }
-      # y x draws matrix
-      draws = do.call(rbind, d[[col_name]])
       # depth of each draw
-      draw_depth = fda::fbplot(draws, plot = FALSE, method = .interval_internal)$depth
+      draw_depth = fda::fbplot(t(draws), plot = FALSE, method = .interval_internal)$depth
     }
 
     # median draw = the one with the maximum depth
     median_draw = which.max(draw_depth)
-    median_y = map_dbl(d[[col_name]], `[[`, median_draw)
+    median_y = map_dbl_(d[[col_name]], `[[`, median_draw)
 
-    map_dfr(.width, function(w) {
-      depth_cutoff = quantile(draw_depth, 1 - w, na.rm = na.rm)
+    # function for determining the intervals given a selected draw depth
+    calc_intervals_at_depth_cutoff = function(depth_cutoff) {
       selected_draws = draw_depth >= depth_cutoff
 
       selected_y = lapply(d[[col_name]], `[`, selected_draws)
-      d[[lower]] = map_dbl(selected_y, min)
-      d[[upper]] = map_dbl(selected_y, max)
+      d[[lower]] = map_dbl_(selected_y, min)
+      d[[upper]] = map_dbl_(selected_y, max)
+      d[[".actual_width"]] = posterior::Pr(posterior::rvar_all(d[[lower]] <= y_rvar & y_rvar <= d[[upper]]))
+
+      d
+    }
+
+    # for each requested width (as a probability), translate it into a
+    # draw depth cutoff where approximately width% draws are contained
+    # by the envelope around all draws deeper than the depth cutoff
+    sorted_draw_depths = sort(draw_depth)
+    map_dfr_(.width, function(w) {
+      if (FALSE) {
+        # naive approach: just use quantiles of draw depths to determine cutoff
+        depth_cutoff = quantile(draw_depth, 1 - w, na.rm = na.rm)
+      } else {
+        # use binary search to find a cutoff
+        draw_depth_i = binary_search(
+          function(i) {
+            depth_cutoff = sorted_draw_depths[i]
+            actual_width = calc_intervals_at_depth_cutoff(depth_cutoff)[[".actual_width"]][[1]]
+            actual_width >= w
+          },
+          min_i = 1,
+          max_i = length(sorted_draw_depths)
+        )
+        depth_cutoff = sorted_draw_depths[draw_depth_i]
+      }
+
+      d = calc_intervals_at_depth_cutoff(depth_cutoff)
       d[[col_name]] = median_y
       d[[".width"]] = w
       d
     })
   })
+}
+
+
+# use binary search to find the largest i such that f(i) is TRUE
+# assumes there is some i such that for all j < i, f(i) is TRUE and
+# for all k > i, f(i) is FALSE
+binary_search = function(f, min_i, max_i) {
+  # pre-conditions: f(min_i) should be TRUE, f(max_i) should be FALSE
+  if (!f(min_i)) return(min_i)
+  if (f(max_i)) return(max_i)
+
+  repeat {
+    if (max_i - min_i == 1) return(min_i)
+
+    i = ceiling((min_i + max_i) / 2)
+    if (f(i)) {
+      min_i = i
+    } else {
+      max_i = i
+    }
+  }
 }

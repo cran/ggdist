@@ -1,7 +1,10 @@
 ## ----chunk_options, include=FALSE---------------------------------------------
-tiny_width = small_width = med_width = 6.75
-tiny_height = small_height = med_height = 4.5
-large_width = 8; large_height = 5.25
+tiny_width = 5.5
+tiny_height = 3 + 2/3
+small_width = med_width = 6.75
+small_height = med_height = 4.5
+large_width = 8
+large_height = 5.25
 
 knitr::opts_chunk$set(
   fig.width = small_width,
@@ -9,7 +12,8 @@ knitr::opts_chunk$set(
 )
 if (capabilities("cairo") && Sys.info()[['sysname']] != "Darwin") {
   knitr::opts_chunk$set(
-    dev.args = list(png = list(type = "cairo"))
+    dev = "png",
+    dev.args = list(type = "cairo")
   )
 }
 
@@ -59,7 +63,7 @@ dists_plot = dists_df %>%
   geom_blank() + # ensures order
   stat_dist_eye(data = . %>% filter(geom == "eye")) +
   stat_dist_halfeye(data = . %>% filter(geom == "halfeye"), position = position_nudge(y = - 0.2)) +
-  stat_dist_gradientinterval(data = . %>% filter(geom == "gradientinterval"), scale = .5) +
+  stat_dist_gradientinterval(data = . %>% filter(geom == "gradientinterval"), scale = .5, fill_type = "gradient") +
   stat_dist_ccdfinterval(data = . %>% filter(geom == "ccdfinterval"), scale = .5) +
   stat_dist_cdfinterval(data = . %>% filter(geom == "cdfinterval"), scale = .5) +
   stat_interval(aes(x = x, y = "interval"), data = hist_df, color = "gray65", alpha = 1/3, size = 10,
@@ -69,7 +73,7 @@ dists_plot = dists_df %>%
   stat_dist_dotsinterval(data = . %>% filter(geom == "dotsinterval"), position = position_nudge(y = - 0.3)) +
   stat_dist_dots(data = . %>% filter(geom == "dots"), position = position_nudge(y = - 0.3)) +
   stat_histinterval(aes(x = x), data = hist_df, position = position_nudge(y = - 0.4)) +
-  scale_slab_alpha_continuous(guide = FALSE) +
+  scale_slab_alpha_continuous(guide = "none") +
   scale_x_continuous(limits = c(0,8), expand = c(0,0)) +
   labs(
     subtitle = "The stat_slabinterval / geom_slabinterval family",
@@ -288,7 +292,7 @@ plot_grid(ncol = 2, align = "hv",
     labs(subtitle = "outline_bars = TRUE")
 )
 
-## ----cdfinterval_family, fig.width = small_width, fig.height = small_width--------------------------------------------
+## ----cdfinterval_family, fig.width = med_width, fig.height = med_width------------------------------------------------
 p = df %>%
   ggplot(aes(x = group, y = value)) +
   panel_border()
@@ -328,7 +332,7 @@ df %>%
   coord_cartesian(expand = FALSE, clip = "off") +
   ggtitle("stat_ccdfinterval(position = 'dodge', justification = 1)")
 
-## ----ccdf_side, fig.width = med_width, fig.height = tiny_height-------------------------------------------------------
+## ----ccdf_side, fig.width = med_width, fig.height = med_height--------------------------------------------------------
 p = df %>%
   ggplot(aes(x = value, y = group)) +
   expand_limits(x = 0) +
@@ -356,17 +360,17 @@ df %>%
   stat_gradientinterval(position = "dodge") +
   labs(title = "stat_gradientinterval(position = 'dodge')")
 
+## ----gradient_dodge_nice----------------------------------------------------------------------------------------------
+df %>%
+  ggplot(aes(x = group, y = value, fill = subgroup)) +
+  stat_gradientinterval(position = "dodge", fill_type = "gradient") +
+  labs(title = "stat_gradientinterval(position = 'dodge')")
+
 ## ----dist_gradient_dodge----------------------------------------------------------------------------------------------
 dist_df %>%
   ggplot(aes(x = group, dist = dist_normal(mean, sd), fill = subgroup)) +
   stat_dist_gradientinterval(position = "dodge") +
   labs(title = "stat_dist_gradientinterval(position = 'dodge')")
-
-## ----dots_dodge, fig.width = med_width, fig.height = small_height-----------------------------------------------------
-df %>%
-  ggplot(aes(x = group, y = value, fill = subgroup)) +
-  stat_dots(position = "dodge") +
-  labs(title = "stat_dots(position = 'dodge')")
 
 ## ----dots_dodge_nocolor, fig.width = med_width, fig.height = small_height---------------------------------------------
 df %>%
@@ -411,33 +415,29 @@ dist_df %>%
 df %>%
   filter(group == "a") %>%
   ggplot(aes(y = group, x = value, fill = stat(x < 5))) +
-  stat_dots(color = NA, layout = "swarm") +
-  labs(title = 'stat_dots(aes(fill = stat(x < 5)), layout = "swarm")') +
+  stat_dots(color = NA, layout = "swarm", side = "both") +
+  labs(title = 'stat_dots(aes(fill = stat(x < 5)), layout = "swarm", side = "both")') +
   geom_vline(xintercept = 5, alpha = 0.25) +
   scale_x_continuous(breaks = 2:8)
 
 ## ----ccdf_gradient, fig.width = med_width, fig.height = small_height--------------------------------------------------
 df %>%
   ggplot(aes(x = group, y = value, fill = subgroup)) +
-  stat_ccdfinterval(aes(slab_alpha = stat(f)), thickness = 1, position = "dodge") +
+  stat_ccdfinterval(aes(slab_alpha = stat(f)), 
+    thickness = 1, position = "dodge", fill_type = "gradient"
+  ) +
   expand_limits(y = 0) +
   # plus coord_cartesian so there is no space between bars and axis
   coord_cartesian(expand = FALSE) +
   ggtitle("stat_ccdfinterval(aes(slab_alpha = stat(f)), thickness = 1)")
 
-## ----norm_vs_t_2, fig.width = small_width, fig.height = small_height--------------------------------------------------
+## ----norm_vs_t_highlight, fig.width = med_width, fig.height = small_height--------------------------------------------
 priors = tribble(
   ~ dist,      ~ args,
   "norm",      list(0, 1),
   "student_t", list(3, 0, 1)
 ) 
 
-priors %>%
-  ggplot(aes(y = dist, dist = dist, args = args)) +
-  stat_dist_halfeye() +
-  ggtitle("stat_dist_halfeye()")
-
-## ----norm_vs_t_highlight, fig.width = med_width, fig.height = small_height--------------------------------------------
 priors %>%
   ggplot(aes(y = dist, dist = dist, args = args)) +
   stat_dist_halfeye(aes(fill = stat(abs(x) < 1.5))) +
@@ -448,7 +448,7 @@ priors %>%
 ## ----norm_vs_t_gradient_eye, fig.width = med_width, fig.height = small_height-----------------------------------------
 priors %>%
   ggplot(aes(y = dist, dist = dist, args = args)) +
-  stat_dist_eye(aes(slab_alpha = stat(f), fill = stat(x > 1))) +
+  stat_dist_eye(aes(slab_alpha = stat(f), fill = stat(x > 1)), fill_type = "gradient") +
   ggtitle("stat_dist_eye(aes(slab_alpha = stat(f), fill = stat(x > 1)))") +
   # we'll use a nicer palette than the default for highlighting:
   scale_fill_manual(values = c("gray75", "skyblue"))
@@ -456,14 +456,16 @@ priors %>%
 ## ----correll_gradient, fig.width = med_width, fig.height = small_height/2---------------------------------------------
 priors %>%
   ggplot(aes(y = dist, dist = dist, args = args)) +
-  stat_dist_gradientinterval(aes(slab_alpha = stat(-pmax(abs(1 - 2*cdf), .95)))) +
-  scale_slab_alpha_continuous(guide = FALSE)
+  stat_dist_gradientinterval(aes(slab_alpha = stat(-pmax(abs(1 - 2*cdf), .95))),
+    fill_type = "gradient"
+  ) +
+  scale_slab_alpha_continuous(guide = "none")
 
 ## ----helske_gradient_eye, fig.width = med_width, fig.height = small_height--------------------------------------------
 priors %>%
   ggplot(aes(y = dist, dist = dist, args = args)) +
-  stat_dist_eye(aes(slab_alpha = stat(-pmax(abs(1 - 2*cdf), .95)))) +
-  scale_slab_alpha_continuous(guide = FALSE)
+  stat_dist_eye(aes(slab_alpha = stat(-pmax(abs(1 - 2*cdf), .95))), fill_type = "gradient") +
+  scale_slab_alpha_continuous(guide = "none")
 
 ## ----tukey_pencils, fig.width = small_height * 1.25, fig.height = small_height----------------------------------------
 dist_df %>%
@@ -472,7 +474,7 @@ dist_df %>%
       thickness = stat(pmax(0, abs(1 - 2*cdf) - .95)), 
       fill_ramp = stat(pmax(0, abs(1 - 2*cdf) - .95))
     ),
-    side = "both", position = "dodge"
+    side = "both", position = "dodge", fill_type = "gradient"
   ) +
   labs(
     title = 'stat_dist_slab(side = "both")', 
@@ -481,7 +483,7 @@ dist_df %>%
       "fill_ramp and thickness = stat(pmax(0, abs(1 - 2*cdf) - .95)))"
     )
   ) +
-  guides(fill_ramp = FALSE) +
+  guides(fill_ramp = "none") +
   coord_cartesian(expand = FALSE)
 
 ## ----halfeye_filled_intervals, fig.width = med_width, fig.height = small_height---------------------------------------
@@ -522,7 +524,11 @@ df %>%
         labels = scales::percent_format()
       ))
     ),
-    position = "dodge",
+    # NOTE: we use position = "dodgejust" (a dodge that respects the 
+    # justification of intervals relative to slabs) instead of 
+    # position = "dodge" here because it ensures the topmost slab does
+    # not extend beyond the plot limits
+    position = "dodgejust",
   ) +
   # a range from 1 down to 0.2 ensures the fill goes dark to light inside-out
   # and doesn't get all the way down to white (0) on the lightest color
@@ -542,19 +548,51 @@ dist_df %>%
     subtitle = "aes(color = subgroup, color_ramp = stat(level))"
   )
 
-## ----halfeye_dotplot, fig.width = med_width, fig.height = small_height------------------------------------------------
+## ----varying_side_dotplot, fig.width = med_width, fig.height = small_height-------------------------------------------
+dist_df %>%
+  filter(subgroup == "h") %>%
+  mutate(side = c("top", "both", "bottom")) %>%
+  ggplot(aes(y = group, dist = dist_normal(mean, sd), side = side)) +
+  stat_dist_dotsinterval(scale = 2/3) +
+  labs(title = 'stat_dist_dotsinterval(aes(side = c("top","both","bottom")))') +
+  coord_cartesian()
+
+## ----dist_slab_discrete, fig.width = med_width, fig.height = small_height---------------------------------------------
+tibble(
+  group = c("a","b","c","d","e"),
+  lambda = c(13,7,4,3,2)
+) %>%
+  ggplot(aes(x = group)) +
+  stat_dist_slab(aes(dist = dist_poisson(lambda), fill = stat(pdf))) +
+  geom_line(aes(y = lambda, group = NA), size = 1) +
+  geom_point(aes(y = lambda), size = 2.5) +
+  labs(fill = "Pr(y)") +
+  ggtitle("stat_dist_slab()", "aes(dist = dist_poisson(lambda), fill = stat(pdf))")
+
+## ----halfeye_dotplot, fig.width = small_height, fig.height = med_width------------------------------------------------
+set.seed(12345) # for reproducibility
 df %>%
-  ggplot(aes(x = group, y = value)) +
-  stat_slab(side = "left", scale = 0.5) +
-  stat_dotsinterval(scale = 0.5) +
-  labs(title = 'stat_halfeye(side = "left") + stat_dotsinterval()')
+  filter(subgroup == "h") %>%
+  group_by(group, subgroup) %>%
+  sample_n(100) %>%
+  ggplot(aes(y = group, x = value)) +
+  stat_slab(scale = 0.6, position = "dodge") +
+  stat_dotsinterval(side = "bottom", scale = 0.6, position = "dodge") +
+  labs(title = 'stat_slab(scale = 0.6) + \nstat_dotsinterval(scale = 0.6, side = "bottom")')
 
 ## ----halfeye_quantile_dotplot, fig.width = med_width, fig.height = small_height---------------------------------------
 df %>%
-  ggplot(aes(x = group, y = value)) +
-  stat_slab(side = "left", scale = 0.5) +
-  stat_dotsinterval(scale = 0.5, quantiles = 100) +
-  labs(title = 'stat_halfeye(side = "left") + stat_dotsinterval(quantiles = 100)')
+  ggplot(aes(x = group, y = value, fill = subgroup)) +
+  stat_slab(side = "left", scale = 0.5, position = "dodge") +
+  stat_dotsinterval(scale = 0.5, quantiles = 100, position = "dodge") +
+  stat_pointinterval(
+    geom = "label", 
+    aes(label = paste0(group, subgroup)), 
+    .width = .5,  # set to a scalar to draw only one label instead of two
+    position = position_dodge(width = 1),
+    size = 3.5
+  ) +
+  labs(title = 'stat_halfeye(side = "left") + stat_dotsinterval(quantiles = 100) +\nstat_pointinterval(geom = "label")')
 
 ## ----slab_and_pointinterval, fig.width = med_width, fig.height = small_height-----------------------------------------
 df %>%

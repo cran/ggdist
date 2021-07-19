@@ -219,6 +219,9 @@ StatSlabinterval = ggproto("StatSlabinterval", Stat,
   ) {
     define_orientation_variables(orientation)
 
+    # remove missing values
+    data = ggplot2::remove_missing(data, na.rm, c(x, y), name = "stat_slabinterval")
+
     # figure out coordinate transformation
     x_trans = if (is.null(scales[[x]]) || scales[[x]]$is_discrete()) {
       scales::identity_trans()
@@ -228,14 +231,14 @@ StatSlabinterval = ggproto("StatSlabinterval", Stat,
 
     # SLABS
     s_data = if (show_slab && !is.null(slab_function)) {
-      compute_slabs(data, scales, x_trans,
+      compute_slabs(data, scales, x_trans, na.rm,
         orientation, limits_function, limits_args, limits, slab_function, slab_args, n
       )
     }
 
     # INTERVALS
     i_data = if (show_interval) {
-      compute_intervals(data, scales, x_trans,
+      compute_intervals(data, scales, x_trans, na.rm,
         orientation, interval_function, interval_args, point_interval, .width
       )
     }
@@ -243,8 +246,8 @@ StatSlabinterval = ggproto("StatSlabinterval", Stat,
     results = bind_rows(s_data, i_data)
     # must ensure there's an f and a .width aesthetic produced even if we don't draw
     # the slab or the interval, otherwise the default aesthetic mappings can break.
-    results$f = results$f %||% NA
-    results$.width = results$.width %||% NA
+    results$f = results[["f"]] %||% NA
+    results$.width = results[[".width"]] %||% NA
     results
   }
 )
@@ -264,7 +267,7 @@ na_ = function(m_, ...) {
 }
 
 
-compute_slabs = function(data, scales, x_trans,
+compute_slabs = function(data, scales, x_trans, na.rm,
   orientation, limits_function, limits_args, limits, slab_function, slab_args, n
 ) {
   define_orientation_variables(orientation)
@@ -325,6 +328,7 @@ compute_slabs = function(data, scales, x_trans,
   slab_args[["n"]] = n
   slab_args[["orientation"]] = orientation
   slab_args[["trans"]] = x_trans
+  slab_args[["na.rm"]] = na.rm
 
   # evaluate the slab function
   slab_function = as_function(slab_function)
@@ -340,7 +344,7 @@ compute_slabs = function(data, scales, x_trans,
 }
 
 
-compute_intervals = function(data, scales, x_trans,
+compute_intervals = function(data, scales, x_trans, na.rm,
   orientation, interval_function, interval_args, point_interval, .width
 ) {
   define_orientation_variables(orientation)
@@ -378,7 +382,7 @@ compute_intervals = function(data, scales, x_trans,
   i_data[[xmax]] = i_data$.upper
   i_data$.upper = NULL
 
-  i_data$level = forcats::fct_rev(ordered(i_data$.width))
+  i_data$level = fct_rev_(ordered(i_data$.width))
   i_data$datatype = "interval"
   i_data
 }

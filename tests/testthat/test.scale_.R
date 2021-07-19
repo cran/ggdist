@@ -4,8 +4,9 @@
 ###############################################################################
 
 library(dplyr)
+library(tidyr)
 
-context("scale_")
+
 
 
 test_that("direct scale setting works", {
@@ -171,9 +172,12 @@ test_that("mapping custom aesthetics works", {
     ggplot(aes(x = x, y = y, group = NA))
 
   vdiffr::expect_doppelganger("dots: slab_color plus slab_shape mapping",
-    p + geom_dots(aes(color = x > 1.9, shape = x > 1.9), orientation = "horizontal")
+    p + geom_dots(aes(slab_color = x > 1.9, slab_shape = x > 1.9), orientation = "horizontal")
+  )
+
+  expect_error(
+    print(p + geom_dots(aes(slab_color = x > 1.9, slab_shape = x), orientation = "horizontal")),
+    "A continuous variable cannot be mapped to shape"
   )
 
 })
-
-

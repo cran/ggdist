@@ -9,7 +9,7 @@
 #' @importFrom stats ppoints
 dots_sample_slab_function = function(
   df, input, limits = NULL, quantiles = NA, orientation = NA,
-  trans = scales::identity_trans(), ...
+  trans = scales::identity_trans(), na.rm = FALSE, ...
 ) {
   x = switch(orientation,
     y = ,
@@ -23,7 +23,7 @@ dots_sample_slab_function = function(
   } else {
     # ppoints() with a = 1/2 corresponds to quantile() with type = 5
     # and ensures that if quantiles == length(df[[x]]) then input == df[[x]]
-    input = quantile(df[[x]], ppoints(quantiles, a = 1/2), type = 5)
+    input = quantile(df[[x]], ppoints(quantiles, a = 1/2), type = 5, na.rm = na.rm)
   }
 
   data.frame(
@@ -41,7 +41,7 @@ dots_dist_slab_function = function(
   df, input, quantiles = 100, trans = scales::identity_trans(), ...
 ) {
   pmap_dfr_(df, function(dist, ...) {
-    if (is.null(dist) || any(is.na(dist))) {
+    if (is.null(dist) || anyNA(dist)) {
       return(data.frame(.input = NA, .value = NA))
     }
 
@@ -49,7 +49,7 @@ dots_dist_slab_function = function(
       list(ppoints(quantiles, a = 1/2)),
       args_from_aes(...)
     )
-    quantile_fun = dist_quantile_fun(dist)
+    quantile_fun = distr_quantile(dist)
     input = do.call(quantile_fun, args)
 
     data.frame(

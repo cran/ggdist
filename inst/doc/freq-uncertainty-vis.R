@@ -1,7 +1,10 @@
 ## ----chunk_options, include=FALSE---------------------------------------------
-tiny_width = small_width = med_width = 6.75
-tiny_height = small_height = med_height = 4.5
-large_width = 8; large_height = 5.25
+tiny_width = 5.5
+tiny_height = 3 + 2/3
+small_width = med_width = 6.75
+small_height = med_height = 4.5
+large_width = 8
+large_height = 5.25
 
 knitr::opts_chunk$set(
   fig.width = small_width,
@@ -9,7 +12,8 @@ knitr::opts_chunk$set(
 )
 if (capabilities("cairo") && Sys.info()[['sysname']] != "Darwin") {
   knitr::opts_chunk$set(
-    dev.args = list(png = list(type = "cairo"))
+    dev = "png",
+    dev.args = list(type = "cairo")
   )
 }
 
@@ -80,7 +84,7 @@ ABC %>%
   ggplot(aes(y = condition)) +
   stat_dist_gradientinterval(
     aes(dist = dist_student_t(df = df.residual(m_ABC), mu = .fitted, sigma = .se.fit)), 
-    scale = .5
+    scale = .5, fill_type = "gradient"
   )
 
 ## ----ccdfinterval-----------------------------------------------------------------------------------------------------

@@ -6,7 +6,7 @@
 library(dplyr)
 library(tidyr)
 
-context("geom_lineribbon")
+
 
 make_line_data = function(offset = 0, seed = 123, g = "a") {
   set.seed(seed)
@@ -28,7 +28,9 @@ test_that("one-group stat_lineribbons work", {
 
   p = ggplot(df, aes(x = x, y = y))
 
-  vdiffr::expect_doppelganger("one-group stat_lineribbon", p + stat_lineribbon(.width = c(.50, .75, .90)) + scale_fill_brewer())
+  vdiffr::expect_doppelganger("one-group stat_lineribbon",
+    p + stat_lineribbon(.width = c(.50, .75, .90)) + scale_fill_brewer()
+  )
   vdiffr::expect_doppelganger("one-group stat (reverse order, mean_qi)",
     p + stat_lineribbon(.width = c(.90, .75, .50), point_interval = mean_qi) + scale_fill_brewer()
   )
@@ -45,28 +47,32 @@ test_that("one-group geom_lineribbons work", {
 
   df = make_line_data()
 
-  vdiffr::expect_doppelganger("one-group geom_lineribbon", df %>%
+  vdiffr::expect_doppelganger("one-group geom_lineribbon",
+    df %>%
       group_by(x, g) %>%
       mode_qi(y, .width = c(.50, .75, .90)) %>%
       ggplot(aes(x = x, y = y, ymin = .lower, ymax = .upper)) +
       geom_lineribbon() +
       scale_fill_brewer()
-    )
-  vdiffr::expect_doppelganger("one-group geom_lineribbon (reverse order)", df %>%
+  )
+  vdiffr::expect_doppelganger("one-group geom_lineribbon (reverse order)",
+    df %>%
       group_by(x, g) %>%
       mean_hdi(y, .width = c(.50, .75, .90)) %>%
       ggplot(aes(x = x, y = y, ymin = .lower, ymax = .upper)) +
       geom_lineribbon() +
       scale_fill_brewer()
   )
-  vdiffr::expect_doppelganger("one-group geom_lineribbon (manual aes)", df %>%
+  vdiffr::expect_doppelganger("one-group geom_lineribbon (manual aes)",
+    df %>%
       group_by(x, g) %>%
       mean_qi(y, .width = c(.50, .75, .90)) %>%
       ggplot(aes(x = x, y = y, ymin = .lower - 10, ymax = .upper)) +
       geom_lineribbon() +
       scale_fill_brewer()
   )
-  vdiffr::expect_doppelganger("one-group geom_lineribbon (horizontal)", df %>%
+  vdiffr::expect_doppelganger("one-group geom_lineribbon (horizontal)",
+    df %>%
       group_by(x, g) %>%
       mode_qi(y, .width = c(.50, .75, .90)) %>%
       rename(l = .lower, u = .upper) %>%
@@ -74,6 +80,26 @@ test_that("one-group geom_lineribbons work", {
       geom_lineribbon() +
       scale_fill_brewer()
   )
+})
+
+test_that("geom_lineribbons unspecified fill and color work", {
+  skip_if_no_vdiffr()
+
+  p = tibble(x = 1:3, lower = 0:2, upper = 2:4) %>%
+    ggplot(aes(x = x, y = x, ymin = lower, ymax = upper))
+
+  vdiffr::expect_doppelganger("lineribbon without .width",
+    p + geom_lineribbon()
+  )
+
+  vdiffr::expect_doppelganger("lineribbon fill = NA",
+    p + geom_lineribbon(fill = NA)
+  )
+
+  vdiffr::expect_doppelganger("lineribbon color = NA",
+    p + geom_lineribbon(color = NA)
+  )
+
 })
 
 test_that("two-group stat_lineribbons work", {
@@ -123,7 +149,7 @@ test_that("the stepped lineribbons work", {
   skip_if_no_vdiffr()
 
 
-  p = data.frame(x = 1:10) %>%
+  p = data.frame(x = 1:5) %>%
     ggplot(aes(x = x, dist = "norm", arg1 = x))
 
   vdiffr::expect_doppelganger("lineribbon with step = TRUE works",
