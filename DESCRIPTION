@@ -1,7 +1,7 @@
 Package: ggdist
 Title: Visualizations of Distributions and Uncertainty
-Version: 3.0.0
-Date: 2021-07-18
+Version: 3.0.1
+Date: 2021-11-29
 Authors@R: c(
         person("Matthew", "Kay", role = c("aut", "cre"), email = "mjskay@northwestern.edu"),
         person("Brenton M.", "Wiernik", role = "ctb", email = "brenton@wiernik.org")
@@ -21,7 +21,7 @@ Description: Provides primitives for visualizing distributions using 'ggplot2' t
 Depends: R (>= 3.5.0)
 Imports: tidyselect, dplyr (>= 1.0.0), ggplot2 (>= 3.3.5), rlang (>=
         0.3.0), scales, grid, HDInterval, tibble, vctrs, withr,
-        distributional (>= 0.2.0)
+        distributional (>= 0.2.2)
 Suggests: knitr, testthat, vdiffr (>= 1.0.0), svglite, broom (>=
         0.5.6), modelr, cowplot, covr, gdtools, rmarkdown, png, fda,
         forcats, purrr (>= 0.2.3), tidyr (>= 1.0.0), beeswarm (>=
@@ -32,7 +32,7 @@ BugReports: https://github.com/mjskay/ggdist/issues/new
 URL: https://mjskay.github.io/ggdist/,
         https://github.com/mjskay/ggdist/
 VignetteBuilder: knitr
-RoxygenNote: 7.1.1
+RoxygenNote: 7.1.2
 LazyData: true
 Encoding: UTF-8
 Collate: "ggdist-package.R" "util.R" "binning_methods.R"
@@ -47,8 +47,8 @@ Collate: "ggdist-package.R" "util.R" "binning_methods.R"
         "stat_lineribbon.R" "student_t.R" "testthat.R" "theme_ggdist.R"
         "tidy_format_translators.R"
 NeedsCompilation: no
-Packaged: 2021-07-19 03:19:45 UTC; matth
+Packaged: 2021-11-30 04:49:53 UTC; matth
 Author: Matthew Kay [aut, cre],
   Brenton M. Wiernik [ctb]
 Repository: CRAN
-Date/Publication: 2021-07-19 10:30:09 UTC
+Date/Publication: 2021-11-30 06:50:02 UTC

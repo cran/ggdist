@@ -50,6 +50,7 @@ test_that("gradientinterval works", {
   # N.B. the following two tests are currently a bit useless as vdiffr doesn't
   # support linearGradient yet, but leaving them here so that once it does we
   # have tests for this.
+  skip("linearGradient not supported in vdiffr yet")
   vdiffr::expect_doppelganger("fill_type = gradient with two groups",
     p + stat_gradientinterval(aes(x = dist, y = x), n = 15, fill_type = "gradient")
   )
@@ -151,6 +152,21 @@ test_that("constant distributions work", {
     p + stat_ccdfinterval()
   )
 
+  # constant dist when n = 1
+  p = data.frame(
+    x = c("constant = 1", rep("normal(2,1)", 50)),
+    # sd of 0 will generate constant dist
+    y = qnorm(c(0.5, ppoints(50)), mean = c(1, rep(2, 50)), sd = c(0, rep(1, 50)))
+  ) %>%
+    ggplot(aes(x = x, y = y))
+
+  vdiffr::expect_doppelganger("constant dist on halfeye with n = 1",
+    p + stat_sample_slabinterval(n = 15)
+  )
+
+  vdiffr::expect_doppelganger("constant dist on ccdf with n = 1",
+    p + stat_ccdfinterval()
+  )
 })
 
 test_that("side and justification can vary", {

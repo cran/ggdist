@@ -34,7 +34,7 @@ distr_function.distribution = function(dist, prefix, fun) {
   distr_function.dist_default(dist[[1]], prefix, fun)
 }
 distr_function.dist_default = function(dist, prefix, fun) {
-  function(x, ...) fun(dist, x, ...)
+  function(x, ...) unlist(fun(dist, x, ...))
 }
 distr_function.rvar = distr_function.distribution
 
@@ -43,11 +43,11 @@ distr_pdf = function(dist) {
   if (inherits(dist, "rvar")) {
     draws = posterior::draws_of(dist)
     if (length(unique(draws)) == 1) {
-      return(function(x, ...) ifelse(x == draws[[1]], 1, 0))
+      return(function(x, ...) ifelse(x == draws[[1]], Inf, 0))
     }
   } else if (inherits(dist, "dist_sample")) {
     if (length(unique(dist[[1]])) == 1) {
-      return(function(x, ...) ifelse(x == dist[[1]], 1, 0))
+      return(function(x, ...) ifelse(x == dist[[1]], Inf, 0))
     }
   }
 
