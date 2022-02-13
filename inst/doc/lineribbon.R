@@ -124,10 +124,10 @@ analytical_df = tibble(
 )
 analytical_df
 
-## ----stat_dist_lineribbon, fig.width = tiny_width, fig.height = tiny_height-------------------------------------------
+## ----stat_lineribbon_dist, fig.width = tiny_width, fig.height = tiny_height-------------------------------------------
 analytical_df %>%
-  ggplot(aes(x = x, dist = dist_normal(y_mean, y_sd))) +
-  stat_dist_lineribbon() +
+  ggplot(aes(x = x, ydist = dist_normal(y_mean, y_sd))) +
+  stat_lineribbon() +
   scale_fill_brewer()
 
 ## ----curve_draws, fig.width = tiny_width, fig.height = tiny_height----------------------------------------------------

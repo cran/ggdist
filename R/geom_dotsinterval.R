@@ -11,7 +11,7 @@
 #' @importFrom dplyr %>% arrange_at group_by_at group_split
 dots_grob = function(data, x, y,
   name = NULL, gp = gpar(), vp = NULL,
-  dotsize = 1, stackratio = 1, binwidth = NA, layout = "bin",
+  dotsize = 1.07, stackratio = 1, binwidth = NA, layout = "bin",
   orientation = "vertical"
 ) {
   datas = data %>%
@@ -39,8 +39,9 @@ makeContent.dots_grob = function(x) {
 
   define_orientation_variables(orientation)
 
-  font_size_ratio = 1.43  # manual fudge factor for point size in ggplot
-  stackratio = 1.07 * grob_$stackratio
+  dot_size_ratio = 1.07                  # historical fudge factor based on old stackratio
+  font_size_ratio = 1.43/dot_size_ratio  # manual fudge factor for point size in ggplot
+  stackratio = grob_$stackratio
 
   # ratio between width of the bins (binwidth)
   # and the vertical spacing of dots (y_spacing)
@@ -70,7 +71,7 @@ makeContent.dots_grob = function(x) {
     # find the best bin widths across all the dotplots we are going to draw
     binwidths = map_dbl_(datas, function(d) {
       maxheight = max(d[[ymax]] - d[[ymin]])
-      find_dotplot_binwidth(d[[x]], maxheight, heightratio)
+      find_dotplot_binwidth(d[[x]], maxheight, heightratio, stackratio)
     })
 
     binwidth = max(min(binwidths, user_max_binwidth), user_min_binwidth)
@@ -81,8 +82,8 @@ makeContent.dots_grob = function(x) {
     # bin the dots
     dot_positions = bin_dots(
       d$x, d$y,
-      binwidth, heightratio, layout,
-      d$side[[1]], orientation
+      binwidth = binwidth, heightratio = heightratio, stackratio = stackratio,
+      layout = layout, side = d$side[[1]], orientation = orientation
     )
 
     # determine size of the dots as a font size
@@ -90,10 +91,12 @@ makeContent.dots_grob = function(x) {
     # the font size in points needed to draw that dot (dot_fontsize); need a fudge
     # factor based on how big the circle glyph is as a ratio of font size
     # (font_size_ratio) plus need to account for stroke width
+    lwd = d$size * .stroke/2
+    lwd[is.na(lwd)] = 0
     dot_pointsize = convertUnit(unit(binwidth * dotsize, "native"),
       "points", axisFrom = x, axisTo = "y", typeFrom = "dimension", valueOnly = TRUE)
     dot_fontsize = max(
-      dot_pointsize * font_size_ratio - max(d$size, 0, na.rm = TRUE) * .stroke/2,
+      dot_pointsize * font_size_ratio - lwd,
       0.5
     )
 
@@ -104,7 +107,7 @@ makeContent.dots_grob = function(x) {
         col = alpha(d$colour, d$alpha),
         fill = alpha(d$fill, d$alpha),
         fontsize = dot_fontsize,
-        lwd = d$size * .stroke/2,
+        lwd = lwd,
         lty = d$linetype
       )
     )
@@ -118,7 +121,8 @@ makeContent.dots_grob = function(x) {
 
 draw_slabs_dots = function(self, s_data, panel_params, coord,
   orientation, normalize, fill_type, na.rm,
-  child_params
+  dotsize, stackratio, binwidth, layout,
+  ...
 ) {
   define_orientation_variables(orientation)
 
@@ -145,7 +149,7 @@ draw_slabs_dots = function(self, s_data, panel_params, coord,
   )
 
   if (!coord$is_linear()) {
-    stop("geom_dotsinterval does not work properly with non-linear coordinates.")
+    stop0("geom_dotsinterval does not work properly with non-linear coordinates.")
   }
   # Swap axes if using coord_flip
   if (inherits(coord, "CoordFlip")) {
@@ -159,19 +163,19 @@ draw_slabs_dots = function(self, s_data, panel_params, coord,
   }
   s_data = coord$transform(s_data, panel_params)
 
-  if (!isTRUE(is.na(child_params$binwidth)) && !is.unit(child_params$binwidth)) {
+  if (!isTRUE(is.na(binwidth)) && !is.unit(binwidth)) {
     #binwidth is expressed in terms of data coordinates, need to translate into standardized space
-    child_params$binwidth = child_params$binwidth / (max(panel_params[[x.range]]) - min(panel_params[[x.range]]))
+    binwidth = binwidth / (max(panel_params[[x.range]]) - min(panel_params[[x.range]]))
   }
 
   # draw the dots grob (which will draw dotplots for all the slabs)
   slab_grobs = list(dots_grob(
       s_data,
       x, y,
-      dotsize = child_params$dotsize,
-      stackratio = child_params$stackratio,
-      binwidth = child_params$binwidth,
-      layout = child_params$layout,
+      dotsize = dotsize,
+      stackratio = stackratio,
+      binwidth = binwidth,
+      layout = layout,
       orientation = orientation
     ))
 }
@@ -183,8 +187,8 @@ draw_slabs_dots = function(self, s_data, panel_params, coord,
 #'
 #' Geoms and stats for creating dotplots that automatically determines a bin width that
 #' ensures the plot fits within the available space. Also ensures dots do not overlap, and allows
-#' generation of quantile dotplots using the `quantiles` argument to `stat_dotsinterval`/`stat_dots`
-#' and `stat_dist_dotsinterval`/`stat_dist_dots`. Generally follows the naming scheme and
+#' generation of quantile dotplots using the `quantiles` argument to [stat_dotsinterval()]/[stat_dots()].
+#' Generally follows the naming scheme and
 #' arguments of the [geom_slabinterval()] and [stat_slabinterval()] family of
 #' geoms and stats.
 #'
@@ -202,39 +206,47 @@ draw_slabs_dots = function(self, s_data, panel_params, coord,
 #'   `dotsinterval` family) or the `shape` or `slab_shape` aesthetic (when using the `dots` family)
 #' }
 #'
-#' The `stat_...` and `stat_dist_...` versions of the stats when used with the `quantiles` argument
+#' [stat_dots()] and [stat_dotsinterval()], when used with the `quantiles` argument,
 #' are particularly useful for constructing quantile dotplots, which can be an effective way to communicate uncertainty
 #' using a frequency framing that may be easier for laypeople to understand (Kay et al. 2016, Fernandes et al. 2018).
 #'
-#' @eval rd_slabinterval_aesthetics(geom = GeomDotsinterval, geom_name = "geom_dotsinterval", stat = StatDotsinterval)
+#' @template details-x-y-xdist-ydist
+#' @eval rd_slabinterval_aesthetics("dotsinterval", stat = StatDotsinterval, vignette = "dotsinterval")
 #' @inheritParams geom_slabinterval
 #' @inheritParams stat_slabinterval
-#' @inheritDotParams geom_slabinterval
-#' @param ...  Other arguments passed to [layer()].
 #' @author Matthew Kay
-#' @param dotsize The size of the dots relative to the bin width. The default, `1`, makes dots be just about as
-#' wide as the bin width.
-#' @param stackratio The distance between the center of the dots in the same stack relative to the bin height. The
-#' default, `1`, makes dots in the same stack just touch each other.
-#' @param binwidth The bin width to use for drawing the dotplots. One of:
+#' @param binwidth The bin width to use for laying out the dots. One of:
 #'   - `NA` (the default): Dynamically select the bin width based on the
-#'     size of the plot when drawn.
+#'     size of the plot when drawn. This will pick a `binwidth` such that the
+#'     tallest stack of dots is at most `scale` in height (ideally exactly `scale`
+#'     in height, though this is not guaranteed).
 #'   - A length-1 (scalar) numeric or [unit] object giving the exact bin width.
 #'   - A length-2 (vector) numeric or [unit] object giving the minimum and maximum
 #'     desired bin width. The bin width will be dynamically selected within
 #'     these bounds.
 #'
 #' If the value is numeric, it is assumed to be in units of data. The bin width
-#' (or its bounds) can also be specified using `unit()`, which may be useful if
+#' (or its bounds) can also be specified using [unit()], which may be useful if
 #' it is desired that the dots be a certain point size or a certain percentage of
 #' the width/height of the viewport. For example, `unit(0.1, "npc")` would make
 #' dots that are *exactly* 10% of the viewport size along whichever dimension the
 #' dotplot is drawn; `unit(c(0, 0.1), "npc")` would make dots that are *at most*
-#' 10% of the viewport size.
+#' 10% of the viewport size (while still ensuring the tallest stack is less than
+#' or equal to `scale`).
+#' @param dotsize The width of the dots relative to the `binwidth`. The default,
+#' `1.07`, makes dots be just a bit wider than the bin width, which is a
+#' manually-tuned parameter that tends to work well with the default circular
+#' shape, preventing gaps between bins from appearing to be too large visually
+#' (as might arise from dots being *precisely* the `binwidth`). If it is desired
+#' to have dots be precisely the `binwidth`, set `dotsize = 1`.
+#' @param stackratio The distance between the center of the dots in the same
+#' stack relative to the dot height. The default, `1`, makes dots in the same
+#' stack just touch each other.
 #' @template param-dots-layout
-#' @param quantiles For the `stat_` and `stat_dist_` stats, setting this to a value other than `NA`
-#' will produce a quantile dotplot: that is, a dotplot of quantiles from the sample (for `stat_`) or a dotplot
-#' of quantiles from the distribution (for `stat_dist_`). The value of `quantiles` determines the number
+#' @param quantiles Setting this to a value other than `NA`
+#' will produce a quantile dotplot: that is, a dotplot of quantiles from the sample or distribution
+#' (for analytical distributions, the default of `NA` is taken to mean `100` quantiles). The value of
+#' `quantiles` determines the number
 #' of quantiles to plot. See Kay et al. (2016) and Fernandes et al. (2018) for more information on quantile dotplots.
 #' @return A [ggplot2::Geom] or [ggplot2::Stat] representing a dotplot or combined dotplot+interval geometry which can
 #' be added to a [ggplot()] object.
@@ -246,9 +258,9 @@ draw_slabs_dots = function(self, s_data, panel_params, coord,
 #'   Fernandes, M., Walls, L., Munson, S., Hullman, J., & Kay, M. (2018). Uncertainty Displays Using Quantile Dotplots
 #'   or CDFs Improve Transit Decision-Making. *Conference on Human Factors in Computing Systems - CHI '18*.
 #'   \doi{10.1145/3173574.3173718}.
-#' @seealso See [stat_sample_slabinterval()] and [stat_dist_slabinterval()] for families of other
+#' @seealso See the [stat_slabinterval()] family for other
 #' stats built on top of [geom_slabinterval()].
-#' See `vignette("slabinterval")` for a variety of examples of use.
+#' See `vignette("dotsinterval")` for a variety of examples of use.
 #' @examples
 #'
 #' library(dplyr)
@@ -282,48 +294,9 @@ draw_slabs_dots = function(self, s_data, panel_params, coord,
 #'
 #' @importFrom rlang %||%
 #' @import grid
-#' @export
-geom_dotsinterval = function(
-  mapping = NULL,
-  data = NULL,
-  stat = "identity",
-  position = "identity",
+#' @name geom_dotsinterval
+NULL
 
-  ...,
-  dotsize = 1,
-  stackratio = 1,
-  binwidth = NA,
-  layout = c("bin", "weave", "swarm"),
-
-  na.rm = FALSE,
-
-  show.legend = NA,
-  inherit.aes = TRUE
-) {
-  layout = match.arg(layout)
-
-  layer(
-    mapping = mapping,
-    data = data,
-    stat = stat,
-    position = position,
-    geom = GeomDotsinterval,
-    show.legend = show.legend,
-    inherit.aes = inherit.aes,
-
-    params = list(
-      normalize = "none",
-
-      dotsize = dotsize,
-      stackratio = stackratio,
-      binwidth = binwidth,
-      layout = layout,
-
-      na.rm = na.rm,
-      ...
-    )
-  )
-}
 #' @rdname ggdist-ggproto
 #' @format NULL
 #' @usage NULL
@@ -346,58 +319,17 @@ GeomDotsinterval = ggproto("GeomDotsinterval", GeomSlabinterval,
     s_data
   },
 
-  extra_params = c(GeomSlabinterval$extra_params,
-    "dotsize",
-    "stackratio",
-    "binwidth",
-    "layout"
-  ),
-
   default_params = defaults(list(
     normalize = "none",
-    dotsize = 1,
-    stackratio = 1,
     binwidth = NA,
+    dotsize = 1.07,
+    stackratio = 1,
     layout = "bin"
   ), GeomSlabinterval$default_params),
 
-  draw_panel = function(self, data, panel_params, coord,
-    orientation = self$default_params$orientation,
-    normalize = self$default_params$normalize,
-    interval_size_domain = self$default_params$interval_size_domain,
-    interval_size_range = self$default_params$interval_size_range,
-    fatten_point = self$default_params$fatten_point,
-    show_slab = self$default_params$show_slab,
-    show_point = self$default_params$show_point,
-    show_interval = self$default_params$show_interval,
-    na.rm = self$default_params$na.rm,
-
-    dotsize = self$default_params$dotsize,
-    stackratio = self$default_params$stackratio,
-    binwidth = self$default_params$binwidth,
-    layout = self$default_params$layout,
-
-    child_params = list()
-  ) {
-    ggproto_parent(GeomSlabinterval, self)$draw_panel(data, panel_params, coord,
-      orientation = orientation,
-      normalize = normalize,
-      interval_size_domain = interval_size_domain,
-      interval_size_range = interval_size_range,
-      fatten_point = fatten_point,
-      show_slab = show_slab,
-      show_point = show_point,
-      show_interval = show_interval,
-      na.rm = na.rm,
-
-      child_params = list(
-        dotsize = dotsize,
-        stackratio = stackratio,
-        binwidth = binwidth,
-        layout = layout
-      )
-    )
-  },
+  hidden_params = union(c(
+    "normalize", "fill_type"
+  ), GeomSlabinterval$hidden_params),
 
   setup_data = function(self, data, params) {
     data = ggproto_parent(GeomSlabinterval, self)$setup_data(data, params)
@@ -433,41 +365,12 @@ GeomDotsinterval = ggproto("GeomDotsinterval", GeomSlabinterval,
   }
 )
 
+#' @rdname geom_dotsinterval
+#' @export
+geom_dotsinterval = make_geom(GeomDotsinterval)
+
 
 # shortcut geoms ----------------------------------------------------------
-#' @export
-#' @rdname geom_dotsinterval
-geom_dots = function(
-  mapping = NULL,
-  data = NULL,
-  stat = "identity",
-  position = "identity",
-
-  ...,
-
-  na.rm = FALSE,
-  show.legend = NA,
-  inherit.aes = TRUE
-) {
-  layer(
-    mapping = mapping,
-    data = data,
-    stat = stat,
-    position = position,
-    geom = GeomDots,
-    show.legend = show.legend,
-    inherit.aes = inherit.aes,
-
-    params = list(
-      normalize = "none",
-      show_point = FALSE,
-      show_interval = FALSE,
-
-      na.rm = na.rm,
-      ...
-    )
-  )
-}
 #' @rdname ggdist-ggproto
 #' @format NULL
 #' @usage NULL
@@ -501,6 +404,11 @@ GeomDots = ggproto("GeomDots", GeomDotsinterval,
     show_interval = FALSE
   ), GeomDotsinterval$default_params),
 
+  hidden_params = union(c(
+    "show_slab", "show_point", "show_interval",
+    "interval_size_domain", "interval_size_range", "fatten_point"
+  ), GeomDotsinterval$hidden_params),
+
   draw_key_slab = function(self, data, key_data, params, size) {
     # can drop all the complicated checks from this key since it's just one geom
     s_key_data = self$override_slab_aesthetics(key_data)
@@ -514,3 +422,7 @@ GeomDots = ggproto("GeomDots", GeomDotsinterval,
 # have to unset these here because defaults() does not treat NULLs as unsetting values
 GeomDots$default_key_aes$slab_colour = NULL
 GeomDots$default_key_aes$slab_size = NULL
+
+#' @rdname geom_dotsinterval
+#' @export
+geom_dots = make_geom(GeomDots)

@@ -27,9 +27,9 @@ columns that are not group columns and which are not in \code{.exclude} (by defa
 This can be list columns.}
 
 \item{.along}{Which columns are the input values to the function describing the curve (e.g., the "x"
-values). Supports tidyselect syntax, as in \code{dplyr::select()}. Intervals are calculated jointly with
+values). Supports tidyselect syntax, as in \code{\link[dplyr:select]{dplyr::select()}}. Intervals are calculated jointly with
 respect to these variables, conditional on all other grouping variables in the data frame. The default
-(\code{NULL}) causes \code{curve_interval()} to use all grouping variables in the input data frame as the value
+(\code{NULL}) causes \code{\link[=curve_interval]{curve_interval()}} to use all grouping variables in the input data frame as the value
 for \code{.along}, which will generate the most conservative intervals. However, if you want to calculate
 intervals for some function \code{y = f(x)} conditional on some other variable(s) (say, conditional on a
 factor \code{g}), you would group by \code{g}, then use \code{.along = x} to calculate intervals jointly over \code{x}
@@ -115,19 +115,18 @@ df \%>\%
   ggtitle("50\% pointwise intervals with point_interval()") +
   theme_ggdist()
 
+\dontshow{if (requireNamespace("posterior", quietly = TRUE)) (if (getRversion() >= "3.4") withAutoprint else force)(\{ # examplesIf}
 # ... compare them to curvewise intervals
-if (requireNamespace("posterior", quietly = TRUE)) {
-  df \%>\%
-    group_by(x) \%>\%
-    curve_interval(y, .width = c(.5)) \%>\%
-    ggplot(aes(x = x, y = y)) +
-    geom_lineribbon(aes(ymin = .lower, ymax = .upper)) +
-    geom_line(aes(group = .draw), alpha=0.15, data = df) +
-    scale_fill_brewer() +
-    ggtitle("50\% curvewise intervals with curve_interval()") +
-    theme_ggdist()
-}
-
+df \%>\%
+  group_by(x) \%>\%
+  curve_interval(y, .width = c(.5)) \%>\%
+  ggplot(aes(x = x, y = y)) +
+  geom_lineribbon(aes(ymin = .lower, ymax = .upper)) +
+  geom_line(aes(group = .draw), alpha=0.15, data = df) +
+  scale_fill_brewer() +
+  ggtitle("50\% curvewise intervals with curve_interval()") +
+  theme_ggdist()
+\dontshow{\}) # examplesIf}
 }
 \references{
 Fraiman, Ricardo and Graciela Muniz. (2001).
@@ -151,7 +150,7 @@ Juul Jonas, Kaare Græsbøll, Lasse Engbo Christiansen, and Sune Lehmann. (2020)
 \href{https://arxiv.org/abs/2007.05035}{arXiv:2007.05035}
 }
 \seealso{
-\code{point_interval()} for pointwise intervals. See \code{vignette("lineribbon")} for more examples
+\code{\link[=point_interval]{point_interval()}} for pointwise intervals. See \code{vignette("lineribbon")} for more examples
 and discussion of the differences between pointwise and curvewise intervals.
 }
 \author{

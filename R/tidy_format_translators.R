@@ -14,7 +14,7 @@
 #' Function prefixed with `to_` translate from the ggdist/tidybayes format to another format, functions
 #' prefixed with `from_` translate from that format back to the ggdist/tidybayes format. Formats include:
 #'
-#' `to_broom_names()` / `from_broom_names()`:
+#' [to_broom_names()] / [from_broom_names()]:
 #'
 #' \itemize{
 #'    \item `.variable` <-> `term`
@@ -24,7 +24,7 @@
 #'    \item `.upper` <-> `conf.high`
 #' }
 #'
-#' `to_ggmcmc_names()` / `from_ggmcmc_names()`:
+#' [to_ggmcmc_names()] / [from_ggmcmc_names()]:
 #'
 #' \itemize{
 #'    \item `.chain` <-> `Chain`
@@ -36,7 +36,7 @@
 #' @param data A data frame to translate.
 #'
 #' @return A data frame with (possibly) new names in some columns, according to the
-#' translation scheme described in *Details*.
+#' translation scheme described in **Details**.
 #'
 #' @author Matthew Kay
 #' @keywords manip

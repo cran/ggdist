@@ -4,53 +4,40 @@
 ###############################################################################
 
 
-# slab function for samples -------------------------
+# compute_slab ------------------------------------------------------------
 
+#' StatDotsinterval$compute_slab()
 #' @importFrom stats ppoints
-dots_sample_slab_function = function(
-  df, input, limits = NULL, quantiles = NA, orientation = NA,
-  trans = scales::identity_trans(), na.rm = FALSE, ...
+#' @noRd
+compute_slab_dots = function(
+  self, data, trans, input, orientation,
+  quantiles,
+  na.rm,
+  ...
 ) {
-  x = switch(orientation,
-    y = ,
-    horizontal = "x",
-    x = ,
-    vertical = "y"
-  )
+  quantiles = quantiles %||% NA
+  quantiles_provided = !isTRUE(is.na(quantiles))
+  dist_quantiles = if (quantiles_provided) quantiles else 100
+  probs = ppoints(dist_quantiles, a = 1/2)
 
-  if (is.null(quantiles) || is.na(quantiles)) {
-    input = df[[x]]
-  } else {
-    # ppoints() with a = 1/2 corresponds to quantile() with type = 5
-    # and ensures that if quantiles == length(df[[x]]) then input == df[[x]]
-    input = quantile(df[[x]], ppoints(quantiles, a = 1/2), type = 5, na.rm = na.rm)
-  }
-
-  data.frame(
-    .input = trans$inverse(input),
-    .value = 1,
-    n = length(input)
-  )
-}
-
-
-# slab functions for distributions -------------------------
-
-#' @importFrom stats ppoints
-dots_dist_slab_function = function(
-  df, input, quantiles = 100, trans = scales::identity_trans(), ...
-) {
-  pmap_dfr_(df, function(dist, ...) {
+  pmap_dfr_(data, function(dist, ...) {
     if (is.null(dist) || anyNA(dist)) {
       return(data.frame(.input = NA, .value = NA))
     }
 
-    args = c(
-      list(ppoints(quantiles, a = 1/2)),
-      args_from_aes(...)
-    )
-    quantile_fun = distr_quantile(dist)
-    input = do.call(quantile_fun, args)
+    args = args_from_aes(...)
+
+    if (distr_is_sample(dist, args)) {
+      input = distr_get_sample(dist, args)
+      if (quantiles_provided) {
+        # ppoints() with a = 1/2 corresponds to quantile() with type = 5
+        # and ensures that if quantiles == length(data[[x]]) then input == data[[x]]
+        input = quantile(input, ppoints(quantiles, a = 1/2), type = 5, na.rm = na.rm)
+      }
+    } else {
+      quantile_fun = distr_quantile(dist)
+      input = do.call(quantile_fun, c(list(probs), args))
+    }
 
     data.frame(
       .input = input,
@@ -63,221 +50,43 @@ dots_dist_slab_function = function(
 
 # stat_dotsinterval ------------------------------------------------
 
-#' @rdname geom_dotsinterval
-#' @export
-stat_dotsinterval = function(
-  mapping = NULL,
-  data = NULL,
-  geom = "dotsinterval",
-  position = "identity",
-  ...,
-
-  quantiles = NA,
-
-  point_interval = median_qi,
-
-  na.rm = FALSE,
-  show.legend = c(size = FALSE),
-  inherit.aes = TRUE
-) {
-  layer(
-    data = data,
-    mapping = mapping,
-    stat = StatDotsinterval,
-    geom = geom,
-    position = position,
-
-    show.legend = show.legend,
-    inherit.aes = inherit.aes,
-
-    params = list(
-      quantiles = quantiles,
-
-      slab_function = dots_sample_slab_function,
-      slab_args = list(),
-
-      point_interval = point_interval,
-
-      na.rm = na.rm,
-      ...
-    )
-  )
-}
 StatDotsinterval = ggproto("StatDotsinterval", StatSlabinterval,
-  extra_params = c(
-    StatSlabinterval$extra_params,
-    "quantiles"
-  ),
-
   default_params = defaults(list(
-    quantiles = NA,
-
-    slab_function = dots_sample_slab_function,
-    point_interval = median_qi
+    quantiles = NA
   ), StatSlabinterval$default_params),
 
-  setup_params = function(self, data, params) {
-    params = ggproto_parent(StatSlabinterval, self)$setup_params(data, params)
+  hidden_params = union(c(
+    "limits", "n",
+    "p_limits", "slab_type", "outline_bars",
+    "adjust", "trim", "expand", "breaks"
+  ), StatSlabinterval$hidden_params),
 
-    params$slab_args = list(
-      quantiles = params$quantiles %||% self$default_params$quantiles
-    )
-
-    params
-  }
+  # workaround (#84)
+  compute_slab = function(self, ...) compute_slab_dots(self, ...)
 )
-
-#' @export
 #' @rdname geom_dotsinterval
-stat_dots = function(
-  mapping = NULL,
-  data = NULL,
-  geom = "dots",
-  position = "identity",
-  ...,
+#' @export
+stat_dotsinterval = make_stat(StatDotsinterval, geom = "dotsinterval")
 
-  show.legend = NA,
-  inherit.aes = TRUE
-) {
-  layer(
-    data = data,
-    mapping = mapping,
-    stat = StatDots,
-    geom = geom,
-    position = position,
 
-    show.legend = show.legend,
-    inherit.aes = inherit.aes,
+# stat_dots ---------------------------------------------------------------
 
-    params = list(
-      show_point = FALSE,
-      show_interval = FALSE,
-      ...
-    )
-  )
-}
 StatDots = ggproto("StatDots", StatDotsinterval,
   default_params = defaults(list(
     show_point = FALSE,
     show_interval = FALSE
-  ), StatDotsinterval$default_params)
+  ), StatDotsinterval$default_params),
+
+  layer_args = defaults(list(
+    show.legend = NA
+  ), StatDotsinterval$layer_args),
+
+  hidden_params = union(c(
+    "show_slab", "show_point", "show_interval",
+    "point_interval", ".width"
+  ), StatDotsinterval$hidden_params)
 )
 StatDots$default_aes$size = NULL
-
-
-# stat_dist_dotsinterval -----------------------------------------------
-
 #' @rdname geom_dotsinterval
 #' @export
-stat_dist_dotsinterval = function(
-  mapping = NULL,
-  data = NULL,
-  geom = "dotsinterval",
-  position = "identity",
-  ...,
-
-  quantiles = 100,
-
-  na.rm = FALSE,
-  show.legend = c(size = FALSE),
-  inherit.aes = TRUE
-) {
-  layer(
-    data = data,
-    mapping = mapping,
-    stat = StatDistDotsinterval,
-    geom = geom,
-    position = position,
-
-    show.legend = show.legend,
-    inherit.aes = inherit.aes,
-
-    params = list(
-      quantiles = quantiles,
-
-      limits_function = NULL,
-
-      slab_function = dots_dist_slab_function,
-      slab_args = list(),
-
-      interval_function = dist_interval_function,
-      interval_args = list(),
-      point_interval = NULL,
-
-      na.rm = na.rm,
-      ...
-    )
-  )
-}
-StatDistDotsinterval = ggproto("StatDistDotsinterval", StatDistSlabinterval,
-  extra_params = c(
-    StatDistSlabinterval$extra_params,
-    "quantiles"
-  ),
-
-  default_params = defaults(list(
-    quantiles = 100,
-
-    limits_function = NULL,
-    slab_function = dots_dist_slab_function,
-    interval_function = dist_interval_function
-  ), StatDistSlabinterval$default_params),
-
-  setup_params = function(self, data, params) {
-    params = defaults(params, self$default_params)
-
-    # detect orientation -- this must be done before calling up to StatSlabInterval
-    # since auto-detection here is different (main_is_orthogonal needs to be FALSE)
-    params$flipped_aes = get_flipped_aes(data, params,
-      main_is_orthogonal = FALSE, range_is_orthogonal = TRUE, group_has_equal = TRUE, main_is_optional = TRUE
-    )
-    params$orientation = get_orientation(params$flipped_aes)
-
-    # we use setup_params from StatSlabinterval instead of StatDistSlabinterval
-    # because StatDistSlabinterval does some limits calculations that are not relevant here
-    params = ggproto_parent(StatSlabinterval, self)$setup_params(data, params)
-
-    params$slab_args = list(
-      quantiles = params$quantiles %||% self$default_params$quantiles
-    )
-
-    params
-  }
-)
-
-#' @export
-#' @rdname geom_dotsinterval
-stat_dist_dots = function(
-  mapping = NULL,
-  data = NULL,
-  geom = "dots",
-  position = "identity",
-  ...,
-
-  show.legend = NA,
-  inherit.aes = TRUE
-) {
-  layer(
-    data = data,
-    mapping = mapping,
-    stat = StatDistDots,
-    geom = geom,
-    position = position,
-
-    show.legend = show.legend,
-    inherit.aes = inherit.aes,
-
-    params = list(
-      show_point = FALSE,
-      show_interval = FALSE,
-      ...
-    )
-  )
-}
-StatDistDots = ggproto("StatDistDots", StatDistDotsinterval,
-  default_params = defaults(list(
-    show_point = FALSE,
-    show_interval = FALSE
-  ), StatDistDotsinterval$default_params)
-)
-StatDistDots$default_aes$size = NULL
+stat_dots = make_stat(StatDots, geom = "dots")

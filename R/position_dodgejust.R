@@ -26,14 +26,14 @@
 
 #' Dodge overlapping objects side-to-side, preserving justification
 #'
-#' A justification-preserving variant of `ggplot2::position_dodge()` which preserves the
+#' A justification-preserving variant of [ggplot2::position_dodge()] which preserves the
 #' vertical position of a geom while adjusting the horizontal position (or vice
-#' versa when in a horizontal orientation). Unlike `ggplot2::position_dodge()`,
-#' `position_dodgejust()` attempts to preserve the "justification" of `x`
+#' versa when in a horizontal orientation). Unlike [ggplot2::position_dodge()],
+#' [position_dodgejust()] attempts to preserve the "justification" of `x`
 #' positions relative to the bounds containing them (`xmin`/`xmax`) (or `y`
 #' positions relative to `ymin`/`ymax` when in a horizontal orientation). This
 #' makes it useful for dodging annotations to geoms and stats from the
-#' `geom_slabinterval()` family, which also preserve the justification of their
+#' [geom_slabinterval()] family, which also preserve the justification of their
 #' intervals relative to their slabs when dodging.
 #'
 #' @inheritParams ggplot2::position_dodge
@@ -64,10 +64,10 @@
 #' # which can cause slabs to be positioned outside their bounds.
 #' dist_df %>%
 #'   ggplot(aes(
-#'     x = factor(group), dist = dist_normal(mean, sd),
+#'     x = factor(group), ydist = dist_normal(mean, sd),
 #'     fill = subgroup
 #'   )) +
-#'   stat_dist_halfeye(
+#'   stat_halfeye(
 #'     position = "dodge"
 #'   ) +
 #'   geom_rect(
@@ -89,15 +89,15 @@
 #'
 #' # This same example with "dodgejust" positioning. For the points we
 #' # supply a justification parameter to position_dodgejust which mimics the
-#' # justification parameter of stat_dist_halfeye, ensuring that they are
+#' # justification parameter of stat_halfeye, ensuring that they are
 #' # placed appropriately. On slabinterval family geoms, position_dodgejust()
 #' # will automatically detect the appropriate justification.
 #' dist_df %>%
 #'   ggplot(aes(
-#'     x = factor(group), dist = dist_normal(mean, sd),
+#'     x = factor(group), ydist = dist_normal(mean, sd),
 #'     fill = subgroup
 #'   )) +
-#'   stat_dist_halfeye(
+#'   stat_halfeye(
 #'     position = "dodgejust"
 #'   ) +
 #'   geom_rect(
@@ -138,8 +138,8 @@ PositionDodgejust <- ggproto("PositionDodgejust", Position,
   justification = NULL,
 
   setup_params = function(self, data) {
-    flipped_aes <- has_flipped_aes(data)
-    data <- flip_data(data, flipped_aes)
+    flipped_aes = has_flipped_aes(data)
+    data = flip_data(data, flipped_aes)
 
     if (is.null(data$xmin) && is.null(data$xmax) && is.null(self$width)) {
       warning0("Width not defined. Set with `position_dodgejust(width = ?)`")
@@ -158,54 +158,48 @@ PositionDodgejust <- ggproto("PositionDodgejust", Position,
 
     just = data$justification %||% params$justification %||% 0.5
     if (!"x" %in% names(data) && all(c("xmin", "xmax") %in% names(data))) {
-      data$x <- (data$xmax - data$xmin) * just + data$xmin
+      data$x = (data$xmax - data$xmin) * just + data$xmin
     }
 
     flip_data(data, params$flipped_aes)
   },
 
   compute_panel = function(data, params, scales) {
-    data <- flip_data(data, params$flipped_aes)
-    collided <- collide(
+    data = flip_data(data, params$flipped_aes)
+    collided = collide(
       data,
       params$width,
       name = "position_dodgejust",
-      strategy = pos_dodge,
+      strategy = pos_dodgejust,
       preserve = params$preserve,
       justification = params$justification,
-      check.width = FALSE
+      x_name = if (isTRUE(params$flipped_aes)) "y" else "x"
     )
     flip_data(collided, params$flipped_aes)
   }
 )
 
-# Dodge overlapping interval.
+# Justification-preserving dodge of overlapping intervals.
 # Assumes that each set has the same horizontal position.
-pos_dodge <- function(df, width, n = NULL) {
-  if (is.null(n)) {
-    n <- length(unique(df$group))
-  }
+# df must have x, xmin, and xmax defined
+pos_dodgejust = function(df, width, n = NULL) {
+  n = n %||% length(unique(df$group))
 
   if (n == 1) return(df)
 
-  if (!all(c("xmin", "xmax") %in% names(df))) {
-    df$xmin <- df$x
-    df$xmax <- df$x
-  }
-
-  d_width <- max(df$xmax - df$xmin)
-
   # Have a new group index from 1 to number of groups.
   # This might be needed if the group numbers in this set don't include all of 1:n
-  groupidx <- match(df$group, sort(unique(df$group)))
+  groupidx = match(df$group, sort(unique(df$group)))
 
   # Find the justification of each point so we can preserve it
-  just = (df$x - df$xmin) / (df$xmax - df$xmin)
+  x_width = df$xmax - df$xmin
+  just = ifelse(x_width == 0, 0, (df$x - df$xmin) / x_width)
 
   # Find the center for each group, then use that to calculate xmin and xmax
-  df$x <- df$x + width * ((groupidx - 0.5) / n - .5)
-  df$xmin <- df$x - d_width / n / 2
-  df$xmax <- df$x + d_width / n / 2
+  max_width = max(x_width)
+  df$x = df$x + width * ((groupidx - 0.5) / n - .5)
+  df$xmin = df$x - max_width / n / 2
+  df$xmax = df$x + max_width / n / 2
 
   # Reset x position based on justification
   df$x = df$xmin + just * (df$xmax - df$xmin)
@@ -213,52 +207,49 @@ pos_dodge <- function(df, width, n = NULL) {
   df
 }
 
-# helper functions from position-collide ----------------------------------
 
-# Detect and prevent collisions.
-# Powers dodging, stacking and filling.
-collide_setup = function(
-  data, width = NULL, name, strategy,
-  justification = NULL,
-  check.width = TRUE
-) {
+# helper functions originally based on position-collide ------------------------
+
+# Setup data for collision detection by making sure width and xmin/xmax are set
+collide_setup = function(data, width = NULL, justification = NULL) {
   # Determine width
   if (!is.null(width)) {
     # Width set manually
     if (!(all(c("xmin", "xmax") %in% names(data)))) {
       just = data$justification %||% justification %||% 0.5
-      data$xmin <- data$x - width * just
-      data$xmax <- data$x + width * (1 - just)
+      data$xmin = data$x - width * just
+      data$xmax = data$x + width * (1 - just)
     }
   } else {
     if (!(all(c("xmin", "xmax") %in% names(data)))) {
-      data$xmin <- data$x
-      data$xmax <- data$x
+      data$xmin = data$x
+      data$xmax = data$x
     }
 
     # Width determined from data, must be floating point constant
-    widths <- unique(data$xmax - data$xmin)
-    widths <- widths[!is.na(widths)]
+    widths = unique(data$xmax - data$xmin)
+    widths = widths[!is.na(widths)]
 
-    width <- widths[1]
+    width = widths[1]
   }
 
   list(data = data, width = width)
 }
 
+# Collision detection
 collide = function(
   data, width = NULL, name, strategy,
   preserve = "total", justification = NULL,
-  check.width = TRUE
+  x_name = "x"
 ) {
-  dlist <- collide_setup(data, width, name, strategy, justification, check.width)
-  data <- dlist$data
-  width <- dlist$width
+  dlist = collide_setup(data, width, justification)
+  data = dlist$data
+  width = dlist$width
 
   # Reorder by x position, then on group. The default stacking order reverses
   # the group in order to match the legend order.
-  ord <- order(data$xmin, -data$group)
-  data <- data[ord, ]
+  ord = order(data$xmin, -data$group)
+  data = data[ord, ]
 
   # determine n
   n = switch(preserve,
@@ -267,11 +258,11 @@ collide = function(
   )
 
   # Check for overlap
-  intervals <- as.numeric(t(unique(data[c("xmin", "xmax")])))
-  intervals <- intervals[!is.na(intervals)]
+  intervals = as.numeric(t(unique(data[c("xmin", "xmax")])))
+  intervals = intervals[!is.na(intervals)]
 
   if (length(unique(intervals)) > 1 & any(diff(scale(intervals)) < -1e-6)) {
-    warning0(paste0(name, " requires non-overlapping x intervals"))
+    warning0(paste0(name, " requires non-overlapping ", x_name, " intervals"))
   }
 
   # workaround so that mapped_discrete columns can be combined with numerics
@@ -279,11 +270,11 @@ collide = function(
   data[xy_cols] = lapply(data[xy_cols], as.numeric)
 
   if (!is.null(data$ymax)) {
-    data <- ddply_(data, "xmin", strategy, n = n, width = width)
+    data = ddply_(data, "xmin", strategy, n = n, width = width)
   } else if (!is.null(data$y)) {
-    data$ymax <- data$y
-    data <- ddply_(data, "xmin", strategy, n = n, width = width)
-    data$y <- data$ymax
+    data$ymax = data$y
+    data = ddply_(data, "xmin", strategy, n = n, width = width)
+    data$y = data$ymax
   } else {
     stop0("Neither y nor ymax defined")
   }

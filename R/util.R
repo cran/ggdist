@@ -48,7 +48,8 @@ defaults = function(x, defaults) {
   if (length(deprecated_args) > 0) {
     stop0(
       "\nIn ", fun, "(): The `", deprecated_args[[1]], "` argument is deprecated.\n",
-      message
+      message,
+      "See help(\"ggdist-deprecated\").\n"
     )
   }
 }
@@ -82,11 +83,16 @@ map_dfr_ = function(data, fun, ...) {
   bind_rows(lapply(data, fun, ...))
 }
 
+pmap_ = function(data, fun) {
+  # this is roughly equivalent to purrr::pmap
+  lapply(vctrs::vec_chop(data), function(row) do.call(fun, lapply(row, `[[`, 1)))
+}
+
 pmap_dfr_ = function(data, fun) {
   # this is roughly equivalent to
   # pmap_dfr(df, function(...) { ... })
   # but works properly with vctrs (pmap_dfr seems broken on rvars?)
-  map_dfr_(vctrs::vec_chop(data), function(row) do.call(fun, lapply(row, `[[`, 1)))
+  bind_rows(pmap_(data, fun))
 }
 
 ddply_ = function(data, groups, fun, ...) {
@@ -95,7 +101,7 @@ ddply_ = function(data, groups, fun, ...) {
 
 fct_explicit_na_ = function(x) {
   x = as.factor(x)
-  if (anyNA(x)) {
+  if (anyNA(x) || anyNA(levels(x))) {
     na_name = "(Missing)"
     levels_x = levels(x)
     while (na_name %in% levels_x) {
@@ -110,18 +116,20 @@ fct_explicit_na_ = function(x) {
 dlply_ = function(data, groups, fun, ...) {
   # must make NAs explicit or they will be dropped by split()
   group_vars = lapply(data[, groups, drop = FALSE], fct_explicit_na_)
-  # group_is = a list where each element is a numeric vector of indices
-  # corresponding to one group
-  group_is = if (length(group_vars) >= 1) {
-    unname(split(seq_len(nrow(data)), group_vars, drop = TRUE, lex.order = TRUE))
+
+  if (length(group_vars) >= 1) {
+    # group_is = a list where each element is a numeric vector of indices
+    # corresponding to one group
+    group_is = unname(split(seq_len(nrow(data)), group_vars, drop = TRUE, lex.order = TRUE))
+
+    lapply(group_is, function(group_i) {
+      # faster version of row_df = data[group_i, ]
+      row_df = tibble::new_tibble(lapply(data, `[`, group_i), nrow = length(group_i))
+      fun(row_df, ...)
+    })
   } else {
-    list(seq_len(nrow(data)))
+    list(fun(data, ...))
   }
-  lapply(group_is, function(group_i) {
-    # faster version of row_df = data[group_i, ]
-    row_df = tibble::new_tibble(lapply(data, `[`, group_i), nrow = length(group_i))
-    fun(row_df, ...)
-  })
 }
 
 map_dbl_ = function(X, FUN, ...) {
@@ -136,16 +144,9 @@ map2_chr_ = function(X, Y, FUN) {
   as.character(mapply(FUN, X, Y, USE.NAMES = FALSE))
 }
 
-map2_dfr_ = function(X, Y, FUN) {
-  bind_rows(mapply(FUN, X, Y, SIMPLIFY = FALSE, USE.NAMES = FALSE))
-}
-
-iwalk_ = function(vec, fun, ...) {
-  # drop in replacement for purrr::iwalk()
-  nms = names(vec) %||% seq_along(x)
-  mapply(fun, vec, nms, MoreArgs = list(...))
-  invisible(vec)
-}
+# map2_dfr_ = function(X, Y, FUN) {
+#   bind_rows(mapply(FUN, X, Y, SIMPLIFY = FALSE, USE.NAMES = FALSE))
+# }
 
 fct_rev_ = function(x) {
   if (is.character(x)) {
@@ -154,6 +155,42 @@ fct_rev_ = function(x) {
     stop0("`x` must be a factor (or character vector).")
   }
   factor(x, levels = rev(levels(x)), ordered = is.ordered(x))
+}
+
+
+# array manipulation ------------------------------------------------------
+
+# flatten dimensions of an array
+flatten_array = function(x) {
+  # determine new dimension names in the form x,y,z
+  # start with numeric names
+  .dim = dim(x) %||% length(x)
+  dimname_lists = lapply(.dim, seq_len)
+  .dimnames = dimnames(x)
+  if (!is.null(.dimnames)) {
+    # where character names are provided, use those instead of the numeric names
+    dimname_lists = lapply(seq_along(dimname_lists), function(i) .dimnames[[i]] %||% dimname_lists[[i]])
+  }
+  # if this has more than one dimension and the first dim is length 1 and is unnamed, drop it
+  # basically: we don't want row vectors to have a bunch of "1,"s in front of their indices.
+  if (length(.dim) > 1 && .dim[[1]] == 1 && length(.dimnames[[1]]) == 0) {
+    dimname_lists = dimname_lists[-1]
+  }
+
+  # flatten array
+  dim(x) = length(x)
+
+  if (length(dimname_lists) == 1) {
+    index_names = dimname_lists[[1]]
+  } else {
+    # expand out the dimname lists into the appropriate combinations and assemble into new names
+    dimname_grid = expand.grid(dimname_lists, KEEP.OUT.ATTRS = FALSE)
+    index_names = do.call(paste, c(list(sep = ","), dimname_grid))
+    # make it a factor to preserve original order
+    index_names = ordered(index_names, levels = index_names)
+  }
+
+  list(x = x, index_names = index_names)
 }
 
 

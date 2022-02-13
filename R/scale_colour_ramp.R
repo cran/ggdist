@@ -15,8 +15,8 @@
 #'
 #' @inheritParams ggplot2::continuous_scale
 #' @param from The color to ramp from. Corresponds to `0` on the scale.
-#' @param ... Arguments passed to underlying scale or guide functions. E.g. `scale_colour_ramp_discrete()`,
-#' passes arguments to [discrete_scale()], `scale_colour_ramp_continuous()` passes arguments
+#' @param ... Arguments passed to underlying scale or guide functions. E.g. [scale_colour_ramp_discrete()],
+#' passes arguments to [discrete_scale()], [scale_colour_ramp_continuous()] passes arguments
 #' to [continuous_scale()]. See those functions for more details.
 #' @param aesthetics Names of aesthetics to set scales for.
 #' @param range a numeric vector of length 2 that specifies the minimum and maximum
@@ -36,18 +36,18 @@
 #' library(distributional)
 #'
 #' tibble(d = dist_uniform(0, 1)) %>%
-#'   ggplot(aes(y = 0, dist = d)) +
-#'   stat_dist_slab(aes(fill_ramp = stat(x)))
+#'   ggplot(aes(y = 0, xdist = d)) +
+#'   stat_slab(aes(fill_ramp = stat(x)))
 #'
 #' tibble(d = dist_uniform(0, 1)) %>%
-#'   ggplot(aes(y = 0, dist = d)) +
-#'   stat_dist_slab(aes(fill_ramp = stat(x)), fill = "blue") +
+#'   ggplot(aes(y = 0, xdist = d)) +
+#'   stat_slab(aes(fill_ramp = stat(x)), fill = "blue") +
 #'   scale_fill_ramp_continuous(from = "red")
 #'
 #' # you can invert the order of `range` to change the order of the blend
 #' tibble(d = dist_normal(0, 1)) %>%
-#'   ggplot(aes(y = 0, dist = d)) +
-#'   stat_dist_slab(aes(fill_ramp = stat(cut_cdf_qi(cdf))), fill = "blue") +
+#'   ggplot(aes(y = 0, xdist = d)) +
+#'   stat_slab(aes(fill_ramp = stat(cut_cdf_qi(cdf))), fill = "blue") +
 #'   scale_fill_ramp_discrete(from = "red", range = c(1, 0))
 #'
 #' @importFrom scales rescale_pal

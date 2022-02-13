@@ -75,6 +75,9 @@ test_that("vanilla dots geoms and stats work", {
 
 })
 
+
+# scale_ and coord_ transformations ----------------------------------------------
+
 test_that("coordinate transformations work", {
   skip_if_no_vdiffr()
 
@@ -99,11 +102,42 @@ test_that("coordinate transformations work", {
   )
 
   expect_error(
-    print(p + coord_polar()),
+    print(p + coord_polar(), newpage = FALSE),
     "geom_dotsinterval does not work properly with non-linear coordinates"
   )
 
 })
+
+
+test_that("scale transformations work", {
+  skip_if_no_vdiffr()
+
+
+  p = data.frame(x = dist_sample(list(qlnorm(ppoints(20))))) %>%
+    ggplot(aes(xdist = x, y = 0))
+
+  vdiffr::expect_doppelganger("transformed scale with dist_sample",
+    p + stat_dist_dotsinterval() + scale_x_log10()
+  )
+
+  p = data.frame(x = qlnorm(ppoints(20))) %>%
+    ggplot(aes(x = x, y = 0))
+
+  vdiffr::expect_doppelganger("transformed scale with sample data on x",
+    p + stat_dist_dotsinterval() + scale_x_log10()
+  )
+
+  p = data.frame(x = qlnorm(ppoints(100))) %>%
+    ggplot(aes(x = x, y = 0))
+
+  vdiffr::expect_doppelganger("transformed scale, sample data, quantiles",
+    p + stat_dist_dotsinterval(quantiles = 20) + scale_x_log10()
+  )
+
+})
+
+
+# dists -------------------------------------------------------------------
 
 test_that("stat_dist_dots[interval] works", {
   skip_if_no_vdiffr()
@@ -166,6 +200,9 @@ test_that("stat_dist_dots works on distributional objects", {
 
 })
 
+
+# binwidth -----------------------------------------------------
+
 test_that("geom_dots binwidth can be specified in unit()s", {
   skip_if_no_vdiffr()
 
@@ -178,6 +215,28 @@ test_that("geom_dots binwidth can be specified in unit()s", {
       facet_grid(~ am, scales = "free")
   )
 })
+
+test_that("geom_dots allows constraints on binwidth", {
+  skip_if_no_vdiffr()
+
+  p = data.frame(x = ppoints(20)) %>%
+    ggplot(aes(x = x, y = 0L))
+
+  # max width of 1/40th of the viewport should approx space
+  # this data with about 1 dot of space in between each dot
+  vdiffr::expect_doppelganger("max binwidth",
+    p + geom_dots(binwidth = unit(c(0, 1/40), "npc"))
+  )
+
+  # min width of 1/4th of the viewport should give us four giant bins
+  vdiffr::expect_doppelganger("min binwidth",
+    p + geom_dots(binwidth = unit(c(1/4, Inf), "npc"))
+  )
+
+})
+
+
+# layout ------------------------------------------------------------------
 
 test_that("dotplot layouts work", {
   skip_if_no_vdiffr()
@@ -226,6 +285,29 @@ test_that("dotplot layouts work", {
 
 })
 
+test_that("dot order is correct", {
+  skip_if_no_vdiffr()
+
+  p = data.frame(x = qnorm(ppoints(50))) %>%
+    ggplot(aes(x = x, fill = stat(x < 0)))
+
+  vdiffr::expect_doppelganger("weave dot order",
+    p +
+      geom_dots(layout = "weave") +
+      geom_vline(xintercept = 0)
+  )
+
+  vdiffr::expect_doppelganger("swarm dot order",
+    p +
+      geom_dots(layout = "swarm") +
+      geom_vline(xintercept = 0)
+  )
+
+})
+
+
+# NAs -------------------------------------------------------------------
+
 test_that("na.rm is propagated to quantile dotplot", {
   skip_if_no_vdiffr()
 
@@ -235,35 +317,6 @@ test_that("na.rm is propagated to quantile dotplot", {
       stat_dots(na.rm = TRUE, quantiles = 20) +
       scale_x_continuous(limits = c(0,4))
   )
-})
-
-test_that("geom_dots works on discrete distributions", {
-  skip_if_no_vdiffr()
-
-  vdiffr::expect_doppelganger("one integer bin",
-    data.frame(x = rep(1L, 10)) %>%
-      ggplot(aes(x = x, y = 0)) +
-      stat_dots(orientation = "horizontal")
-  )
-
-  vdiffr::expect_doppelganger("three integer bins",
-    data.frame(x = c(rep(1L, 10), rep(2L, 12), rep(3L, 5))) %>%
-      ggplot(aes(x = x, y = 0)) +
-      stat_dots(orientation = "horizontal")
-  )
-
-  vdiffr::expect_doppelganger("one character bin",
-    data.frame(x = rep("a", 10)) %>%
-      ggplot(aes(x = x, y = 0)) +
-      stat_dots(orientation = "horizontal")
-  )
-
-  vdiffr::expect_doppelganger("three character bins",
-    data.frame(x = c(rep("a", 10), rep("b", 12), rep("c", 5))) %>%
-      ggplot(aes(x = x, y = 0)) +
-      stat_dots(orientation = "horizontal")
-  )
-
 })
 
 test_that("geom_dots works with NA in non-data axis", {
@@ -284,24 +337,56 @@ test_that("geom_dots works with NA in non-data axis", {
   )
 })
 
-test_that("geom_dots allows constraints on binwidth", {
+test_that("empty slab from NA removal works", {
   skip_if_no_vdiffr()
 
-  p = data.frame(x = ppoints(20)) %>%
-    ggplot(aes(x = x, y = 0L))
 
-  # max width of 1/40th of the viewport should approx space
-  # this data with about 1 dot of space in between each dot
-  vdiffr::expect_doppelganger("max binwidth",
-    p + geom_dots(binwidth = unit(c(0, 1/40), "npc"))
+  vdiffr::expect_doppelganger("dots with no slab from NA removal", {
+    data.frame(x = c(1, NA), datatype = c("interval", "slab")) %>%
+      ggplot(aes(x = x, xmin = x - 1, xmax = x + 1, datatype = datatype)) +
+      geom_dotsinterval(na.rm = TRUE)
+  })
+})
+
+
+# discrete distributions --------------------------------------------------
+
+test_that("geom_dots works on discrete distributions", {
+  skip_if_no_vdiffr()
+
+  vdiffr::expect_doppelganger("one integer bin",
+    data.frame(x = rep(1L, 10)) %>%
+      ggplot(aes(x = x, y = 0)) +
+      stat_dots(orientation = "horizontal") +
+      geom_hline(yintercept = 0.9)
   )
 
-  # min width of 1/4th of the viewport should give us four giant bins
-  vdiffr::expect_doppelganger("min binwidth",
-    p + geom_dots(binwidth = unit(c(1/4, Inf), "npc"))
+  vdiffr::expect_doppelganger("three integer bins",
+    data.frame(x = c(rep(1L, 10), rep(2L, 12), rep(3L, 5))) %>%
+      ggplot(aes(x = x, y = 0)) +
+      stat_dots(orientation = "horizontal") +
+      geom_hline(yintercept = 0.9)
+  )
+
+  vdiffr::expect_doppelganger("one character bin",
+    data.frame(x = rep("a", 10)) %>%
+      ggplot(aes(x = x, y = 0)) +
+      stat_dots(orientation = "horizontal") +
+      geom_hline(yintercept = 0.9)
+  )
+
+  vdiffr::expect_doppelganger("three character bins",
+    data.frame(x = c(rep("a", 10), rep("b", 12), rep("c", 5))) %>%
+      ggplot(aes(x = x, y = 0)) +
+      stat_dots(orientation = "horizontal") +
+      geom_hline(yintercept = 0.9)
   )
 
 })
+
+
+
+# dot stroke --------------------------------------------------------------
 
 test_that("geom_dots correctly adjusts dot size for stroke size", {
   skip_if_no_vdiffr()
@@ -316,6 +401,9 @@ test_that("geom_dots correctly adjusts dot size for stroke size", {
   )
 
 })
+
+
+# side, justification, scale aes ------------------------------------------
 
 test_that("side, justification, and scale can vary", {
   skip_if_no_vdiffr()

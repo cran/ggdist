@@ -15,10 +15,12 @@
 #' @param y numeric vector of y values
 #' @param binwidth bin width
 #' @param heightratio ratio of bin width to dot height
+#' @param stackratio ratio of dot height to vertical distance between dot
+#' centers
 #' @template param-dots-layout
 #' @template param-slab-side
 #' @param orientation Whether the dots are laid out horizontally or vertically.
-#' Follows the naming scheme of `geom_slabinterval()`:
+#' Follows the naming scheme of [geom_slabinterval()]:
 #'
 #'   - `"horizontal"` assumes the data values for the dotplot are in the `x`
 #'   variable and that dots will be stacked up in the `y` direction.
@@ -62,6 +64,7 @@
 #' @export
 bin_dots = function(x, y, binwidth,
   heightratio = 1,
+  stackratio = 1,
   layout = c("bin", "weave", "swarm"),
   side = c("topright", "top", "right", "bottomleft", "bottom", "left", "topleft", "bottomright", "both"),
   orientation = c("horizontal", "vertical", "y", "x")
@@ -76,18 +79,26 @@ bin_dots = function(x, y, binwidth,
   # to the orientation
   define_orientation_variables(orientation)
 
+  # Sort the x values, because they must be sorted for bin methods to maintain
+  # the correct connection between input values and output bins.
+  # Because of this (and other later grouping operations that may re-order the
+  # data as well) we need to keep the original data order around so that
+  # we can restore the original order at the end.
+  d$order = seq_len(nrow(d))
+  d = d[order(d[[x]]), ]
+
   # binning from the center (automatic_bin) is only useful in the "bin" layout
   # and can give weird results with "weave" (and is pointless on "swarm")
   bin_method = if (layout == "bin") automatic_bin else wilkinson_bin_to_right
 
   # bin the dots
-  h = dot_heap(d[[x]], binwidth = binwidth, heightratio = heightratio, bin_method = bin_method)
+  h = dot_heap(d[[x]], binwidth = binwidth, heightratio = heightratio, stackratio = stackratio, bin_method = bin_method)
   d$bin = h$binning$bins
 
   # determine x positions (for bin/weave) or x and y positions (for swarm)
   y_start = switch_side(side, orientation,
-    topright = h$y_spacing / 2,
-    bottomleft = - h$y_spacing / 2,
+    topright = h$y_spacing / stackratio / 2,
+    bottomleft = - h$y_spacing / stackratio / 2,
     both = 0
   )
   switch(layout,
@@ -152,6 +163,10 @@ bin_dots = function(x, y, binwidth,
     })
   }
 
+  # restore the original data order in case it was destroyed
+  d = d[order(d$order), ]
+  d$order = NULL
+
   d
 }
 
@@ -165,6 +180,8 @@ bin_dots = function(x, y, binwidth,
 #' @param x numeric vector of values
 #' @param maxheight maximum height of the dotplot
 #' @param heightratio ratio of bin width to dot height
+#' @param stackratio ratio of dot height to vertical distance between dot
+#' centers
 #'
 #' @details
 #' This dynamic bin selection algorithm uses a binary search over the number of
@@ -172,7 +189,7 @@ bin_dots = function(x, y, binwidth,
 #' using a Wilkinson-style dotplot algorithm the height of the tallest bin
 #' will be less than `maxheight`.
 #'
-#' This algorithm is used by `geom_dotsinterval()` (and its variants) to automatically
+#' This algorithm is used by [geom_dotsinterval()] (and its variants) to automatically
 #' select bin widths. Unless you are manually implementing you own dotplot [`grob`]
 #' or `geom`, you probably do not need to use this function directly
 #'
@@ -205,19 +222,21 @@ bin_dots = function(x, y, binwidth,
 #'   coord_fixed()
 #'
 #' @importFrom grDevices nclass.Sturges nclass.FD nclass.scott
+#' @importFrom stats optimize
 #' @export
-find_dotplot_binwidth = function(x, maxheight, heightratio = 1) {
+find_dotplot_binwidth = function(x, maxheight, heightratio = 1, stackratio = 1) {
   # figure out a reasonable minimum number of bins based on histogram binning
   min_nbins = if (length(x) <= 1) {
     1
   } else{
     min(nclass.scott(x), nclass.FD(x), nclass.Sturges(x))
   }
-  min_h = dot_heap(x, nbins = min_nbins, maxheight = maxheight, heightratio = heightratio)
+  dot_heap_ = function(...) dot_heap(x, ..., maxheight = maxheight, heightratio = heightratio, stackratio = stackratio)
+  min_h = dot_heap_(nbins = min_nbins)
 
   if (!min_h$is_valid) {
     # figure out a maximum number of bins based on data resolution
-    max_h = dot_heap(x, binwidth = resolution(x), maxheight = maxheight, heightratio = heightratio)
+    max_h = dot_heap_(binwidth = resolution(x))
 
     if (max_h$nbins <= min_h$nbins) {
       # even at data resolution there aren't enough bins, not much we can do...
@@ -228,7 +247,7 @@ find_dotplot_binwidth = function(x, maxheight, heightratio = 1) {
     } else {
       # use binary search to find a reasonable number of bins
       repeat {
-        h = dot_heap(x, (min_h$nbins + max_h$nbins) / 2, maxheight = maxheight, heightratio = heightratio)
+        h = dot_heap_(nbins = (min_h$nbins + max_h$nbins) / 2)
         if (h$is_valid) {
           # heap spec is valid, search downwards
           if (h$nbins - 1 <= min_h$nbins) {
@@ -245,6 +264,29 @@ find_dotplot_binwidth = function(x, maxheight, heightratio = 1) {
           }
           min_h = h
         }
+      }
+    }
+
+    # attempt to refine binwidth using optimization.
+    # after finding a reasonable candidate based on number of bins, we refine
+    # the binwidth around that number of bins using optimization. We do this
+    # only as a second step because just using optimization on binwidth as a
+    # first step tends to end up in a local minimum, sometimes very far from
+    # maxheight.
+    candidate_binwidths = c(min_h$binwidth, max_h$binwidth, h$binwidth)
+    if (length(unique(candidate_binwidths)) != 1) {
+      binwidth = optimize(
+        function(binwidth) {
+          h = dot_heap_(binwidth = binwidth)
+          (h$max_bin_count * h$max_y_spacing - h$maxheight)^2
+        },
+        candidate_binwidths
+      )$minimum
+      new_h = dot_heap_(binwidth = binwidth)
+
+      # approximate version of new_h$is_valid used here to tolerate approximation with optimize()
+      if (isTRUE(new_h$max_bin_count * new_h$max_y_spacing <= new_h$maxheight + .Machine$double.eps^0.25)) {
+        h = new_h
       }
     }
   } else {
@@ -277,7 +319,7 @@ find_dotplot_binwidth = function(x, maxheight, heightratio = 1) {
 #' @param heightratio ratio between the bin width and the y spacing
 #' @return  a list of properties of this dot "heap"
 #' @noRd
-dot_heap = function(x, nbins = NULL, binwidth = NULL, maxheight = Inf, heightratio = 1, bin_method = automatic_bin) {
+dot_heap = function(x, nbins = NULL, binwidth = NULL, maxheight = Inf, heightratio = 1, stackratio = 1, bin_method = automatic_bin) {
   xrange = range(x)
   xspread = xrange[[2]] - xrange[[1]]
   if (xspread == 0) xspread = 1
@@ -288,11 +330,15 @@ dot_heap = function(x, nbins = NULL, binwidth = NULL, maxheight = Inf, heightrat
     nbins = max(floor(xspread / binwidth), 1)
   }
   binning = bin_method(x, binwidth)
-  max_bin_count = max(tabulate(binning$bins))
+  bin_counts = tabulate(binning$bins)
+  # max bin count is the max "effective" number of elements in a bin, which
+  # is the number of elements in the bin modified by the stackratio to account
+  # for how dots align with tops and bottoms of stacks when stackratio != 1
+  max_bin_count = max(bin_counts) - 1 + 1/stackratio
 
   y_spacing = binwidth * heightratio
 
-  if (nbins == 1) {
+  if (length(bin_counts) == 1) {
     # if there's only 1 bin, we can scale it to be as large as we want as long as it fits, so
     # let's back out a max bin size based on that...
     max_y_spacing = maxheight / max_bin_count

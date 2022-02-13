@@ -2,8 +2,7 @@
 % Please edit documentation in R/stat_lineribbon.R
 \name{stat_lineribbon}
 \alias{stat_lineribbon}
-\alias{stat_dist_lineribbon}
-\title{Line + multiple probability ribbon plots (ggplot stat)}
+\title{Line + multiple-ribbon plot (shortcut stat)}
 \usage{
 stat_lineribbon(
   mapping = NULL,
@@ -11,26 +10,9 @@ stat_lineribbon(
   geom = "lineribbon",
   position = "identity",
   ...,
-  interval_function = NULL,
-  interval_args = list(),
-  point_interval = median_qi,
   .width = c(0.5, 0.8, 0.95),
-  na.rm = FALSE,
-  show.legend = NA,
-  inherit.aes = TRUE,
-  .prob,
-  fun.data,
-  fun.args
-)
-
-stat_dist_lineribbon(
-  mapping = NULL,
-  data = NULL,
-  geom = "lineribbon",
-  position = "identity",
-  ...,
-  n = 501,
-  .width = c(0.5, 0.8, 0.95),
+  point_interval = "median_qi",
+  orientation = NA,
   na.rm = FALSE,
   show.legend = NA,
   inherit.aes = TRUE
@@ -58,71 +40,205 @@ will be used as the layer data. A \code{function} can be created
 from a \code{formula} (e.g. \code{~ head(.x, 10)}).}
 
 \item{geom}{Use to override the default connection between
-\code{geom_lineribbon} and \code{stat_lineribbon}.}
+\code{\link[=stat_lineribbon]{stat_lineribbon()}} and \code{\link[=geom_lineribbon]{geom_lineribbon()}}}
 
-\item{position}{Position adjustment, either as a string, or the result of
-a call to a position adjustment function.}
+\item{position}{Position adjustment, either as a string, or the result of a call to a position adjustment function.
+Setting this equal to \code{"dodge"} (\code{\link[=position_dodge]{position_dodge()}}) or \code{"dodgejust"} (\code{\link[=position_dodgejust]{position_dodgejust()}}) can be useful if
+you have overlapping geometries.}
 
-\item{...}{Other arguments passed to \code{\link[=layer]{layer()}}. They may also be arguments to the paired geom
-(e.g., \code{\link[=geom_pointinterval]{geom_pointinterval()}})}
+\item{...}{Other arguments passed to \code{\link[=layer]{layer()}}. These are often aesthetics, used to set an aesthetic
+to a fixed value, like \code{colour = "red"} or \code{size = 3} (see \strong{Aesthetics}, below). They may also be
+parameters to the paired geom/stat. When paired with the default geom, \code{\link[=geom_lineribbon]{geom_lineribbon()}},
+these include:
+\describe{
+\item{\code{step}}{Should the line/ribbon be drawn as a step function? One of:
+\itemize{
+\item \code{FALSE} (default): do not draw as a step function.
+\item \code{"mid"} (or \code{TRUE}): draw steps midway between adjacent x values.
+\item \code{"hv"}: draw horizontal-then-vertical steps.
+\item \code{"vh"}: draw as vertical-then-horizontal steps.
+}
+\code{TRUE} is an alias for \code{"mid"} because for a step function with ribbons, \code{"mid"} is probably what you want
+(for the other two step approaches the ribbons at either the very first or very last x value will not be
+visible).}
+}}
 
-\item{interval_function}{Custom function for generating intervals (for most common use cases the \code{point_interval}
-argument will be easier to use). This function takes a data frame of aesthetics and a \code{.width} parameter (a vector
-of interval widths), and returns a data frame with
-columns \code{.width} (from the \code{.width} vector), \code{.value} (point summary) and \code{.lower} and \code{.upper}
-(endpoints of the intervals, given the \code{.width}). Output will be converted to the appropriate \code{x}- or
-\code{y}-based aesthetics depending on the value of \code{orientation}. If \code{interval_function} is \code{NULL},
-\code{point_interval} is used instead.}
-
-\item{interval_args}{Additional arguments passed to \code{interval_function} or \code{point_interval}.}
+\item{.width}{The \code{.width} argument passed to \code{point_interval}: a vector of probabilities to use
+that determine the widths of the resulting intervals. If multiple probabilities are provided,
+multiple intervals per group are generated, each with a different probability interval (and
+value of the corresponding \code{.width} and \code{level} generated variables).}
 
 \item{point_interval}{A function from the \code{\link[=point_interval]{point_interval()}} family (e.g., \code{median_qi},
-\code{mean_qi}, etc). This function should take in a vector of value, and should obey the
-\code{.width} and \code{.simple_names} parameters of \code{\link[=point_interval]{point_interval()}} functions, such that when given
-a vector with \code{.simple_names = TRUE} should return a data frame with variables \code{.value}, \code{.lower},
-\code{.upper}, and \code{.width}. Output will be converted to the appropriate \code{x}- or \code{y}-based aesthetics
-depending on the value of \code{orientation}. See the \code{\link[=point_interval]{point_interval()}} family of functions for
-more information.}
+\code{mean_qi}, \code{mode_hdi}, etc), or a string giving the name of a function from that family
+(e.g., \code{"median_qi"}, \code{"mean_qi"}, \code{"mode_hdi"}, etc). This function determines the point summary
+(typically mean, median, or mode) and interval type (quantile interval, \code{qi};
+highest-density interval, \code{hdi}; or highest-density continuous interval, \code{hdci}). Output will
+be converted to the appropriate \code{x}- or \code{y}-based aesthetics depending on the value of \code{orientation}.
+See the \code{\link[=point_interval]{point_interval()}} family of functions for more information.}
 
-\item{.width}{The \code{.width} argument passed to \code{interval_function} or \code{point_interval}.}
+\item{orientation}{Whether this geom is drawn horizontally or vertically. One of:
+\itemize{
+\item \code{NA} (default): automatically detect the orientation based on how the aesthetics
+are assigned. Automatic detection works most of the time.
+\item \code{"horizontal"} (or \code{"y"}): draw horizontally, using the \code{y} aesthetic to identify different
+groups. For each group, uses the \code{x}, \code{xmin}, \code{xmax}, and \code{thickness} aesthetics to
+draw points, intervals, and slabs.
+\item \code{"vertical"} (or \code{"x"}): draw vertically, using the \code{x} aesthetic to identify different
+groups. For each group, uses the \code{y}, \code{ymin}, \code{ymax}, and \code{thickness} aesthetics to
+draw points, intervals, and slabs.
+}
+For compatibility with the base ggplot naming scheme for \code{orientation}, \code{"x"} can be used as an alias
+for \code{"vertical"} and \code{"y"} as an alias for \code{"horizontal"} (tidybayes had an \code{orientation} parameter
+before base ggplot did, hence the discrepancy).}
 
 \item{na.rm}{If \code{FALSE}, the default, missing values are removed with a warning. If \code{TRUE}, missing
 values are silently removed.}
 
-\item{show.legend}{Should this layer be included in the legends? \code{NA}, the default, includes if any aesthetics
-are mapped. \code{FALSE} never includes, and \code{TRUE} always includes.}
+\item{show.legend}{Should this layer be included in the legends? \code{NA},
+the default, includes if any aesthetics are mapped. \code{FALSE} never includes,
+and \code{TRUE} always includes.}
 
 \item{inherit.aes}{If \code{FALSE}, overrides the default aesthetics,
 rather than combining with them. This is most useful for helper functions
 that define both data and aesthetics and shouldn't inherit behaviour from
 the default plot specification, e.g. \code{\link[ggplot2:borders]{borders()}}.}
-
-\item{.prob}{Deprecated. Use \code{.width} instead.}
-
-\item{fun.data}{Deprecated. Use \code{point_interval} or \code{interval_function} instead.}
-
-\item{fun.args}{Deprecated. Use \code{interval_args} instead.}
-
-\item{n}{Number of points at which to evaluate \code{slab_function}}
 }
 \value{
-A \link[ggplot2:ggplot2-ggproto]{ggplot2::Stat} representing a combined line+uncertainty ribbon geometry which can
+A \link[ggplot2:ggplot2-ggproto]{ggplot2::Stat} representing a line + multiple-ribbon geometry which can
 be added to a \code{\link[=ggplot]{ggplot()}} object.
 }
 \description{
-A combination of \code{\link[=stat_slabinterval]{stat_slabinterval()}} and \code{\link[=geom_lineribbon]{geom_lineribbon()}} with sensible defaults.
-While \code{geom_lineribbon} is intended for use on data frames that have already been summarized using
-a \code{\link[=point_interval]{point_interval()}} function, \code{stat_lineribbon} is intended for use directly on data
-frames of draws, and will perform the summarization using a \code{\link[=point_interval]{point_interval()}} function;
-\code{stat_dist_lineribbon} is intended for use on analytical distributions through the \code{dist},
-\code{arg1}, ... \code{arg9}, and \code{args} aesthetics.
-}
-\examples{
+A combination of \code{\link[=stat_slabinterval]{stat_slabinterval()}} and \code{\link[=geom_lineribbon]{geom_lineribbon()}} with sensible defaults
+for making line + multiple-ribbon plots. While \code{\link[=geom_lineribbon]{geom_lineribbon()}} is intended for use on data
+frames that have already been summarized using a \code{\link[=point_interval]{point_interval()}} function,
+\code{\link[=stat_lineribbon]{stat_lineribbon()}} is intended for use directly on data frames of draws or of
+analytical distributions, and will perform the summarization using a \code{\link[=point_interval]{point_interval()}}
+function.
 
+Roughly equivalent to:
+
+\preformatted{stat_slabinterval(
+  aes(group = stat(level), fill = stat(level), size = NULL),
+  geom = "lineribbon",
+  .width = c(0.5, 0.8, 0.95), show_slab = FALSE,
+  show.legend = NA
+)
+}
+}
+\details{
+\strong{To visualize sample data}, such as a data distribution, samples from a
+bootstrap distribution, or a Bayesian posterior, you can supply samples to
+the \code{x} or \code{y} aesthetic.
+
+\strong{To visualize analytical distributions}, you can use the \code{xdist} or \code{ydist}
+aesthetic. For historical reasons, you can also use \code{dist} to specify the distribution, though
+this is not recommended as it does not work as well with orientation detection.
+These aesthetics can be used as follows:
+\itemize{
+\item \code{xdist}, \code{ydist}, and \code{dist} can be any distribution object from the \href{https://pkg.mitchelloharawild.com/distributional/}{distributional}
+package (\code{\link[=dist_normal]{dist_normal()}}, \code{\link[=dist_beta]{dist_beta()}}, etc) or can be a \code{\link[posterior:rvar]{posterior::rvar()}} object.
+Since these functions are vectorized,
+other columns can be passed directly to them in an \code{\link[=aes]{aes()}} specification; e.g.
+\code{aes(dist = dist_normal(mu, sigma))} will work if \code{mu} and \code{sigma} are columns in the
+input data frame.
+\item \code{dist} can be a character vector giving the distribution name. Then the  \code{arg1}, ... \code{arg9}
+aesthetics (or \code{args} as a list column) specify distribution arguments. Distribution names
+should correspond to R functions that have \code{"p"}, \code{"q"}, and \code{"d"} functions; e.g. \code{"norm"}
+is a valid distribution name because R defines the \code{\link[=pnorm]{pnorm()}}, \code{\link[=qnorm]{qnorm()}}, and \code{\link[=dnorm]{dnorm()}}
+functions for Normal distributions.
+
+See the \code{\link[=parse_dist]{parse_dist()}} function for a useful way to generate \code{dist} and \code{args}
+values from human-readable distribution specs (like \code{"normal(0,1)"}). Such specs are also
+produced by other packages (like the \code{brms::get_prior} function in brms); thus,
+\code{\link[=parse_dist]{parse_dist()}} combined with the stats described here can help you visualize the output
+of those functions.
+}
+}
+\section{Computed Variables}{
+
+The following variables are computed by this stat and made available for
+use in aesthetic specifications (\code{\link[=aes]{aes()}}) using the \code{\link[=stat]{stat()}} or \code{\link[=after_stat]{after_stat()}}
+functions:
+\itemize{
+\item \code{x} or \code{y}: For slabs, the input values to the slab function.
+For intervals, the point summary from the interval function. Whether it is \code{x} or \code{y} depends on \code{orientation}
+\item \code{xmin} or \code{ymin}: For intervals, the lower end of the interval from the interval function.
+\item \code{xmax} or \code{ymax}: For intervals, the upper end of the interval from the interval function.
+\item \code{.width}: For intervals, the interval width as a numeric value in \verb{[0, 1]}.
+\item \code{level}: For intervals, the interval width as an ordered factor.
+}
+}
+
+\section{Aesthetics}{
+
+The line+ribbon \code{stat}s and \code{geom}s have a wide variety of aesthetics that control
+the appearance of their two sub-geometries: the \strong{line} and the \strong{ribbon}.
+
+These \code{stat}s support the following aesthetics:
+
+\itemize{
+\item{\code{x}: x position of the geometry (when orientation = \code{"vertical"}); or sample data to be summarized
+(when \code{orientation = "horizontal"} with sample data).}
+\item{\code{y}: y position of the geometry (when orientation = \code{"horizontal"}); or sample data to be summarized
+(when \code{orientation = "vertical"} with sample data).}
+\item{\code{xdist}: When using analytical distributions, distribution to map on the x axis: a \pkg{distributional}
+object (e.g. \code{\link[=dist_normal]{dist_normal()}}) or a \code{\link[posterior:rvar]{posterior::rvar()}} object.}
+\item{\code{ydist}: When using analytical distributions, distribution to map on the y axis: a \pkg{distributional}
+object (e.g. \code{\link[=dist_normal]{dist_normal()}}) or a \code{\link[posterior:rvar]{posterior::rvar()}} object.}
+\item{\code{dist}: When using analytical distributions, a name of a distribution (e.g. \code{"norm"}), a
+\pkg{distributional} object (e.g. \code{\link[=dist_normal]{dist_normal()}}), or a \code{\link[posterior:rvar]{posterior::rvar()}} object. See \strong{Details}.}
+\item{\code{args}: Distribution arguments (\code{args} or \code{arg1}, ... \code{arg9}). See \strong{Details}.}
+}
+
+In addition, in their default configuration (paired with \code{\link[=geom_lineribbon]{geom_lineribbon()}})
+the following aesthetics are supported by the underlying geom:
+
+\strong{Ribbon-specific aesthetics}
+
+\itemize{
+\item{\code{xmin}: Left edge of the ribbon sub-geometry (if \code{orientation = "horizontal"}).}
+\item{\code{xmax}: Right edge of the ribbon sub-geometry (if \code{orientation = "horizontal"}).}
+\item{\code{ymin}: Lower edge of the ribbon sub-geometry (if \code{orientation = "vertical"}).}
+\item{\code{ymax}: Upper edge of the ribbon sub-geometry (if \code{orientation = "vertical"}).}
+}
+
+\strong{Color aesthetics}
+
+\itemize{
+\item{\code{colour}: (or \code{color}) The color of the \strong{line} sub-geometry.}
+\item{\code{fill}: The fill color of the \strong{ribbon} sub-geometry.}
+\item{\code{alpha}: The opacity of the \strong{line} and \strong{ribbon} sub-geometries.}
+\item{\code{fill_ramp}: A secondary scale that modifies the \code{fill}
+scale to "ramp" to another color. See \code{\link[=scale_fill_ramp]{scale_fill_ramp()}} for examples.}
+}
+
+\strong{Line aesthetics}
+
+\itemize{
+\item{\code{size}: Width of \strong{line}.}
+\item{\code{linetype}: Type of \strong{line} (e.g., \code{"solid"}, \code{"dashed"}, etc)}
+}
+
+\strong{Other aesthetics} (these work as in standard \code{geom}s)
+
+\itemize{
+\item{\code{group}}
+}
+
+See examples of some of these aesthetics in action in \code{vignette("lineribbon")}.
+Learn more about the sub-geom override aesthetics (like \code{interval_color}) in the
+\link[ggdist]{scales} documentation. Learn more about basic ggplot aesthetics in
+\code{vignette("ggplot2-specs")}.
+}
+
+\examples{
 library(dplyr)
 library(ggplot2)
 library(distributional)
 
+theme_set(theme_ggdist())
+
+# ON SAMPLE DATA
 tibble(x = 1:10) \%>\%
   group_by_all() \%>\%
   do(tibble(y = rnorm(100, .$x))) \%>\%
@@ -130,17 +246,21 @@ tibble(x = 1:10) \%>\%
   stat_lineribbon() +
   scale_fill_brewer()
 
+# ON ANALYTICAL DISTRIBUTIONS
+# Vectorized distribution types, like distributional::dist_normal()
+# and posterior::rvar(), can be used with the `xdist` / `ydist` aesthetics
 tibble(
   x = 1:10,
   sd = seq(1, 3, length.out = 10)
 ) \%>\%
-  ggplot(aes(x = x, dist = dist_normal(x, sd))) +
-  stat_dist_lineribbon() +
+  ggplot(aes(x = x, ydist = dist_normal(x, sd))) +
+  stat_lineribbon() +
   scale_fill_brewer()
-
 }
 \seealso{
-See \code{\link[=geom_lineribbon]{geom_lineribbon()}} for the geom version, intended for use on points and intervals that have
-already been summarized using a \code{\link[=point_interval]{point_interval()}} function. See \code{\link[=stat_pointinterval]{stat_pointinterval()}}
-for a similar stat intended for point summaries and intervals.
+See \code{\link[=geom_lineribbon]{geom_lineribbon()}} for the geom underlying this stat.
+
+Other stat_lineribbon shortcut stats: 
+\code{\link{stat_ribbon}()}
 }
+\concept{stat_lineribbon shortcut stats}

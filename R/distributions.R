@@ -9,48 +9,41 @@
 
 #' Helper function to create pdf/cdf/quantile functions
 #' @param dist The distribution, either as a string (given the suffix to a
-#' p/q/d/r function set), \pkg{distributional} object, or `rvar()`
+#' p/q/d/r function set), \pkg{distributional} object, or [rvar()]
 #' @param prefix For strings, one of `"p"`, `"q"`, `"d"`, or `"r"`
 #' @param fun For \pkg{distributional} objects and `rvar`s, the function to apply (e.g.
-#' `pdf()`, `cdf()`, `quantile()`, or `generate()`).
+#' [`pdf`], [`cdf`], [`quantile`], or [`generate`]).
 #' @noRd
 distr_function = function(dist, prefix, fun) {
   UseMethod("distr_function")
 }
+#' @export
 distr_function.default = function(dist, prefix, fun) {
   stop0("The `dist` aesthetic does not support objects of type ", deparse0(class(dist)))
 }
+#' @export
 distr_function.character = function(dist, prefix, fun) {
   match.fun(paste0(prefix, dist))
 }
+#' @export
 distr_function.factor = function(dist, prefix, fun) {
   distr_function(as.character(dist), prefix, fun)
 }
+#' @export
 distr_function.distribution = function(dist, prefix, fun) {
   if (length(dist) > 1) stop(
     "distributional objects should never have length > 1 here.\n",
     "Please report this bug at https://github.com/mjskay/ggdist/issues"
   )
-  distr_function.dist_default(dist[[1]], prefix, fun)
+  # eat up extra args as they are ignored anyway
+  # (and can cause problems, e.g. with cdf())
+  # TODO: at least until #114 / distributional/#72
+  function(x, ...) unlist(fun(dist[[1]], x))
 }
-distr_function.dist_default = function(dist, prefix, fun) {
-  function(x, ...) unlist(fun(dist, x, ...))
-}
+#' @export
 distr_function.rvar = distr_function.distribution
 
 distr_pdf = function(dist) {
-  # handle constant distributions
-  if (inherits(dist, "rvar")) {
-    draws = posterior::draws_of(dist)
-    if (length(unique(draws)) == 1) {
-      return(function(x, ...) ifelse(x == draws[[1]], Inf, 0))
-    }
-  } else if (inherits(dist, "dist_sample")) {
-    if (length(unique(dist[[1]])) == 1) {
-      return(function(x, ...) ifelse(x == dist[[1]], Inf, 0))
-    }
-  }
-
   distr_function(dist, "d", density)
 }
 
@@ -69,6 +62,40 @@ distr_random = function(dist) {
 }
 
 
+# point_interval ----------------------------------------------------------
+
+#' Apply a point_interval to a distribution
+#' @noRd
+distr_point_interval = function(dist, args = list(), point_interval, trans, ...) {
+  UseMethod("distr_point_interval")
+}
+#' @export
+distr_point_interval.numeric = function(dist, args = list(), point_interval, trans, ...) {
+  point_interval(trans$transform(dist), .simple_names = TRUE, ...)
+}
+#' @importFrom distributional dist_wrap
+#' @export
+distr_point_interval.character = function(dist, args = list(), point_interval, trans, .width = 0.95, ...) {
+  dist = do.call(dist_wrap, c(list(dist), args))
+  distr_point_interval(dist, args, point_interval, trans, .width = .width, ...)
+}
+#' @export
+distr_point_interval.factor = function(dist, args = list(), point_interval, trans, ...) {
+  distr_point_interval(as.character(dist), args, point_interval, trans, ...)
+}
+#' @importFrom distributional dist_transformed
+#' @export
+distr_point_interval.distribution = function(dist, args = list(), point_interval, trans, ...) {
+  if (distr_is_sample(dist, args)) {
+    distr_point_interval(distr_get_sample(dist, args), args, point_interval, trans, ...)
+  } else {
+    t_dist = dist_transformed(dist, trans$transform, trans$inverse)
+    point_interval(t_dist, .simple_names = TRUE, ...)
+  }
+}
+#' @export
+distr_point_interval.rvar = distr_point_interval.distribution
+
 # other distribution helpers ----------------------------------------------
 
 #' Is a distribution discrete?
@@ -83,6 +110,50 @@ distr_is_discrete = function(dist, args = list()) {
       is.integer(one_value_from_dist)
     })
   }
+}
+
+#' Is a distribution sample based?
+#' @noRd
+distr_is_sample = function(dist, args = list()) {
+  inherits(dist, c("rvar", "dist_sample")) ||
+    (
+      inherits(dist, c("distribution")) &&
+      length(dist) == 1 &&
+      inherits(vctrs::field(dist, 1), "dist_sample")
+    )
+}
+
+#' Get all samples from a sample-based distribution
+#' @noRd
+distr_get_sample = function(dist, args = list()) {
+  if (inherits(dist, "rvar")) {
+    posterior::draws_of(dist)
+  } else if (inherits(dist, "distribution")) {
+    vctrs::field(vctrs::field(dist, 1), 1)
+  } else if (inherits(dist, "dist_sample")) {
+    vctrs::field(dist, 1)
+  }
+}
+
+#' Is a distribution a constant?
+#' @noRd
+distr_is_constant = function(dist, args = list()) {
+  if (distr_is_sample(dist, args)) {
+    x = distr_get_sample(dist, args)
+    length(unique(x)) == 1
+  } else {
+    quantile_fun = distr_quantile(dist)
+    lower = do.call(quantile_fun, c(list(.Machine$double.eps), args))
+    upper = do.call(quantile_fun, c(list(1 - .Machine$double.neg.eps), args))
+    isTRUE(lower == upper)
+  }
+}
+
+#' Is x a distribution-like object? i.e. a distributional::distribution or
+#' a posterior::rvar
+#' @noRd
+is_dist_like = function(x) {
+  inherits(x, c("distribution", "rvar"))
 }
 
 
@@ -114,10 +185,11 @@ f_deriv_at_y = function(f, y) {
     names(args) = y_name
     eval(f_deriv_expr, args, environment(f))
   }, error = function(e) {
-    # if analytical approach fails, use numerical approach
-    # need to convert y to numeric in case it's an integer (numericDeriv doesn't like ints)
-    y = as.numeric(y)
-    diag(attr(numericDeriv(quote(f(y)), "y"), "gradient"))
+    # if analytical approach fails, use numerical approach.
+    # we use this (slightly less quick) approach instead of numDeriv::grad()
+    # because numDeriv::grad() errors out if any data point fails while this
+    # will return `NA` for those points
+    vapply(y, numDeriv::jacobian, func = f, numeric(1))
   })
 }
 

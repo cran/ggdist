@@ -52,13 +52,16 @@ rescale_slab_thickness = function(s_data, orientation, normalize, height, y, ymi
 
 draw_slabs = function(self, s_data, panel_params, coord,
   orientation, normalize, fill_type, na.rm,
-  child_params
+  ...
 ) {
   define_orientation_variables(orientation)
 
   s_data = self$override_slab_aesthetics(rescale_slab_thickness(
     s_data, orientation, normalize, height, y, ymin, ymax
   ))
+
+  # avoid giving fill type warnings multiple times
+  fill_type = switch_fill_type(fill_type, segments = "segments", gradient = "gradient")
 
   # build groups for the slabs
   # must group within both group and y for the polygon and path drawing functions to work
@@ -108,29 +111,38 @@ draw_slabs = function(self, s_data, panel_params, coord,
 
 draw_pointintervals = function(self, i_data, panel_params, coord,
   orientation, interval_size_domain, interval_size_range, fatten_point, show_point, na.rm,
-  child_params
+  ...
 ) {
   if (nrow(i_data) == 0) return(list())
   define_orientation_variables(orientation)
 
+  if (is.null(i_data[[xmin]]) || is.null(i_data[[xmax]])) {
+    stop0(glue('
+      You did not specify {xmin} or {xmax} aesthetics, which are needed to
+      draw intervals with {snake_case(class(self)[[1]])}.
+       - If you were using ggdist or tidybayes prior to version 2.1,
+         these aesthetics were automatically set to ".lower" and ".upper" if
+         those columns were in your data, in which case you may need to set
+         aes({xmin} = .lower, {xmax} = .upper) explicitly.
+      '))
+  }
+
   interval_grobs = list()
   point_grobs = list()
 
-  if (nrow(i_data) > 0) {
-    # reorder by interval width so largest intervals are drawn first
-    i_data = i_data[order(abs(i_data[[xmax]] - i_data[[xmin]]), decreasing = TRUE),]
+  # reorder by interval width so largest intervals are drawn first
+  i_data = i_data[order(abs(i_data[[xmax]] - i_data[[xmin]]), decreasing = TRUE),]
 
-    point_grobs = if (show_point) {
-      p_data = self$override_point_aesthetics(i_data, interval_size_domain, interval_size_range, fatten_point)
-      point_grobs = list(GeomPoint$draw_panel(p_data, panel_params, coord, na.rm = na.rm))
-    }
-
-    i_data[[x]] = i_data[[xmin]]
-    i_data[[xend]] = i_data[[xmax]]
-    i_data[[yend]] = i_data[[y]]
-    i_data = self$override_interval_aesthetics(i_data, interval_size_domain, interval_size_range)
-    interval_grobs = list(GeomSegment$draw_panel(i_data, panel_params, coord, lineend = "butt", na.rm = na.rm))
+  point_grobs = if (show_point) {
+    p_data = self$override_point_aesthetics(i_data, interval_size_domain, interval_size_range, fatten_point)
+    point_grobs = list(GeomPoint$draw_panel(p_data, panel_params, coord, na.rm = na.rm))
   }
+
+  i_data[[x]] = i_data[[xmin]]
+  i_data[[xend]] = i_data[[xmax]]
+  i_data[[yend]] = i_data[[y]]
+  i_data = self$override_interval_aesthetics(i_data, interval_size_domain, interval_size_range)
+  interval_grobs = list(GeomSegment$draw_panel(i_data, panel_params, coord, lineend = "butt", na.rm = na.rm))
 
   c(interval_grobs, point_grobs)
 }
@@ -205,22 +217,22 @@ get_line_size = function(i_data, size_domain, size_range) {
 #' vertical orientations, dodging (via the `position` argument), and relative justification of slabs with their
 #' corresponding intervals.
 #'
-#' `geom_slabinterval` is a flexible meta-geom that you can use directly or through a variety of "shortcut"
+#' [geom_slabinterval()] is a flexible meta-geom that you can use directly or through a variety of "shortcut"
 #' geoms that represent useful combinations of the various parameters of this geom. In many cases you will want to
 #' use the shortcut geoms instead as they create more useful mnemonic primitives, such as eye plots,
 #' half-eye plots, point+interval plots, or CCDF barplots.
 #'
 #' The *slab* portion of the geom is much like a ridge or "joy" plot: it represents the value of a function
-#' scaled to fit between values on the x or y access (depending on the value of `orientation`). Values of
+#' scaled to fit between values on the `x` or `y` axis (depending on the value of `orientation`). Values of
 #' the functions are specified using the `thickness` aesthetic and are scaled to fit into `scale`
 #' times the distance between points on the relevant axis. E.g., if `orientation` is `"horizontal"`,
-#' `scale` is 0.9, and `y` is a discrete variable, then the `thickness` aesthetic specifies the
-#' value of some function of `x` that is drawn for every `y` value and scaled to fit into 0.9 times
-#' the distance between points on the y axis.
+#' `scale` is `0.9`, and `y` is a discrete variable, then the `thickness` aesthetic specifies the
+#' value of some function of `x` that is drawn for every `y` value and scaled to fit into `0.9` times
+#' the distance between points on the `y` axis.
 #'
 #' For the *interval* portion of the geom, `x` and `y` aesthetics specify the location of the
-#' point and `ymin`/`ymax` or `xmin`/`xmax` (depending on the value of `orientation`
-#' specifying the endpoints of the interval. A scaling factor for interval line width and point size is applied
+#' point, and `ymin`/`ymax` or `xmin`/`xmax` (depending on the value of `orientation`)
+#' specify the endpoints of the interval. A scaling factor for interval line width and point size is applied
 #' through the `interval_size_domain`, `interval_size_range`, and `fatten_point` parameters.
 #' These scaling factors are designed to give multiple uncertainty intervals reasonable
 #' scaling at the default settings for [scale_size_continuous()].
@@ -231,71 +243,32 @@ get_line_size = function(i_data, size_domain, size_range) {
 #' usually set this aesthetic for you as needed, and their use is recommended unless you have a very custom
 #' use case.
 #'
-#' Wrapper geoms and stats include:
+#' Wrapper geoms include:
 #'
-#'  - [stat_sample_slabinterval()] and associated stats
-#'  - [stat_dist_slabinterval()] and associated stats
-#'  - [geom_pointinterval()] / [stat_pointinterval()]
-#'  - [geom_interval()] / [stat_interval()]
-#'  - [geom_dots()] / [stat_dots()]
+#'  - [geom_pointinterval()]
+#'  - [geom_interval()]
+#'  - [geom_slab()]
 #'
-#' Typically, the `geom_*` versions are meant for use with already-summarized data (such as intervals) and the
+#' In addition, the [stat_slabinterval()] family of stats uses geoms from the
+#' [geom_slabinterval()] family, and is often easier to use than using these geoms
+#' directly. Typically, the `geom_*` versions are meant for use with already-summarized data (such as intervals) and the
 #' `stat_*` versions are summarize the data themselves (usually draws from a distribution) to produce the geom.
 #'
+#' @eval rd_slabinterval_params()
 #' @eval rd_slabinterval_aesthetics()
 #' @inheritParams ggplot2::layer
-#' @param ...  Other arguments passed to [layer()].
-#' @param orientation Whether this geom is drawn horizontally (`"horizontal"`) or
-#' vertically (`"vertical"`). The default, `NA`, automatically detects the orientation based on how the
-#' aesthetics are assigned, and should generally do an okay job at this. When horizontal (resp. vertical),
-#' the geom uses the `y` (resp. `x`) aesthetic to identify different groups, then for each group uses
-#' the `x` (resp. `y`) aesthetic and the `thickness` aesthetic to draw a function as an slab, and draws
-#' points and intervals horizontally (resp. vertically) using the `xmin`, `x`, and `xmax` (resp.
-#' `ymin`, `y`, and `ymax`) aesthetics. For compatibility with the base
-#' ggplot naming scheme for `orientation`, `"x"` can be used as an alias for `"vertical"` and `"y"` as an alias for
-#' `"horizontal"` (tidybayes had an `orientation` parameter before ggplot did, and I think the tidybayes naming
-#' scheme is more intuitive: `"x"` and `"y"` are not orientations and their mapping to orientations is, in my
-#' opinion, backwards; but the base ggplot naming scheme is allowed for compatibility).
-#' @param normalize How to normalize heights of functions input to the `thickness` aesthetic. If `"all"`
-#' (the default), normalize so that the maximum height across all data is `1`; if `"panels"`, normalize within
-#' panels so that the maximum height in each panel is `1`; if `"xy"`, normalize within
-#' the x/y axis opposite the `orientation` of this geom so that the maximum height at each value of the
-#' opposite axis is `1`; if `"groups"`, normalize within values of the opposite axis and within
-#' groups so that the maximum height in each group is `1`; if `"none"`, values are taken as is with no
-#' normalization (this should probably only be used with functions whose values are in \[0,1\], such as CDFs).
-#' @param fill_type What type of fill to use when the fill color or alpha varies within a slab. The default,
-#' `"segments"`, breaks up the slab geometry into segments for each unique combination of fill color and
-#' alpha value. This approach is supported by all graphics devices and works well for sharp cutoff values,
-#' but can result in ugly results if a large number of unique fill colors are being used (as in gradients,
-#' like in [`stat_gradientinterval()`]). When `fill_type == "gradient"`, a `linearGradient()` is used to
-#' create a smooth gradient fill. This works well for large numbers of unique fill colors, but requires
-#' R > 4.1 and is not yet supported on all graphics devices.
-#' @param interval_size_domain The minimum and maximum of the values of the size aesthetic that will be translated into actual
-#' sizes for intervals drawn according to `interval_size_range` (see the documentation for that argument.)
-#' @param interval_size_range (Deprecated). This geom scales the raw size aesthetic values when drawing interval and point sizes, as
-#' they tend to be too thick when using the default settings of [scale_size_continuous()], which give sizes
-#' with a range of `c(1, 6)`. The `interval_size_domain` value indicates the input domain of raw size values
-#' (typically this should be equal to the value of the `range` argument of the [scale_size_continuous()]
-#' function), and `interval_size_range` indicates the desired output range of the size values (the min and max of
-#' the actual sizes used to draw intervals). Most of the time it is not recommended to change the value of this argument,
-#' as it may result in strange scaling of legends; this argument is a holdover from earlier versions
-#' that did not have size aesthetics targeting the point and interval separately. If you want to adjust the
-#' size of the interval or points separately, you can instead use the `interval_size` or `point_size`
-#' aesthetics; see [scales].
-#' @param fatten_point A multiplicative factor used to adjust the size of the point relative to the size of the
-#' thickest interval line. If you wish to specify point sizes directly, you can also use the `point_size`
-#' aesthetic and [scale_point_size_continuous()] or [scale_point_size_discrete()]; sizes
-#' specified with that aesthetic will not be adjusted using `fatten_point`.
-#' @param show_slab Should the slab portion of the geom be drawn? Default `TRUE`.
-#' @param show_point Should the point portion of the geom be drawn? Default `TRUE`.
-#' @param show_interval Should the interval portion of the geom be drawn? Default `TRUE`.
-#' @param na.rm	If `FALSE`, the default, missing values are removed with a warning. If `TRUE`, missing
-#' values are silently removed.
+#' @param ...  Other arguments passed to [layer()]. These are often aesthetics, used to set an aesthetic
+#' to a fixed value, like `colour = "red"` or `size = 3` (see **Aesthetics**, below). They may also be
+#' parameters to the paired geom/stat.
+#' @param position Position adjustment, either as a string, or the result of a call to a position adjustment function.
+#' Setting this equal to `"dodge"` ([position_dodge()]) or `"dodgejust"` ([position_dodgejust()]) can be useful if
+#' you have overlapping geometries.
 #' @return A [ggplot2::Geom] representing a slab or combined slab+interval geometry which can
 #' be added to a [ggplot()] object.
 #' @author Matthew Kay
 #' @seealso See [geom_lineribbon()] for a combination geom designed for fit curves plus probability bands.
-#' See [stat_sample_slabinterval()] and [stat_dist_slabinterval()] for families of stats
+#' See [geom_dotsinterval()] for a combination geom designed for plotting dotplots with intervals.
+#' See [stat_slabinterval()] for families of stats
 #' built on top of this geom for common use cases (like [stat_halfeye()]).
 #' See `vignette("slabinterval")` for a variety of examples of use.
 #' @examples
@@ -307,107 +280,14 @@ get_line_size = function(i_data, size_domain, size_range) {
 #'
 #' @importFrom ggplot2 GeomSegment GeomPolygon
 #' @importFrom rlang %||%
-#' @export
-geom_slabinterval = function(
-  mapping = NULL,
-  data = NULL,
-  stat = "identity",
-  position = "identity",
-  ...,
-
-  # IF YOU ARE CHANGING THESE,
-  # YOU MUST ALSO UPDATE:
-  # 1. The call to layer_geom_slabinterval below
-  # 2. The definition of GeomSlabinterval$extra_params
-  # 3. The definition of GeomSlabinterval$default_params
-  # 4. The argument definitions of GeomSlabinterval$draw_panel
-  # This is needed to support how defaults work with child geoms,
-  # amongst other things
-  orientation = NA,
-  normalize = c("all", "panels", "xy", "groups", "none"),
-  fill_type = c("segments", "gradient"),
-  interval_size_domain = c(1, 6),
-  interval_size_range = c(0.6, 1.4),
-  fatten_point = 1.8,
-  show_slab = TRUE,
-  show_point = TRUE,
-  show_interval = TRUE,
-  na.rm = FALSE,
-
-  show.legend = NA,
-  inherit.aes = TRUE
-) {
-  normalize = match.arg(normalize)
-  fill_type = match.arg(fill_type)
-
-  layer_geom_slabinterval(
-    mapping = mapping,
-    data = data,
-    stat = stat,
-    position = position,
-    geom = GeomSlabinterval,
-    ...,
-
-    orientation = orientation,
-    normalize = normalize,
-    fill_type = fill_type,
-    interval_size_domain = interval_size_domain,
-    interval_size_range = interval_size_range,
-    fatten_point = fatten_point,
-    show_slab = show_slab,
-    show_point = show_point,
-    show_interval = show_interval,
-    na.rm = na.rm,
-
-    show.legend = show.legend,
-    inherit.aes = inherit.aes
-  )
-}
-
-layer_geom_slabinterval = function(
-  mapping = NULL,
-  default_mapping = NULL,
-  data = NULL,
-  stat = "identity",
-  position = "identity",
-  geom = GeomSlabinterval,
-  ...,
-
-  show.legend = NA,
-  inherit.aes = TRUE
-) {
-
-  .Deprecated_arguments(
-    c("size_domain", "size_range"), ..., which = -2,
-    message = "Use the interval_size_domain and interval_size_range arguments instead."
-  )
-
-  l = layer(
-    data = data,
-    mapping = mapping,
-    stat = stat,
-    geom = geom,
-    position = position,
-    show.legend = show.legend,
-    inherit.aes = inherit.aes,
-
-    params = list(
-      ...
-    )
-  )
-
-  if (!is.null(default_mapping)) {
-    add_default_computed_aesthetics(l, default_mapping)
-  } else {
-    l
-  }
-}
+#' @name geom_slabinterval
+NULL
 
 #' @rdname ggdist-ggproto
 #' @format NULL
 #' @usage NULL
 #' @export
-GeomSlabinterval = ggproto("GeomSlabinterval", Geom,
+GeomSlabinterval = ggproto("GeomSlabinterval", AbstractGeom,
   default_aes = aes(
     # default datatype is slab (other valid value is "interval" for points/intervals)
     datatype = "slab",
@@ -480,19 +360,6 @@ GeomSlabinterval = ggproto("GeomSlabinterval", Geom,
   override_point_aesthetics = function(self, ...) override_point_aesthetics(self, ...),
   override_interval_aesthetics = function(self, ...) override_interval_aesthetics(self, ...),
 
-  extra_params = c(
-    "orientation",
-    "normalize",
-    "fill_type",
-    "interval_size_domain",
-    "interval_size_range",
-    "fatten_point",
-    "show_slab",
-    "show_point",
-    "show_interval",
-    "na.rm"
-  ),
-
   default_params = list(
     orientation = NA,
     normalize = "all",
@@ -506,21 +373,16 @@ GeomSlabinterval = ggproto("GeomSlabinterval", Geom,
     na.rm = FALSE
   ),
 
-  setup_params = function(self, data, params) {
-    params = defaults(params, self$default_params)
+  deprecated_params = union(c(
+    "size_domain", "size_range"
+  ), AbstractGeom$deprecated_params),
 
-    # detect orientation
-    params$flipped_aes = get_flipped_aes(data, params,
-      main_is_orthogonal = TRUE, range_is_orthogonal = TRUE, group_has_equal = TRUE, main_is_optional = TRUE
-    )
-    params$orientation = get_orientation(params$flipped_aes)
-
-    params
-  },
+  orientation_options = defaults(list(
+    main_is_orthogonal = TRUE, range_is_orthogonal = TRUE, group_has_equal = TRUE, main_is_optional = TRUE
+  ), AbstractGeom$orientation_options),
 
   setup_data = function(self, data, params) {
-    #set up orientation
-    data$flipped_aes = params$flipped_aes
+    data = ggproto_parent(AbstractGeom, self)$setup_data(data, params)
     define_orientation_variables(params$orientation)
 
     # when we are missing a main aesthetic (e.g. the y aes in a horizontal orientation),
@@ -529,15 +391,26 @@ GeomSlabinterval = ggproto("GeomSlabinterval", Geom,
 
     data$datatype = data[["datatype"]] %||% self$default_aes[["datatype"]]
 
-    # normalize functions according to how we want to scale them
+    # normalize thickness according to what groups the user wants to scale it within
+    normalize_thickness = function(data) {
+      finite_thickness = data$thickness[is.finite(data$thickness)]
+      if (length(finite_thickness) > 0) {
+        max_finite_thickness = max(finite_thickness)
+        if (max_finite_thickness != 0) {
+          data$thickness = data$thickness / max_finite_thickness
+        }
+      }
+      # infinite values get plotted at the max height (e.g. for point masses)
+      if (length(data$thickness) > 0) {
+        data$thickness[data$thickness == Inf] = 1
+      }
+      data
+    }
     switch(params$normalize,
       all = {
         # normalize so max height across all data is 1
         # this preserves slabs across groups in slab plots
-        finite_thickness = data$thickness[data$datatype == "slab" & is.finite(data$thickness)]
-        if (length(finite_thickness) > 0) {
-          data$thickness = data$thickness / max(finite_thickness)
-        }
+        data = normalize_thickness(data)
       },
       panels = ,
       xy = ,
@@ -548,13 +421,7 @@ GeomSlabinterval = ggproto("GeomSlabinterval", Geom,
           xy = c("PANEL", y),
           groups = c("PANEL", y, "group")
         )
-        data = ddply_(data, normalization_groups, function(d) {
-          finite_thickness = d$thickness[d$datatype == "slab" & is.finite(d$thickness)]
-          if (length(finite_thickness) > 0) {
-            d$thickness = d$thickness / max(finite_thickness)
-          }
-          d
-        })
+        data = ddply_(data, normalization_groups, normalize_thickness)
       },
       none = {},
       stop('`normalize` must be "all", "panels", "xy", groups", or "none", not "', params$normalize, '"')
@@ -592,19 +459,11 @@ GeomSlabinterval = ggproto("GeomSlabinterval", Geom,
 
   draw_panel = function(self, data, panel_params, coord,
       orientation = self$default_params$orientation,
-      normalize = self$default_params$normalize,
-      fill_type = self$default_params$fill_type,
-      interval_size_domain = self$default_params$interval_size_domain,
-      interval_size_range = self$default_params$interval_size_range,
-      fatten_point = self$default_params$fatten_point,
       show_slab = self$default_params$show_slab,
       show_point = self$default_params$show_point,
       show_interval = self$default_params$show_interval,
       na.rm = self$default_params$na.rm,
-      # because draw_panel cannot take ... for some reason (!!), if we
-      # want child geoms to add their own parameters we need some way to
-      # pass them along
-      child_params = list()
+      ...
     ) {
 
     define_orientation_variables(orientation)
@@ -628,24 +487,31 @@ GeomSlabinterval = ggproto("GeomSlabinterval", Geom,
       s_data = data[data$datatype == "slab",]
       if (nrow(s_data) > 0) {
         self$draw_slabs(s_data, panel_params, coord,
-          orientation, normalize, fill_type,
-          na.rm, child_params
+          orientation = orientation,
+          na.rm = na.rm,
+          ...
         )
       }
     }
 
-    point_interval_grobs = if (show_interval && !is.null(data[[xmin]]) && !is.null(data[[xmax]])) {
+    point_interval_grobs = if (show_interval) {
       self$draw_pointintervals(data[data$datatype == "interval",], panel_params, coord,
-        orientation, interval_size_domain, interval_size_range, fatten_point, show_point, na.rm,
-        child_params
+        orientation = orientation,
+        show_point = show_point,
+        na.rm = na.rm,
+        ...
       )
     }
 
     ggname("geom_slabinterval",
-      gTree(children = do.call(gList, c(list(), slab_grobs, point_interval_grobs)))
+      do.call(grobTree, c(list(), slab_grobs, point_interval_grobs))
     )
   }
 )
+
+#' @rdname geom_slabinterval
+#' @export
+geom_slabinterval = make_geom(GeomSlabinterval)
 
 
 # side and justification calculations -------------------------------------
@@ -666,7 +532,7 @@ switch_side = function(side, orientation, topright, bottomleft, both) {
 
       both = both,
 
-      stop("Invalid side: `", side, "`")
+      stop0("Unknown side: ", deparse0(side))
     ),
     x = ,
     vertical = switch(side,
@@ -682,9 +548,9 @@ switch_side = function(side, orientation, topright, bottomleft, both) {
 
       both = both,
 
-      stop("Invalid side: `", side, "`")
+      stop0("Unknown side: ", deparse0(side))
     ),
-    stop("Invalid orientation: `", orientation, "`")
+    stop0("Unknown orientation: ", deparse0(orientation))
   )
 }
 
@@ -787,7 +653,7 @@ group_slab_data_by = function(slab_data, aesthetics = c("fill", "colour", "alpha
 }
 
 # avoid NOTE on R < 4.1 for the use of linearGradient below
-if(getRversion() < "4.1") globalVariables("linearGradient")
+if (getRversion() < "4.1") globalVariables("linearGradient")
 
 #' construct a linearGradient() that can be used as a fill based on the fill
 #' and alpha aesthetics of the provided data
@@ -823,7 +689,10 @@ make_gradient_fill = function(slab_data, orientation = "horizontal") {
 draw_polygon = function(data, panel_params, coord, fill = NULL) {
   n = nrow(data)
 
-  if (n == 1) return(zeroGrob())
+  # NOTE: this condition should always be false given where draw_polygon()
+  # is currently used (after group_slab_data_by(), which returns data in pairs)
+  # but leaving it in for safety and setting nocov
+  if (n == 1) return(zeroGrob())  # nocov
 
   munched = coord_munch(coord, data, panel_params)
 
@@ -852,97 +721,41 @@ draw_polygon = function(data, panel_params, coord, fill = NULL) {
 }
 
 switch_fill_type = function(fill_type, segments, gradient) {
-  if (getRversion() < "4.1.0" && fill_type == "gradient") {
-    message(                                                      # nocov
-      'fill_type = "gradient" is not supported in R < 4.1.0.\n',  # nocov
-      'Falling back to fill_type = "segments"'                    # nocov
-    )                                                             # nocov
-    fill_type = "segments"                                        # nocov
-  }
+  if (getRversion() < "4.1.0" && fill_type == "gradient") {             # nocov start
+    warning0(glue('
+      fill_type = "gradient" is not supported in R < 4.1.0.
+       - Falling back to fill_type = "segments".
+       - See help("geom_slabinterval") for more information.
+      '))
+    fill_type = "segments"
+  } else if (getRversion() < "4.2.0" && fill_type == "auto") {
+    warning0(glue('
+      fill_type cannot be auto-detected in R < 4.2.0.
+       - Falling back to fill_type = "segments".
+       - For best results, if you are using a graphics device that
+         supports gradients, set fill_type = "gradient".
+       - See help("geom_slabinterval") for more information.
+      '))
+    fill_type = "segments"
+  } else if (fill_type == "auto") {
+    if ("LinearGradient" %in% grDevices::dev.capabilities()$patterns) {
+      fill_type = "gradient"
+    } else {
+      warning0(glue('
+        fill_type = "gradient" is not supported by the current graphics device.
+         - Falling back to fill_type = "segments".
+         - If you believe your current graphics device *does* support
+           fill_type = "gradient" but auto-detection failed, set that option
+           explicitly and consider reporting a bug.
+         - See help("geom_slabinterval") for more information.
+        '))
+      fill_type = "segments"
+    }
+  }                                                                     # nocov end
 
   switch(fill_type,
     segments = segments,
     gradient = gradient,
-    stop("Unknown fill_type: ", deparse0(fill_type), '\nShould be "segments" or "gradient"')
+    stop0("Unknown fill_type: ", deparse0(fill_type), '\nShould be "segments" or "gradient"')
   )
 }
-
-
-# shortcut geoms ----------------------------------------------------------
-
-#' @export
-#' @rdname geom_slabinterval
-geom_slab = function(
-  mapping = NULL,
-  data = NULL,
-  stat = "identity",
-  position = "identity",
-
-  ...,
-
-  na.rm = FALSE,
-  show.legend = NA,
-  inherit.aes = TRUE
-) {
-  layer(
-    mapping = mapping,
-    data = data,
-    stat = stat,
-    position = position,
-    geom = GeomSlab,
-    show.legend = show.legend,
-    inherit.aes = inherit.aes,
-
-    params = list(
-      show_point = FALSE,
-      show_interval = FALSE,
-
-      na.rm = na.rm,
-      ...
-    )
-  )
-}
-#' @rdname ggdist-ggproto
-#' @format NULL
-#' @usage NULL
-#' @import ggplot2
-#' @export
-GeomSlab = ggproto("GeomSlab", GeomSlabinterval,
-  default_key_aes = defaults(aes(
-    size = 1,
-    colour = NA
-  ), GeomSlabinterval$default_key_aes),
-
-  override_slab_aesthetics = function(self, s_data) {
-    # we define these differently from geom_slabinterval to make this easier to use on its own
-    s_data$colour = s_data[["slab_colour"]] %||% s_data[["colour"]]
-    s_data$colour = apply_colour_ramp(s_data[["colour"]], s_data[["colour_ramp"]])
-    s_data$fill = s_data[["slab_fill"]] %||% s_data[["fill"]]
-    s_data$fill = apply_colour_ramp(s_data[["fill"]], s_data[["fill_ramp"]])
-    s_data$alpha = s_data[["slab_alpha"]] %||% s_data[["alpha"]]
-    s_data$size = s_data[["slab_size"]] %||% s_data[["size"]]
-    s_data$linetype = s_data[["slab_linetype"]] %||% s_data[["linetype"]]
-    s_data
-  },
-
-  default_params = defaults(list(
-    show_point = FALSE,
-    show_interval = FALSE
-  ), GeomSlabinterval$default_params),
-
-  draw_key_slab = function(self, data, key_data, params, size) {
-    # can drop all the complicated checks from this key since it's just one geom
-    s_key_data = self$override_slab_aesthetics(key_data)
-
-    # what point calls "stroke" is what we call "size", since "size" is determined automatically
-    if (is.na(data$colour) && (!is.na(data$size) || !is.na(data$linetype))) {
-      # because the default colour is NA, if we want to draw a key for size / linetype we need to
-      # reset the colour to something reasonable
-      s_key_data$colour = "black"
-    }
-    draw_key_polygon(s_key_data, params, size)
-  }
-)
-# have to unset these here because defaults() does not treat NULLs as unsetting values
-GeomSlab$default_key_aes$slab_colour = NULL
-GeomSlab$default_key_aes$slab_size = NULL

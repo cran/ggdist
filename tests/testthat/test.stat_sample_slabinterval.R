@@ -4,27 +4,9 @@
 ###############################################################################
 
 library(dplyr)
+library(tidyr)
 
 
-
-test_that("vanilla stat_slabinterval works", {
-  skip_if_no_vdiffr()
-
-
-  set.seed(1234)
-  p = tribble(
-    ~dist,  ~x,
-    "norm", rnorm(100),
-    "t",    rt(100, 3)
-  ) %>%
-    unnest(x) %>%
-    ggplot() +
-    scale_slab_alpha_continuous(range = c(0,1))
-
-  vdiffr::expect_doppelganger("vanilla stat_slabinterval",
-    p + stat_slabinterval(aes(x = dist, y = x), n = 10, slab_function = sample_slab_function)
-  )
-})
 
 test_that("gradientinterval works", {
   skip_if_no_vdiffr()
@@ -47,15 +29,36 @@ test_that("gradientinterval works", {
     p + stat_gradientinterval(aes(y = dist, x = x), n = 15, fill_type = "segments")
   )
 
-  # N.B. the following two tests are currently a bit useless as vdiffr doesn't
-  # support linearGradient yet, but leaving them here so that once it does we
-  # have tests for this.
-  skip("linearGradient not supported in vdiffr yet")
+})
+
+test_that("fill_type = 'gradient' works", {
+  skip_if_no_vdiffr()
+  skip_if_no_linearGradient()
+
+
+  set.seed(1234)
+  p = tribble(
+    ~dist,  ~x,
+    "norm", rnorm(100),
+    "t",    rt(100, 3)
+  ) %>%
+    unnest(x) %>%
+    ggplot() +
+    scale_slab_alpha_continuous(range = c(0,1))
+
+  write_svg_with_gradient = function(plot, file, title = "") {
+    svglite::svglite(file, width = 10, height = 8, bg = "white", pointsize = 12, standalone = TRUE, always_valid = FALSE)
+    on.exit(grDevices::dev.off())
+    vdiffr:::print_plot(plot, title)
+  }
+
   vdiffr::expect_doppelganger("fill_type = gradient with two groups",
-    p + stat_gradientinterval(aes(x = dist, y = x), n = 15, fill_type = "gradient")
+    p + stat_gradientinterval(aes(x = dist, y = x), n = 15, fill_type = "gradient"),
+    writer = write_svg_with_gradient
   )
   vdiffr::expect_doppelganger("fill_type = gradient with two groups, h",
-    p + stat_gradientinterval(aes(y = dist, x = x), n = 15, fill_type = "gradient")
+    p + stat_gradientinterval(aes(y = dist, x = x), n = 15, fill_type = "gradient"),
+    writer = write_svg_with_gradient
   )
 
 })
@@ -77,7 +80,7 @@ test_that("histinterval and slab work", {
     p + stat_histinterval(aes(x = dist, y = x), slab_color = "black")
   )
   vdiffr::expect_doppelganger("histintervalh with outline",
-    p + stat_histinterval(aes(y = dist, x = x), slab_color = "black")
+    p + stat_histinterval(aes(y = dist, x = x), slab_color = "black", breaks = seq(-5, 7, length.out = 20))
   )
   vdiffr::expect_doppelganger("histinterval with outlines bw bars",
     p + stat_histinterval(aes(x = dist, y = x), slab_color = "black", outline_bars = TRUE)
@@ -145,7 +148,11 @@ test_that("constant distributions work", {
     ggplot(aes(x = x, y = y))
 
   vdiffr::expect_doppelganger("constant dist on halfeye",
-    p + stat_sample_slabinterval(n = 15)
+    p + stat_halfeye(n = 15, slab_color = "blue")
+  )
+
+  vdiffr::expect_doppelganger("constant dist on histinterval",
+    p + stat_histinterval(n = 15, slab_color = "blue")
   )
 
   vdiffr::expect_doppelganger("constant dist on ccdf",
@@ -161,7 +168,7 @@ test_that("constant distributions work", {
     ggplot(aes(x = x, y = y))
 
   vdiffr::expect_doppelganger("constant dist on halfeye with n = 1",
-    p + stat_sample_slabinterval(n = 15)
+    p + stat_sample_slabinterval(n = 15, slab_color = "blue")
   )
 
   vdiffr::expect_doppelganger("constant dist on ccdf with n = 1",
@@ -217,5 +224,24 @@ test_that("NAs are handled correctly", {
 
   vdiffr::expect_doppelganger("NAs with na.rm = TRUE",
     p + stat_halfeye(na.rm = TRUE, n = 15)
+  )
+})
+
+
+# trim and expand ---------------------------------------------------------
+
+test_that("trim and expand work", {
+  skip_if_no_vdiffr()
+
+  set.seed(1234)
+  df = data.frame(
+    g = c("a","a","a","b","c"),
+    x = rnorm(120, c(1,1,1,2,3))
+  )
+
+  vdiffr::expect_doppelganger("untrimmed and expanded",
+    df %>%
+      ggplot(aes(x = x, y = g)) +
+      stat_sample_slabinterval(n = 15, slab_color = "black", expand = TRUE, trim = FALSE)
   )
 })

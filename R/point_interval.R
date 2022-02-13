@@ -61,6 +61,9 @@ globalVariables(c("y", "ymin", "ymax"))
 #' [HDInterval::hdi()] with `allowSplit = FALSE`; see that function for more
 #' information on multimodality and continuous versus discontinuous intervals.
 #'
+#' `ll` and `ul` yield lower limits and upper limits, respectively (where the opposite
+#' limit is set to either `Inf` or `-Inf`).
+#'
 #' @param .data Data frame (or grouped data frame as returned by [group_by()])
 #' that contains draws to summarize.
 #' @param ... Bare column names or expressions that, when evaluated in the context of
@@ -138,7 +141,7 @@ globalVariables(c("y", "ymin", "ymax"))
 #'   stat_halfeye(point_interval = mode_hdi, .width = c(.66, .95))
 #'
 #' @importFrom dplyr do bind_cols group_vars summarise_at %>%
-#' @importFrom rlang set_names quos quos_auto_name eval_tidy as_quosure
+#' @importFrom rlang quos quos_auto_name eval_tidy syms
 #' @importFrom stats median
 #' @importFrom tibble as_tibble
 #' @export
@@ -166,14 +169,12 @@ point_interval.default = function(.data, ..., .width = .95, .point = median, .in
       #don't aggregate groups because we aggregate within these
       setdiff(group_vars(data)) %>%
       setdiff(.exclude) %>%
-      # have to use quos here because lists of symbols don't work correctly with iwalk() for some reason
-      # (the simpler version of this line would be `syms() %>%`)
-      lapply(function(x) quo(!!sym(x))) %>%
+      syms() %>%
       quos_auto_name()
 
     if (length(col_exprs) == 0) {
       #still nothing to aggregate? not sure what the user wants
-      stop("No columns found to calculate point and interval summaries for.")
+      stop0("No columns found to calculate point and interval summaries for.")
     }
   }
 
@@ -188,40 +189,69 @@ point_interval.default = function(.data, ..., .width = .95, .point = median, .in
 
     # if the value we are going to summarise is not already a list column, make it into a list column
     # (making it a list column first is faster than anything else I've tried)
-    if (is.list(data[[col_name]])) {
-      draws = data[[col_name]]
-    } else {
+    if (!is.list(data[[col_name]])) {
       data = summarise_at(data, col_name, list)
-      draws = data[[col_name]]
     }
 
     result = map_dfr_(.width, function(p) {
       # compute intervals; this is robust to grouped data frames and
       # to intervals that can return multiple intervals (e.g., hdi())
 
-      # reduce `data` to just point estimate column and grouping factors (if any)
-      data[[col_name]] = map_dbl_(draws, .point, na.rm = na.rm)
-
-      # for each row of `data`, compute the intervals (may be more than one),
+      # for each row of `data`, compute the point and the intervals (may be more than one),
       # and construct a tibble with grouping factors (if any), point estimate,
       # lower and upper values, and width
       # - equivalent to unnest_legacy()
-      data = map2_dfr_(seq_len(nrow(data)), draws, function(row_i, draws_i) {
-        interval = .interval(draws_i, .width = p, na.rm = na.rm) # intervals (one or more rows)
-        dimnames(interval)[[2]] = c(".lower", ".upper")
-        cbind(
-          data[row_i, , drop = FALSE], # each row of `data`; grouping factors and point estimate
-          interval,
-          .width = p # width
-        )
+      data = map_dfr_(seq_len(nrow(data)), function(i) {
+        row = data[i, , drop = FALSE]
+        draws = row[[col_name]]
+
+        # if multivariate rvar => flatten it first
+        if (inherits(draws, "rvar") && length(draws) > 1) {
+          flat_draws = flatten_array(draws)
+          draws = flat_draws$x
+          row[[col_name]] = NA # the next line will have to recycle row[[col_name]]
+                               # which may be expensive b/c it is an rvar, so just
+                               # skip that since we're overwriting it after anyway
+          row = bind_cols(row, .index = flat_draws$index_names)
+          row[[col_name]] = draws
+        }
+
+        # unless draws is multivariate this will usually be just one iteration
+        map_dfr_(seq_len(nrow(row)), function(j) {
+          # get row of `data` with grouping factors
+          row_j = row[j, , drop = FALSE]
+          draws_j = draws[[j]]
+
+          # calculate point estimate --- usually a scalar
+          point_j = .point(draws_j, na.rm = na.rm)
+
+          # if this is a multivariate distributional object, flatten the point estimate
+          if (distributional::is_distribution(draws_j) && length(point_j) > 1) {
+            flat_point = flatten_array(point_j)
+            point_j = flat_point$x
+            row_j[[col_name]] = NA
+            row_j = bind_cols(row_j, .index = flat_point$index_names)
+          }
+          row_j[[col_name]] = as.vector(point_j)
+
+          # calculate intervals (one or more rows)
+          interval = .interval(draws_j, .width = p, na.rm = na.rm)
+          dimnames(interval)[[2]] = c(".lower", ".upper")
+
+          cbind(
+            row_j,
+            interval,
+            .width = p
+          )
+        })
       })
 
       as_tibble(data)
     })
   } else {
-    iwalk_(col_exprs, function(col_expr, col_name) {
-      data[[col_name]] <<- eval_tidy(col_expr, data)
-    })
+    for (i in seq_along(col_exprs)) {
+      data[[names(col_exprs)[[i]]]] = eval_tidy(col_exprs[[i]], data)
+    }
 
     # if the values we are going to summarise are not already list columns, make them into list columns
     # (making them list columns first is faster than anything else I've tried)
@@ -245,7 +275,7 @@ point_interval.default = function(.data, ..., .width = .95, .point = median, .in
         lower = lapply(intervals, function(x) x[, 1])
         upper = lapply(intervals, function(x) x[, 2])
         if (any(lengths(lower) > 1) || any(lengths(upper) > 1)) {
-          stop(
+          stop0(
             "You are summarizing a multimodal distribution using a method that returns\n",
             "multiple intervals (such as `hdi()`), but you are attempting to generate\n",
             "intervals for multiple columns in wide format.\n\n",
@@ -253,8 +283,7 @@ point_interval.default = function(.data, ..., .width = .95, .point = median, .in
             "multi-modal, you can only summarize one column at a time.\n\n",
             "You might try using `tidybayes::gather_variables()` to put all your draws into\n",
             "a single column before summarizing them, or use an interval type that always\n",
-            "returns exactly one interval per probability level (such as `hdci()` or `qi()`).",
-            call. = FALSE
+            "returns exactly one interval per probability level (such as `hdci()` or `qi()`)."
           )
         }
         data[[paste0(col_name, ".lower")]] = unlist(lower)
@@ -324,26 +353,48 @@ point_interval.rvar = function(
 #' @export
 point_interval.distribution = point_interval.rvar
 
-#' @rdname point_interval
-#' @export
-point_interval.dist_default = point_interval.rvar
 
 #' @importFrom stats quantile
 #' @export
 #' @rdname point_interval
 qi = function(x, .width = .95, .prob, na.rm = FALSE) {
   .width = .Deprecated_argument_alias(.width, .prob)
+
+  lower_prob = (1 - .width) / 2
+  upper_prob = (1 + .width) / 2
+
+  qi_(x, lower_prob, upper_prob, na.rm)
+}
+
+qi_ = function(x, lower_prob, upper_prob, na.rm) {
   if (!na.rm && anyNA(x)) {
     return(matrix(c(NA_real_, NA_real_), ncol = 2))
   }
 
-  lower_prob = (1 - .width) / 2
-  upper_prob = (1 + .width) / 2
   if (distributional::is_distribution(x)) {
-    do.call(rbind, quantile(x, c(lower_prob, upper_prob), na.rm = na.rm))
+    #TODO: when #114 / distributional#72 is fixed, pass na.rm to quantile in this call
+    do.call(rbind, lapply(quantile(x, c(lower_prob, upper_prob)), t))
   } else {
     matrix(quantile(x, c(lower_prob, upper_prob), na.rm = na.rm), ncol = 2)
   }
+}
+
+#' @export
+#' @rdname point_interval
+ll = function(x, .width = .95, na.rm = FALSE) {
+  lower_prob = 1 - .width
+  upper_prob = rep(1, length(.width))
+
+  out = qi_(x, lower_prob, upper_prob, na.rm)
+}
+
+#' @export
+#' @rdname point_interval
+ul = function(x, .width = .95, na.rm = FALSE) {
+  lower_prob = rep(0, length(.width))
+  upper_prob = .width
+
+  out = qi_(x, lower_prob, upper_prob, na.rm)
 }
 
 #' @export
@@ -356,6 +407,7 @@ hdi_ = function(x, ...) {
   UseMethod("hdi_")
 }
 #' @importFrom stats density
+#' @export
 hdi_.numeric = function(x, .width = .95, na.rm = FALSE, ...) {
   if (!na.rm && anyNA(x)) {
     return(matrix(c(NA_real_, NA_real_), ncol = 2))
@@ -369,22 +421,28 @@ hdi_.numeric = function(x, .width = .95, na.rm = FALSE, ...) {
   }
   matrix(intervals, ncol = 2)
 }
+#' @export
 hdi_.rvar = function(x, ...) {
   if (length(x) > 1) {
     stop0("HDI for non-scalar rvars is not implemented")
   }
   hdi_.numeric(posterior::draws_of(x), ...)
 }
-#' @importFrom distributional hdr
-hdi_.dist_default = function(x, .width = .95, ...) {
-  hilos = hdr(x, .width * 100, ...)
-  matrix(c(unlist(vctrs::field(hilos, "lower")), unlist(vctrs::field(hilos, "upper"))), ncol = 2)
-}
+#' @importFrom distributional hdr support
+#' @export
 hdi_.distribution = function(x, .width = .95, ...) {
   if (length(x) > 1) {
-    stop0("HDI for non-scalar distributions is not implemented")
+    stop0("HDI for non-scalar distribution objects is not implemented")
   }
-  hdi_.dist_default(x[[1]], .width = .width, ...)
+  if (length(dim(vctrs::field(support(x), "x")[[1]])) > 1) {
+    stop0("HDI for multivariate distribution objects is not implemented")
+  }
+  if (anyNA(x)) {
+    return(matrix(c(NA_real_, NA_real_), ncol = 2))
+  }
+
+  hilos = hdr(x, .width * 100, ...)
+  matrix(c(unlist(vctrs::field(hilos, "lower")), unlist(vctrs::field(hilos, "upper"))), ncol = 2)
 }
 
 #' @export
@@ -421,27 +479,28 @@ Mode.rvar = function(x, na.rm = FALSE) {
   dim <- dim(draws)
   apply(draws, seq_along(dim)[-1], Mode, na.rm = na.rm)
 }
-#' @export
-#' @rdname point_interval
-Mode.dist_sample = function(x, na.rm = FALSE) {
-  Mode(x[[1]], na.rm = na.rm)
-}
 #' @importFrom stats optim
 #' @export
 #' @rdname point_interval
-Mode.dist_default = function(x, na.rm = FALSE) {
-  optim(
-    quantile(x, 0.5),
-    function(q) -density(x, at = q),
-    lower = quantile(x, 0),
-    upper = quantile(x, 1),
-    method = "L-BFGS-B"
-  )$par
-}
-#' @export
-#' @rdname point_interval
 Mode.distribution = function(x, na.rm = FALSE) {
-  map_dbl_(x, Mode.dist_default, na.rm)
+  find_mode = function(x) {
+    if (anyNA(x)) {
+      NA_real_
+    } else if (distr_is_sample(x)) {
+      Mode(distr_get_sample(x), na.rm = na.rm)
+    } else {
+      optim(
+        median(x, na.rm = na.rm),
+        function(q) -density(x, at = q, na.rm = na.rm),
+        #TODO: when #114 / distributional#72 is fixed, pass na.rm to quantile below
+        lower = quantile(x, 0),
+        upper = quantile(x, 1),
+        method = "L-BFGS-B"
+      )$par
+    }
+  }
+
+  map_dbl_(x, find_mode)
 }
 
 
@@ -454,6 +513,7 @@ hdci_ = function(x, ...) {
   UseMethod("hdci_")
 }
 #' @importFrom stats density
+#' @export
 hdci_.numeric = function(x, .width = .95, na.rm = FALSE, ...) {
   if (!na.rm && anyNA(x)) {
     return(matrix(c(NA_real_, NA_real_), ncol = 2))
@@ -462,17 +522,30 @@ hdci_.numeric = function(x, .width = .95, na.rm = FALSE, ...) {
   intervals = HDInterval::hdi(x, credMass = .width)
   matrix(intervals, ncol = 2)
 }
+#' @export
 hdci_.rvar = function(x, ...) {
   if (length(x) > 1) {
     stop0("HDCI for non-scalar rvars is not implemented")
   }
   hdci_.numeric(posterior::draws_of(x), ...)
 }
-#' @importFrom distributional hdr
-hdci_.dist_default = function(x, .width = .95, ...) {
-  stop0("HDCI for distributional objects is not implemented")
+#' @importFrom distributional hdr support
+#' @export
+hdci_.distribution = function(x, .width = .95, na.rm = FALSE, ...) {
+  if (length(x) > 1) {
+    stop0("HDCI for non-scalar distribution objects is not implemented")
+  }
+  if (length(dim(vctrs::field(support(x), "x")[[1]])) > 1) {
+    stop0("HDCI for multivariate distribution objects is not implemented")
+  }
+  if (anyNA(x)) {
+    return(matrix(c(NA_real_, NA_real_), ncol = 2))
+  }
+
+  #TODO: after #114, pass na.rm to quantile here
+  intervals = HDInterval::hdi(function(p) quantile(x, p), credMass = .width)
+  matrix(intervals, ncol = 2)
 }
-hdci_.distribution = hdci_.dist_default
 
 #' @export
 #' @rdname point_interval
@@ -488,6 +561,36 @@ median_qi = function(.data, ..., .width = .95)
 #' @rdname point_interval
 mode_qi = function(.data, ..., .width = .95)
   point_interval(.data, ..., .width = .width, .point = Mode, .interval = qi)
+
+#' @export
+#' @rdname point_interval
+mean_ll = function(.data, ..., .width = .95)
+  point_interval(.data, ..., .width = .width, .point = mean, .interval = ll)
+
+#' @export
+#' @rdname point_interval
+median_ll = function(.data, ..., .width = .95)
+  point_interval(.data, ..., .width = .width, .point = median, .interval = ll)
+
+#' @export
+#' @rdname point_interval
+mode_ll = function(.data, ..., .width = .95)
+  point_interval(.data, ..., .width = .width, .point = Mode, .interval = ll)
+
+#' @export
+#' @rdname point_interval
+mean_ul = function(.data, ..., .width = .95)
+  point_interval(.data, ..., .width = .width, .point = mean, .interval = ul)
+
+#' @export
+#' @rdname point_interval
+median_ul = function(.data, ..., .width = .95)
+  point_interval(.data, ..., .width = .width, .point = median, .interval = ul)
+
+#' @export
+#' @rdname point_interval
+mode_ul = function(.data, ..., .width = .95)
+  point_interval(.data, ..., .width = .width, .point = Mode, .interval = ul)
 
 #' @export
 #' @rdname point_interval

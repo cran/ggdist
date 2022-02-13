@@ -26,14 +26,14 @@ are not supplied; in that case, \code{justification} will be used along with
 \code{width} to determine the bounds of the object prior to dodging.}
 }
 \description{
-A justification-preserving variant of \code{ggplot2::position_dodge()} which preserves the
+A justification-preserving variant of \code{\link[ggplot2:position_dodge]{ggplot2::position_dodge()}} which preserves the
 vertical position of a geom while adjusting the horizontal position (or vice
-versa when in a horizontal orientation). Unlike \code{ggplot2::position_dodge()},
-\code{position_dodgejust()} attempts to preserve the "justification" of \code{x}
+versa when in a horizontal orientation). Unlike \code{\link[ggplot2:position_dodge]{ggplot2::position_dodge()}},
+\code{\link[=position_dodgejust]{position_dodgejust()}} attempts to preserve the "justification" of \code{x}
 positions relative to the bounds containing them (\code{xmin}/\code{xmax}) (or \code{y}
 positions relative to \code{ymin}/\code{ymax} when in a horizontal orientation). This
 makes it useful for dodging annotations to geoms and stats from the
-\code{geom_slabinterval()} family, which also preserve the justification of their
+\code{\link[=geom_slabinterval]{geom_slabinterval()}} family, which also preserve the justification of their
 intervals relative to their slabs when dodging.
 }
 \examples{
@@ -56,10 +56,10 @@ dist_df = tribble(
 # which can cause slabs to be positioned outside their bounds.
 dist_df \%>\%
   ggplot(aes(
-    x = factor(group), dist = dist_normal(mean, sd),
+    x = factor(group), ydist = dist_normal(mean, sd),
     fill = subgroup
   )) +
-  stat_dist_halfeye(
+  stat_halfeye(
     position = "dodge"
   ) +
   geom_rect(
@@ -81,15 +81,15 @@ dist_df \%>\%
 
 # This same example with "dodgejust" positioning. For the points we
 # supply a justification parameter to position_dodgejust which mimics the
-# justification parameter of stat_dist_halfeye, ensuring that they are
+# justification parameter of stat_halfeye, ensuring that they are
 # placed appropriately. On slabinterval family geoms, position_dodgejust()
 # will automatically detect the appropriate justification.
 dist_df \%>\%
   ggplot(aes(
-    x = factor(group), dist = dist_normal(mean, sd),
+    x = factor(group), ydist = dist_normal(mean, sd),
     fill = subgroup
   )) +
-  stat_dist_halfeye(
+  stat_halfeye(
     position = "dodgejust"
   ) +
   geom_rect(

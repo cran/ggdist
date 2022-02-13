@@ -2,7 +2,7 @@
 % Please edit documentation in R/geom_lineribbon.R
 \name{geom_lineribbon}
 \alias{geom_lineribbon}
-\title{Line + multiple uncertainty ribbon plots (ggplot geom)}
+\title{Line + multiple-ribbon plots (ggplot geom)}
 \usage{
 geom_lineribbon(
   mapping = NULL,
@@ -44,29 +44,38 @@ layer, as a string.}
 \item{position}{Position adjustment, either as a string, or the result of
 a call to a position adjustment function.}
 
-\item{...}{Other arguments passed to \code{\link[=layer]{layer()}}.}
+\item{...}{Other arguments passed to \code{\link[=layer]{layer()}}. These are often aesthetics, used to set an aesthetic
+to a fixed value, like \code{colour = "red"} or \code{size = 3} (see \strong{Aesthetics}, below). They may also be
+parameters to the paired geom/stat.}
 
-\item{step}{Should the line/ribbon be drawn as a step function? One of: \code{FALSE} (do not draw as a step
-function, the default), \code{TRUE} (draw a step function using the \code{"mid"} approach), \code{"mid"}
-(draw steps midway between adjacent x values), \code{"hv"} (draw horizontal-then-vertical steps), \code{"vh"}
-(draw as vertical-then-horizontal steps). \code{TRUE} is an alias for \code{"mid"} because for a step function with
-ribbons, \code{"mid"} is probably what you want (for the other two step approaches the ribbons at either the
-vert first or vert last x value will not be visible).}
+\item{step}{Should the line/ribbon be drawn as a step function? One of:
+\itemize{
+\item \code{FALSE} (default): do not draw as a step function.
+\item \code{"mid"} (or \code{TRUE}): draw steps midway between adjacent x values.
+\item \code{"hv"}: draw horizontal-then-vertical steps.
+\item \code{"vh"}: draw as vertical-then-horizontal steps.
+}
+\code{TRUE} is an alias for \code{"mid"} because for a step function with ribbons, \code{"mid"} is probably what you want
+(for the other two step approaches the ribbons at either the very first or very last x value will not be
+visible).}
 
-\item{orientation}{Whether this geom is drawn horizontally (\code{"horizontal"}) or
-vertically (\code{"vertical"}). The default, \code{NA}, automatically detects the orientation based on how the
-aesthetics are assigned, and should generally do an okay job at this. When horizontal (resp. vertical),
-the geom uses the \code{y} (resp. \code{x}) aesthetic to identify different groups, then for each group uses
-the \code{x} (resp. \code{y}) aesthetic and the \code{thickness} aesthetic to draw a function as an slab, and draws
-points and intervals horizontally (resp. vertically) using the \code{xmin}, \code{x}, and \code{xmax} (resp.
-\code{ymin}, \code{y}, and \code{ymax}) aesthetics. For compatibility with the base
-ggplot naming scheme for \code{orientation}, \code{"x"} can be used as an alias for \code{"vertical"} and \code{"y"} as an alias for
-\code{"horizontal"} (tidybayes had an \code{orientation} parameter before ggplot did, and I think the tidybayes naming
-scheme is more intuitive: \code{"x"} and \code{"y"} are not orientations and their mapping to orientations is, in my
-opinion, backwards; but the base ggplot naming scheme is allowed for compatibility).}
+\item{orientation}{Whether this geom is drawn horizontally or vertically. One of:
+\itemize{
+\item \code{NA} (default): automatically detect the orientation based on how the aesthetics
+are assigned. Automatic detection works most of the time.
+\item \code{"horizontal"} (or \code{"y"}): draw horizontally, using the \code{y} aesthetic to identify different
+groups. For each group, uses the \code{x}, \code{xmin}, \code{xmax}, and \code{thickness} aesthetics to
+draw points, intervals, and slabs.
+\item \code{"vertical"} (or \code{"x"}): draw vertically, using the \code{x} aesthetic to identify different
+groups. For each group, uses the \code{y}, \code{ymin}, \code{ymax}, and \code{thickness} aesthetics to
+draw points, intervals, and slabs.
+}
+For compatibility with the base ggplot naming scheme for \code{orientation}, \code{"x"} can be used as an alias
+for \code{"vertical"} and \code{"y"} as an alias for \code{"horizontal"} (tidybayes had an \code{orientation} parameter
+before base ggplot did, hence the discrepancy).}
 
-\item{na.rm}{If \code{FALSE}, the default, missing values are removed with
-a warning. If \code{TRUE}, missing values are silently removed.}
+\item{na.rm}{If \code{FALSE}, the default, missing values are removed with a warning. If \code{TRUE}, missing
+values are silently removed.}
 
 \item{show.legend}{logical. Should this layer be included in the legends?
 \code{NA}, the default, includes if any aesthetics are mapped.
@@ -80,7 +89,7 @@ that define both data and aesthetics and shouldn't inherit behaviour from
 the default plot specification, e.g. \code{\link[ggplot2:borders]{borders()}}.}
 }
 \value{
-A \link[ggplot2:ggplot2-ggproto]{ggplot2::Geom} representing a combined line+uncertainty ribbon geometry which can
+A \link[ggplot2:ggplot2-ggproto]{ggplot2::Geom} representing a combined line + multiple-ribbon geometry which can
 be added to a \code{\link[=ggplot]{ggplot()}} object.
 }
 \description{
@@ -88,14 +97,64 @@ A combination of \code{\link[=geom_line]{geom_line()}} and \code{\link[=geom_rib
 designed for use with output from \code{\link[=point_interval]{point_interval()}}.
 }
 \details{
-\code{geom_lineribbon} is a combination version of a \code{\link[=geom_line]{geom_line()}}, and \code{geom_ribbon} designed for use
+\code{\link[=geom_lineribbon]{geom_lineribbon()}} is a combination of a \code{\link[=geom_line]{geom_line()}} and \code{\link[=geom_ribbon]{geom_ribbon()}} designed for use
 with output from \code{\link[=point_interval]{point_interval()}}. This geom sets some default aesthetics equal to the \code{.width}
-column generated by the \code{point_interval} family of functions, making them
+column generated by the \code{\link[=point_interval]{point_interval()}} family of functions, making them
 often more convenient than a vanilla \code{\link[=geom_ribbon]{geom_ribbon()}} + \code{\link[=geom_line]{geom_line()}}.
 
-Specifically, \code{geom_lineribbon} acts as if its default aesthetics are
+Specifically, \code{\link[=geom_lineribbon]{geom_lineribbon()}} acts as if its default aesthetics are
 \code{aes(fill = forcats::fct_rev(ordered(.width)))}.
 }
+\section{Aesthetics}{
+
+The line+ribbon \code{stat}s and \code{geom}s have a wide variety of aesthetics that control
+the appearance of their two sub-geometries: the \strong{line} and the \strong{ribbon}.
+
+\strong{Positional aesthetics}
+
+\itemize{
+\item{\code{x}: x position of the geometry}
+\item{\code{y}: y position of the geometry}
+}
+
+\strong{Ribbon-specific aesthetics}
+
+\itemize{
+\item{\code{xmin}: Left edge of the ribbon sub-geometry (if \code{orientation = "horizontal"}).}
+\item{\code{xmax}: Right edge of the ribbon sub-geometry (if \code{orientation = "horizontal"}).}
+\item{\code{ymin}: Lower edge of the ribbon sub-geometry (if \code{orientation = "vertical"}).}
+\item{\code{ymax}: Upper edge of the ribbon sub-geometry (if \code{orientation = "vertical"}).}
+}
+
+\strong{Color aesthetics}
+
+\itemize{
+\item{\code{colour}: (or \code{color}) The color of the \strong{line} sub-geometry.}
+\item{\code{fill}: The fill color of the \strong{ribbon} sub-geometry.}
+\item{\code{alpha}: The opacity of the \strong{line} and \strong{ribbon} sub-geometries.}
+\item{\code{fill_ramp}: A secondary scale that modifies the \code{fill}
+scale to "ramp" to another color. See \code{\link[=scale_fill_ramp]{scale_fill_ramp()}} for examples.}
+}
+
+\strong{Line aesthetics}
+
+\itemize{
+\item{\code{size}: Width of \strong{line}.}
+\item{\code{linetype}: Type of \strong{line} (e.g., \code{"solid"}, \code{"dashed"}, etc)}
+}
+
+\strong{Other aesthetics} (these work as in standard \code{geom}s)
+
+\itemize{
+\item{\code{group}}
+}
+
+See examples of some of these aesthetics in action in \code{vignette("lineribbon")}.
+Learn more about the sub-geom override aesthetics (like \code{interval_color}) in the
+\link[ggdist]{scales} documentation. Learn more about basic ggplot aesthetics in
+\code{vignette("ggplot2-specs")}.
+}
+
 \examples{
 
 library(dplyr)

@@ -49,8 +49,8 @@ scale_fill_ramp_discrete(..., aesthetics = "fill_ramp")
 \arguments{
 \item{from}{The color to ramp from. Corresponds to \code{0} on the scale.}
 
-\item{...}{Arguments passed to underlying scale or guide functions. E.g. \code{scale_colour_ramp_discrete()},
-passes arguments to \code{\link[=discrete_scale]{discrete_scale()}}, \code{scale_colour_ramp_continuous()} passes arguments
+\item{...}{Arguments passed to underlying scale or guide functions. E.g. \code{\link[=scale_colour_ramp_discrete]{scale_colour_ramp_discrete()}},
+passes arguments to \code{\link[=discrete_scale]{discrete_scale()}}, \code{\link[=scale_colour_ramp_continuous]{scale_colour_ramp_continuous()}} passes arguments
 to \code{\link[=continuous_scale]{continuous_scale()}}. See those functions for more details.}
 
 \item{limits}{One of:
@@ -89,18 +89,18 @@ library(ggplot2)
 library(distributional)
 
 tibble(d = dist_uniform(0, 1)) \%>\%
-  ggplot(aes(y = 0, dist = d)) +
-  stat_dist_slab(aes(fill_ramp = stat(x)))
+  ggplot(aes(y = 0, xdist = d)) +
+  stat_slab(aes(fill_ramp = stat(x)))
 
 tibble(d = dist_uniform(0, 1)) \%>\%
-  ggplot(aes(y = 0, dist = d)) +
-  stat_dist_slab(aes(fill_ramp = stat(x)), fill = "blue") +
+  ggplot(aes(y = 0, xdist = d)) +
+  stat_slab(aes(fill_ramp = stat(x)), fill = "blue") +
   scale_fill_ramp_continuous(from = "red")
 
 # you can invert the order of `range` to change the order of the blend
 tibble(d = dist_normal(0, 1)) \%>\%
-  ggplot(aes(y = 0, dist = d)) +
-  stat_dist_slab(aes(fill_ramp = stat(cut_cdf_qi(cdf))), fill = "blue") +
+  ggplot(aes(y = 0, xdist = d)) +
+  stat_slab(aes(fill_ramp = stat(cut_cdf_qi(cdf))), fill = "blue") +
   scale_fill_ramp_discrete(from = "red", range = c(1, 0))
 
 }

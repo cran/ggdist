@@ -1,3 +1,84 @@
+# ggdist 3.1.0
+
+New features and enhancements:
+
+* The `stat_sample_...` and `stat_dist_...` families of stats have been merged (#83).
+  * All `stat_dist_...` stats are deprecated in favor of their `stat_...` counterparts,
+    which now understand the `dist`, `args`, and `arg1`...`arg9` aesthetics.
+  * `xdist` and `ydist` can now be used in place of the `dist` aesthetic to
+    specify the axis one is mapping a distribution onto (`dist` may be
+    deprecated in the future).
+  * Passing dist-like objects to the `x` or `y` aesthetics now raise a helpful
+    error message suggesting you probably want to use `xdist` or `ydist`.
+  * Restructured internals for stats and geoms makes it much easier to maintain
+    shortcut geoms and stats, eliminating a large amount of code duplication (#106).
+  * New `expand` parameter to `stat_slabinterval()` allows explicitly setting 
+    whether or not the slab is expanded to the limits of the scale (rather than
+    implicitly setting this based on `slab_type`).
+* The `point_interval()` family of functions can now be passed `distributional`
+  and `posterior::rvar()` objects, meaning that means and modes (in addition
+  to medians) and highest-density intervals (in addition to quantile intervals)
+  can now be visualized for analytical distributions.
+  * As part of this, multivariate distribution objects and `rvar`s will generate
+    a `.index` column when passed to `point_interval()` functions (#111).
+    Based on a suggestion from @mitchelloharawild.
+* New `stat_ribbon()` provided as a shortcut stat for `stat_lineribbon()` with
+  no line (#48). Also, if you supply only an `x` or `y` aesthetic to
+  `geom_lineribbon()`, you will get ribbons without a line (#127).
+* One-sided intervals (i.e. quantiles) can now be calculated using `ul()` (upper
+  limit) or `ll()` (lower limit), e.g. with `point_interval()` explicitly or
+  via `mean_ll()`, `median_ll()`, `mode_ll()`, `mean_ul()`, `median_ul()`, 
+  or `mode_ul()` (#49).
+* Constant distributions are now reliably detected in a variety of situations
+  and rendered as point masses in both density plots and histograms (#103, #32).
+* Minor improvements and changes to dotplot layouts that may result in minor
+  changes to the appearance of existing dotplots:
+  * Minor improvements to automatic bin width selection; the maximum
+    dot stack height should be closer to or equal to `scale` more often.
+  * A formerly-internal fudge factor of `1.07` for dot sizes is now exposed as
+    the default value of the `dotsize` parameter instead of being applied
+    internally. This fudge factor tends (in my opinion) to make dotplots look a
+    bit better due to the visual distance between circles, but is (I think) 
+    better used as an explicit value than an implicit one, hence the change.
+    This may create subtle changes to plots that use the `dotsize` or `stackratio` 
+    parameters, but allows those parameters to have a more precise 
+    geometric interpretation.
+
+Documentation:
+
+* New vignette for the `stat_dotsinterval()` sub-family: `vignette("dotsinterval")` (#120).
+* Vastly improved and expanded documentation for the `stat_slabinterval()` and
+  `geom_slabinterval()` family: each shortcut stat/geom now has its own documentation
+  page that comprehensively lists all parameters, aesthetics, and computed variables,
+  including those pulled in via `...` from typically-paired geoms. These docs are
+  auto-generated and should be easy to maintain going forward. (#36)
+* The `stat_lineribbon()` and `geom_lineribbon()` family now also has separate
+  documentation pages with a comprehensive listing of aesthetics and parameters (#107).
+* Ridge plot-like example in `vignette("slabinterval")` using the new `expand`
+  parameter (#115).
+  
+Deprecations and removals:
+
+* The `.prob` argument, a long-deprecated alias for `.width`, was removed.
+* The `limits_function`, `limits_args`, `slab_function`, `slab_args`, `interval_function`,
+  and `interval_args` arguments to `stat_slabinterval()` were removed: these were
+  largely internal-use parameters only needed by subclasses of the base class for
+  creating shortcut stats, yet added a lot of noise to the documentation, so these
+  were replaced with the `$compute_limits()`, `$compute_slabs()`, and 
+  `$compute_intervals()` methods on the new `AbstractStatSlabinterval` 
+  internal base class.
+  
+Bug fixes:
+
+* Improved handling of `NA`s for analytical distributions.
+* Fixed bug where within-bin order of dots in dotplots for `"bin"` and `"weave"`
+  layouts could be incorrect with aesthetics mapped at a sub-bin level.
+* `stackratio`s that are not equal to `1` are now accounted for in 
+  `find_dotplot_binwidth()` (i.e. automatic dotplot bin width selection).
+* Ensure distinct fill colors in lineribbons are still treated as distinct for
+  grouping even if the `fill_ramp` aesthetic ramps them to the same color.
+
+
 # ggdist 3.0.1
 
 Bug fixes:

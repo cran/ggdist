@@ -142,7 +142,7 @@ test_that("side and justification can vary", {
   )
 
   expect_error(
-    print(
+    print(newpage = FALSE,
       ggplot(df, aes(x = x, y = g, thickness = y, group = g,
         side = ifelse(x < 5, "top", "bottom")
       )) +
@@ -152,7 +152,7 @@ test_that("side and justification can vary", {
   )
 
   expect_error(
-    print(
+    print(newpage = FALSE,
       ggplot(df, aes(x = x, y = g, thickness = y, group = g,
         justification = ifelse(x < 5, 0, 1)
       )) +
@@ -162,7 +162,7 @@ test_that("side and justification can vary", {
   )
 
   expect_error(
-    print(
+    print(newpage = FALSE,
       ggplot(df, aes(x = x, y = g, thickness = y, group = g,
         scale = ifelse(x < 5, 0.5, 0.25)
       )) +
@@ -173,3 +173,46 @@ test_that("side and justification can vary", {
 
 })
 
+
+
+# Incorrect values of enums -----------------------------------------------
+
+test_that("define_orientation_variables fails on incorrect orientation", {
+  expect_error(define_orientation_variables("foo"), "Unknown orientation")
+})
+
+test_that("incorrect side, orientation are caught", {
+  p = data.frame(x = 1) %>%
+    ggplot(aes(x = x, y = x, thickness = x))
+
+  expect_error(print(newpage = FALSE,
+    p + geom_slabinterval(side = "foo", orientation = "horizontal")
+  ), "Unknown side")
+
+  expect_error(print(newpage = FALSE,
+    p + geom_slabinterval(side = "foo", orientation = "vertical")
+  ), "Unknown side")
+
+  expect_error(print(newpage = FALSE,
+    p + geom_slabinterval(orientation = "foo")
+  ), "Unknown orientation")
+  expect_error(switch_side("top", "foo"), "Unknown orientation")
+
+  expect_error(print(newpage = FALSE,
+    p + geom_slabinterval(fill_type = "foo")
+  ), "Unknown fill_type")
+
+})
+
+
+# no interval data in input -----------------------------------------------
+
+test_that("geoms without interval data are valid", {
+  skip_if_no_vdiffr()
+
+  vdiffr::expect_doppelganger("slabinterval without interval data", {
+    data.frame(x = 1:2) %>%
+      ggplot(aes(x = x, xmin = x,xmax = x, datatype = "slab", thickness = x)) +
+      geom_slabinterval()
+  })
+})

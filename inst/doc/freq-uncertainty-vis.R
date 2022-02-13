@@ -60,8 +60,8 @@ tidy(m_ABC)
 m_ABC %>%
   tidy() %>%
   ggplot(aes(y = term)) +
-  stat_dist_halfeye(
-    aes(dist = dist_student_t(df = df.residual(m_ABC), mu = estimate, sigma = std.error))
+  stat_halfeye(
+    aes(xdist = dist_student_t(df = df.residual(m_ABC), mu = estimate, sigma = std.error))
   )
 
 ## ----halfeye_with_data------------------------------------------------------------------------------------------------
@@ -69,8 +69,8 @@ ABC %>%
   data_grid(condition) %>%
   augment(m_ABC, newdata = ., se_fit = TRUE) %>%
   ggplot(aes(y = condition)) +
-  stat_dist_halfeye(
-    aes(dist = dist_student_t(df = df.residual(m_ABC), mu = .fitted, sigma = .se.fit)), 
+  stat_halfeye(
+    aes(xdist = dist_student_t(df = df.residual(m_ABC), mu = .fitted, sigma = .se.fit)), 
     scale = .5
   ) +
   # we'll add the data back in too (scale = .5 above adjusts the halfeye height so
@@ -82,8 +82,8 @@ ABC %>%
   data_grid(condition) %>%
   augment(m_ABC, newdata = ., se_fit = TRUE) %>%
   ggplot(aes(y = condition)) +
-  stat_dist_gradientinterval(
-    aes(dist = dist_student_t(df = df.residual(m_ABC), mu = .fitted, sigma = .se.fit)), 
+  stat_gradientinterval(
+    aes(xdist = dist_student_t(df = df.residual(m_ABC), mu = .fitted, sigma = .se.fit)), 
     scale = .5, fill_type = "gradient"
   )
 
@@ -92,8 +92,8 @@ ABC %>%
   data_grid(condition) %>%
   augment(m_ABC, newdata = ., se_fit = TRUE) %>%
   ggplot(aes(y = condition)) +
-  stat_dist_ccdfinterval(
-    aes(dist = dist_student_t(df = df.residual(m_ABC), mu = .fitted, sigma = .se.fit))
+  stat_ccdfinterval(
+    aes(xdist = dist_student_t(df = df.residual(m_ABC), mu = .fitted, sigma = .se.fit))
   )
 
 ## ----dotplot----------------------------------------------------------------------------------------------------------
@@ -101,8 +101,8 @@ ABC %>%
   data_grid(condition) %>%
   augment(m_ABC, newdata = ., se_fit = TRUE) %>%
   ggplot(aes(y = condition)) +
-  stat_dist_dots(
-    aes(dist = dist_student_t(df = df.residual(m_ABC), mu = .fitted, sigma = .se.fit)),
+  stat_dots(
+    aes(xdist = dist_student_t(df = df.residual(m_ABC), mu = .fitted, sigma = .se.fit)),
     quantiles = 100
   )
 
@@ -115,8 +115,8 @@ mtcars %>%
   data_grid(hp = seq_range(hp, n = 101)) %>%
   augment(m_mpg, newdata = ., se_fit = TRUE) %>%
   ggplot(aes(x = hp, fill = ordered(cyl), color = ordered(cyl))) +
-  stat_dist_lineribbon(
-    aes(dist = dist_student_t(df = df.residual(m_mpg), mu = .fitted, sigma = .se.fit)),
+  stat_lineribbon(
+    aes(ydist = dist_student_t(df = df.residual(m_mpg), mu = .fitted, sigma = .se.fit)),
     alpha = 1/4
   ) +
   geom_point(aes(y = mpg), data = mtcars) +
@@ -135,8 +135,8 @@ mtcars %>%
   data_grid(hp = seq_range(hp, n = 101)) %>%
   augment(m_mpg, newdata = ., se_fit = TRUE) %>%
   ggplot(aes(x = hp, color = ordered(cyl))) +
-  stat_dist_lineribbon(aes(
-    dist = dist_student_t(df = df.residual(m_mpg), mu = .fitted, sigma = .se.fit),
+  stat_lineribbon(aes(
+    ydist = dist_student_t(df = df.residual(m_mpg), mu = .fitted, sigma = .se.fit),
     fill = ordered(cyl),
     fill_ramp = stat(level)
   )) +

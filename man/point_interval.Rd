@@ -6,19 +6,24 @@
 \alias{point_interval.numeric}
 \alias{point_interval.rvar}
 \alias{point_interval.distribution}
-\alias{point_interval.dist_default}
 \alias{qi}
+\alias{ll}
+\alias{ul}
 \alias{hdi}
 \alias{Mode}
 \alias{Mode.default}
 \alias{Mode.rvar}
-\alias{Mode.dist_sample}
-\alias{Mode.dist_default}
 \alias{Mode.distribution}
 \alias{hdci}
 \alias{mean_qi}
 \alias{median_qi}
 \alias{mode_qi}
+\alias{mean_ll}
+\alias{median_ll}
+\alias{mode_ll}
+\alias{mean_ul}
+\alias{median_ul}
+\alias{mode_ul}
 \alias{mean_hdi}
 \alias{median_hdi}
 \alias{mode_hdi}
@@ -83,17 +88,11 @@ point_interval(
   na.rm = FALSE
 )
 
-\method{point_interval}{dist_default}(
-  .data,
-  ...,
-  .width = 0.95,
-  .point = median,
-  .interval = qi,
-  .simple_names = TRUE,
-  na.rm = FALSE
-)
-
 qi(x, .width = 0.95, .prob, na.rm = FALSE)
+
+ll(x, .width = 0.95, na.rm = FALSE)
+
+ul(x, .width = 0.95, na.rm = FALSE)
 
 hdi(x, .width = 0.95, .prob, na.rm = FALSE, ...)
 
@@ -102,10 +101,6 @@ Mode(x, na.rm = FALSE)
 \method{Mode}{default}(x, na.rm = FALSE)
 
 \method{Mode}{rvar}(x, na.rm = FALSE)
-
-\method{Mode}{dist_sample}(x, na.rm = FALSE)
-
-\method{Mode}{dist_default}(x, na.rm = FALSE)
 
 \method{Mode}{distribution}(x, na.rm = FALSE)
 
@@ -116,6 +111,18 @@ mean_qi(.data, ..., .width = 0.95)
 median_qi(.data, ..., .width = 0.95)
 
 mode_qi(.data, ..., .width = 0.95)
+
+mean_ll(.data, ..., .width = 0.95)
+
+median_ll(.data, ..., .width = 0.95)
+
+mode_ll(.data, ..., .width = 0.95)
+
+mean_ul(.data, ..., .width = 0.95)
+
+median_ul(.data, ..., .width = 0.95)
+
+mode_ul(.data, ..., .width = 0.95)
 
 mean_hdi(.data, ..., .width = 0.95)
 
@@ -228,6 +235,9 @@ is multimodal, this may not actually be the highest-density interval (there may 
 discontinuous interval). Internally \code{hdci} uses
 \code{\link[HDInterval:hdi]{HDInterval::hdi()}} with \code{allowSplit = FALSE}; see that function for more
 information on multimodality and continuous versus discontinuous intervals.
+
+\code{ll} and \code{ul} yield lower limits and upper limits, respectively (where the opposite
+limit is set to either \code{Inf} or \code{-Inf}).
 }
 \examples{
 

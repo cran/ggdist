@@ -128,3 +128,33 @@ test_that("missing data is handled correctly", {
   )
 
 })
+
+test_that("dist aesthetic can be NULLed out", {
+  skip_if_no_vdiffr()
+
+
+  hist_df = tibble(
+    geom = "histinterval",
+    x = qnorm(ppoints(100), 4, 1),
+    dist = NA
+  )
+
+  vdiffr::expect_doppelganger("dist aesthetic can be NULLed out",
+    hist_df %>%
+      ggplot(aes(y = geom, dist = dist)) +
+      stat_pointinterval(aes(x = x, y = "pointinterval", dist = NULL))
+  )
+})
+
+
+# error on missing xmin/ymin/xmax/ymax ------------------------------------
+
+test_that("missing min/max aesthetics are caught", {
+  expect_error(
+    print(newpage = FALSE,
+      ggplot(data.frame(x = 1), aes(x = x)) +
+        geom_pointinterval()
+    ),
+    "You did not specify xmin or xmax aesthetics"
+  )
+})
