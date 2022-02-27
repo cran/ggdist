@@ -1,7 +1,7 @@
 Package: ggdist
 Title: Visualizations of Distributions and Uncertainty
-Version: 3.1.0
-Date: 2022-02-12
+Version: 3.1.1
+Date: 2022-02-26
 Authors@R: c(
         person("Matthew", "Kay", role = c("aut", "cre"), email = "mjskay@northwestern.edu"),
         person("Brenton M.", "Wiernik", role = "ctb", email = "brenton@wiernik.org")
@@ -12,7 +12,7 @@ Description: Provides primitives for visualizing distributions using 'ggplot2' t
     frequentist confidence distributions or Bayesian priors) and distributions represented as samples (such as 
     bootstrap distributions or Bayesian posterior samples) are easily visualized. Visualization primitives include
     but are not limited to: points with multiple uncertainty intervals, 
-    eye plots (Spiegelhalter D., 1999) <doi:10.1111/1467-985X.00120>,
+    eye plots (Spiegelhalter D., 1999) <https://ideas.repec.org/a/bla/jorssa/v162y1999i1p45-58.html>,
     density plots, gradient plots, dot plots (Wilkinson L., 1999) <doi:10.1080/00031305.1999.10474474>,
     quantile dot plots (Kay M., Kola T., Hullman J., Munson S., 2016) <doi:10.1145/2858036.2858558>,
     complementary cumulative distribution function 
@@ -49,8 +49,8 @@ Collate: "ggdist-package.R" "util.R" "abstract_geom.R"
         "student_t.R" "testthat.R" "theme_ggdist.R"
         "tidy_format_translators.R" "deprecated.R"
 NeedsCompilation: no
-Packaged: 2022-02-13 01:27:00 UTC; matth
+Packaged: 2022-02-27 05:31:35 UTC; matth
 Author: Matthew Kay [aut, cre],
   Brenton M. Wiernik [ctb]
 Repository: CRAN
-Date/Publication: 2022-02-13 03:30:02 UTC
+Date/Publication: 2022-02-27 06:00:02 UTC

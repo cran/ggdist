@@ -399,11 +399,11 @@ data.frame(
 ) %>%
   ggplot(aes(y = abc, x = value, fill = abc)) +
   stat_slab(aes(thickness = stat(pdf*n)), scale = 0.7) +
-  stat_dotsinterval(side = "bottom", scale = 0.7, slab_color = NA) +
+  stat_dotsinterval(side = "bottom", scale = 0.7, slab_size = NA) +
   scale_fill_brewer(palette = "Set2") +
   ggtitle(paste0(
       'stat_slab(aes(thickness = stat(pdf*n)), scale = 0.7) +\n',
-      'stat_dotsinterval(side = "bottom", scale = 0.7, slab_color = NA)'
+      'stat_dotsinterval(side = "bottom", scale = 0.7, slab_size = NA)'
     ),
     'aes(fill = abc)'
   )
