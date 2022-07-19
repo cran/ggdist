@@ -219,8 +219,9 @@ test_that("geom_dots binwidth can be specified in unit()s", {
 test_that("geom_dots allows constraints on binwidth", {
   skip_if_no_vdiffr()
 
-  p = data.frame(x = ppoints(20)) %>%
-    ggplot(aes(x = x, y = 0L))
+  p = data.frame(x = seq(0, 2, length.out = 20)) %>%
+    ggplot(aes(x = x, y = 0L)) +
+    coord_cartesian(expand = FALSE)
 
   # max width of 1/40th of the viewport should approx space
   # this data with about 1 dot of space in between each dot
@@ -229,8 +230,12 @@ test_that("geom_dots allows constraints on binwidth", {
   )
 
   # min width of 1/4th of the viewport should give us four giant bins
-  vdiffr::expect_doppelganger("min binwidth",
-    p + geom_dots(binwidth = unit(c(1/4, Inf), "npc"))
+  # also test that verbose = TRUE outputs the binwidth
+  expect_message(
+    vdiffr::expect_doppelganger("min binwidth",
+      p + geom_dots(binwidth = unit(c(1/4, Inf), "npc"), verbose = TRUE)
+    ),
+    'binwidth = 0\\.5 data units.*unit\\(0\\.25, "npc"\\)'
   )
 
 })
@@ -288,18 +293,32 @@ test_that("dotplot layouts work", {
 test_that("dot order is correct", {
   skip_if_no_vdiffr()
 
-  p = data.frame(x = qnorm(ppoints(50))) %>%
-    ggplot(aes(x = x, fill = stat(x < 0)))
+  p = data.frame(x = qnorm(ppoints(50)), g = c("a", "b")) %>%
+    ggplot(aes(x = x, fill = stat(x < 0), color = g, group = NA)) +
+    scale_fill_brewer(palette = "Set1") +
+    scale_color_brewer(palette = "Paired")
+
+  vdiffr::expect_doppelganger("bin dot order",
+    p +
+      geom_dots(layout = "bin", size = 5) +
+      geom_vline(xintercept = 0)
+  )
+
+  vdiffr::expect_doppelganger("bin dot order, kept",
+    p +
+      geom_dots(aes(order = g), layout = "bin", size = 5) +
+      geom_vline(xintercept = 0)
+  )
 
   vdiffr::expect_doppelganger("weave dot order",
     p +
-      geom_dots(layout = "weave") +
+      geom_dots(layout = "weave", size = 5) +
       geom_vline(xintercept = 0)
   )
 
   vdiffr::expect_doppelganger("swarm dot order",
     p +
-      geom_dots(layout = "swarm") +
+      geom_dots(layout = "swarm", size = 5) +
       geom_vline(xintercept = 0)
   )
 

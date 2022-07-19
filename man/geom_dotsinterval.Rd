@@ -17,6 +17,7 @@ geom_dotsinterval(
   dotsize = 1.07,
   stackratio = 1,
   layout = "bin",
+  verbose = FALSE,
   orientation = NA,
   interval_size_domain = c(1, 6),
   interval_size_range = c(0.6, 1.4),
@@ -39,6 +40,7 @@ geom_dots(
   dotsize = 1.07,
   stackratio = 1,
   layout = "bin",
+  verbose = FALSE,
   orientation = NA,
   na.rm = FALSE,
   show.legend = NA,
@@ -150,6 +152,14 @@ align dots within columns. Does not work well when \code{side = "both"}.
 columns, but can be more compact and neat looking, especially for sample data (as opposed to quantile
 dotplots of theoretical distributions, which may look better with \code{"bin"} or \code{"weave"}).
 }}
+
+\item{verbose}{If \code{TRUE}, print out the bin width of the dotplot. Can be useful
+if you want to start from an automatically-selected bin width and then adjust it
+manually. Bin width is printed both as data units and as normalized parent
+coordinates or \code{"npc"}s (see \code{\link[=unit]{unit()}}). Note that if you just want to scale the
+selected bin width to fit within a desired area, it is probably easier to use
+\code{scale} than to copy and scale \code{binwidth} manually, and if you just want to
+provide constraints on the bin width, you can pass a length-2 vector to \code{binwidth}.}
 
 \item{orientation}{Whether this geom is drawn horizontally or vertically. One of:
 \itemize{
@@ -338,6 +348,15 @@ slab portion of the geometry and rows with \code{datatype = "interval"} target t
 the geometry. This is set automatically when using ggdist \code{stat}s.}
 }
 
+\strong{Binning aesthetics}
+
+\itemize{
+\item{\code{order}: The order in which data points are stacked within bins. Can be used to create the effect of
+"stacked" dots by ordering dots according to a discrete variable. If omitted (\code{NULL}), the
+value of the data points themselves are used to determine stacking order. Only applies when
+\code{layout = "bin"}, as the other layout methods fully determine both \emph{x} and \emph{y} positions.}
+}
+
 \strong{Interval-specific aesthetics}
 
 \itemize{
@@ -417,6 +436,7 @@ and the outline of the \strong{slab} (if it is visible). Use the \code{slab_line
 \strong{Other aesthetics} (these work as in standard \code{geom}s)
 
 \itemize{
+\item{\code{family}}
 \item{\code{width}}
 \item{\code{height}}
 \item{\code{group}}

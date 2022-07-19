@@ -304,6 +304,16 @@ abcc_df %>%
     'aes(shape = abc, color = hi, group = NA)'
   )
 
+## ----beeswarm_shape_color_together_stacked----------------------------------------------------------------------------
+abcc_df %>%
+  ggplot(aes(y = value, x = abc, shape = abc, color = hi, group = NA, order = hi)) +
+  geom_dots() +
+  scale_color_brewer(palette = "Dark2") +
+  ggtitle(
+    'geom_dots()',
+    'aes(shape = abc, color = hi, group = NA, order = hi)'
+  )
+
 ## ----beeswarm_shape_color_continuous----------------------------------------------------------------------------------
 abcc_df %>%
   arrange(hi) %>%
@@ -345,6 +355,16 @@ dist_df %>%
   ggtitle(
     "stat_dotsinterval(quantiles = 1000, point_interval = mode_hdci)",
     "aes(y = dist_name, xdist = dist)"
+  )
+
+## ----dotsinterval_dist_1000_level_color-------------------------------------------------------------------------------
+dist_df %>%
+  ggplot(aes(y = dist_name, xdist = dist, slab_color = stat(level))) +
+  stat_dotsinterval(quantiles = 1000, point_interval = mode_hdci, layout = "weave") +
+  scale_color_manual(values = scales::brewer_pal()(3)[-1], aesthetics = "slab_color") +
+  ggtitle(
+    "stat_dotsinterval(quantiles = 1000, point_interval = mode_hdci)",
+    "aes(y = dist_name, xdist = dist, slab_color = stat(level))"
   )
 
 ## ----dotsinterval_dist_color------------------------------------------------------------------------------------------

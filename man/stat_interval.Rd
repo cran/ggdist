@@ -117,13 +117,13 @@ creating multiple-interval plots.
 
 Roughly equivalent to:
 
-\preformatted{stat_slabinterval(
+\if{html}{\out{<div class="sourceCode">}}\preformatted{stat_slabinterval(
   aes(colour = stat(level), size = NULL),
   geom = "interval",
   .width = c(0.5, 0.8, 0.95), show_slab = FALSE,
   show.legend = NA
 )
-}
+}\if{html}{\out{</div>}}
 }
 \details{
 \strong{To visualize sample data}, such as a data distribution, samples from a
@@ -165,7 +165,17 @@ For intervals, the point summary from the interval function. Whether it is \code
 \item \code{xmin} or \code{ymin}: For intervals, the lower end of the interval from the interval function.
 \item \code{xmax} or \code{ymax}: For intervals, the upper end of the interval from the interval function.
 \item \code{.width}: For intervals, the interval width as a numeric value in \verb{[0, 1]}.
+For slabs, the width of the smallest interval containing that value of the slab.
 \item \code{level}: For intervals, the interval width as an ordered factor.
+For slabs, the level of the smallest interval containing that value of the slab.
+\item \code{pdf}: For slabs, the probability density function (PDF).
+If \code{options("ggdist.experimental.slab_data_in_intervals")} is \code{TRUE}:
+For intervals, the PDF at the point summary; intervals also have \code{pdf_min} and \code{pdf_max}
+for the PDF at the lower and upper ends of the interval.
+\item \code{cdf}: For slabs, the cumulative distribution function.
+If \code{options("ggdist.experimental.slab_data_in_intervals")} is \code{TRUE}:
+For intervals, the CDF at the point summary; intervals also have \code{cdf_min} and \code{cdf_max}
+for the CDF at the lower and upper ends of the interval.
 }
 }
 

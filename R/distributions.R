@@ -14,23 +14,23 @@
 #' @param fun For \pkg{distributional} objects and `rvar`s, the function to apply (e.g.
 #' [`pdf`], [`cdf`], [`quantile`], or [`generate`]).
 #' @noRd
-distr_function = function(dist, prefix, fun) {
+distr_function = function(dist, fun) {
   UseMethod("distr_function")
 }
 #' @export
-distr_function.default = function(dist, prefix, fun) {
+distr_function.default = function(dist, fun) {
   stop0("The `dist` aesthetic does not support objects of type ", deparse0(class(dist)))
 }
 #' @export
-distr_function.character = function(dist, prefix, fun) {
-  match.fun(paste0(prefix, dist))
+distr_function.list = function(dist, fun) {
+  if (length(dist) > 1) stop(
+    "lists of distributions should never have length > 1 here.\n",
+    "Please report this bug at https://github.com/mjskay/ggdist/issues"
+  )
+  distr_function(dist[[1]], fun)
 }
 #' @export
-distr_function.factor = function(dist, prefix, fun) {
-  distr_function(as.character(dist), prefix, fun)
-}
-#' @export
-distr_function.distribution = function(dist, prefix, fun) {
+distr_function.distribution = function(dist, fun) {
   if (length(dist) > 1) stop(
     "distributional objects should never have length > 1 here.\n",
     "Please report this bug at https://github.com/mjskay/ggdist/issues"
@@ -44,21 +44,21 @@ distr_function.distribution = function(dist, prefix, fun) {
 distr_function.rvar = distr_function.distribution
 
 distr_pdf = function(dist) {
-  distr_function(dist, "d", density)
+  distr_function(dist, density)
 }
 
 #' @importFrom distributional cdf
 distr_cdf = function(dist) {
-  distr_function(dist, "p", cdf)
+  distr_function(dist, cdf)
 }
 
 distr_quantile = function(dist) {
-  distr_function(dist, "q", quantile)
+  distr_function(dist, quantile)
 }
 
 #' @importFrom distributional generate
 distr_random = function(dist) {
-  distr_function(dist, "r", generate)
+  distr_function(dist, generate)
 }
 
 
@@ -66,28 +66,30 @@ distr_random = function(dist) {
 
 #' Apply a point_interval to a distribution
 #' @noRd
-distr_point_interval = function(dist, args = list(), point_interval, trans, ...) {
+distr_point_interval = function(dist, point_interval, trans, ...) {
   UseMethod("distr_point_interval")
 }
 #' @export
-distr_point_interval.numeric = function(dist, args = list(), point_interval, trans, ...) {
+distr_point_interval.NULL = function(dist, point_interval, trans, ...) {
+  data.frame()
+}
+#' @export
+distr_point_interval.numeric = function(dist, point_interval, trans, ...) {
   point_interval(trans$transform(dist), .simple_names = TRUE, ...)
 }
-#' @importFrom distributional dist_wrap
 #' @export
-distr_point_interval.character = function(dist, args = list(), point_interval, trans, .width = 0.95, ...) {
-  dist = do.call(dist_wrap, c(list(dist), args))
-  distr_point_interval(dist, args, point_interval, trans, .width = .width, ...)
-}
-#' @export
-distr_point_interval.factor = function(dist, args = list(), point_interval, trans, ...) {
-  distr_point_interval(as.character(dist), args, point_interval, trans, ...)
+distr_point_interval.list = function(dist, point_interval, trans, ...) {
+  if (length(dist) > 1) stop(
+    "lists of distributions should never have length > 1 here.\n",
+    "Please report this bug at https://github.com/mjskay/ggdist/issues"
+  )
+  distr_point_interval(dist[[1]], point_interval, trans, ...)
 }
 #' @importFrom distributional dist_transformed
 #' @export
-distr_point_interval.distribution = function(dist, args = list(), point_interval, trans, ...) {
-  if (distr_is_sample(dist, args)) {
-    distr_point_interval(distr_get_sample(dist, args), args, point_interval, trans, ...)
+distr_point_interval.distribution = function(dist, point_interval, trans, ...) {
+  if (distr_is_sample(dist)) {
+    distr_point_interval(distr_get_sample(dist), point_interval, trans, ...)
   } else {
     t_dist = dist_transformed(dist, trans$transform, trans$inverse)
     point_interval(t_dist, .simple_names = TRUE, ...)
@@ -100,21 +102,33 @@ distr_point_interval.rvar = distr_point_interval.distribution
 
 #' Is a distribution discrete?
 #' @noRd
-distr_is_discrete = function(dist, args = list()) {
+distr_is_discrete = function(dist) {
   if (inherits(dist, "rvar")) {
     is.integer(posterior::draws_of(dist))
   } else {
     withr::with_seed(1, {
-      random_fun = distr_random(dist)
-      one_value_from_dist = do.call(random_fun, c(list(1), args))
+      one_value_from_dist = distr_random(dist)(1)
       is.integer(one_value_from_dist)
+    })
+  }
+}
+
+#' Is a distribution multivariate?
+#' @noRd
+distr_is_multivariate = function(dist) {
+  if (inherits(dist, "rvar")) {
+    length(dist) > 1
+  } else {
+    withr::with_seed(1, {
+      one_value_from_dist = distr_random(dist)(1)
+      length(one_value_from_dist) > 1
     })
   }
 }
 
 #' Is a distribution sample based?
 #' @noRd
-distr_is_sample = function(dist, args = list()) {
+distr_is_sample = function(dist) {
   inherits(dist, c("rvar", "dist_sample")) ||
     (
       inherits(dist, c("distribution")) &&
@@ -125,7 +139,7 @@ distr_is_sample = function(dist, args = list()) {
 
 #' Get all samples from a sample-based distribution
 #' @noRd
-distr_get_sample = function(dist, args = list()) {
+distr_get_sample = function(dist) {
   if (inherits(dist, "rvar")) {
     posterior::draws_of(dist)
   } else if (inherits(dist, "distribution")) {
@@ -137,16 +151,22 @@ distr_get_sample = function(dist, args = list()) {
 
 #' Is a distribution a constant?
 #' @noRd
-distr_is_constant = function(dist, args = list()) {
-  if (distr_is_sample(dist, args)) {
-    x = distr_get_sample(dist, args)
+distr_is_constant = function(dist) {
+  if (distr_is_sample(dist)) {
+    x = distr_get_sample(dist)
     length(unique(x)) == 1
   } else {
     quantile_fun = distr_quantile(dist)
-    lower = do.call(quantile_fun, c(list(.Machine$double.eps), args))
-    upper = do.call(quantile_fun, c(list(1 - .Machine$double.neg.eps), args))
+    lower = quantile_fun(.Machine$double.eps)
+    upper = quantile_fun(1 - .Machine$double.neg.eps)
     isTRUE(lower == upper)
   }
+}
+
+#' Is a distribution missing / NA (or equivalent)?
+#' @noRd
+distr_is_missing = function(dist) {
+  is.null(dist) || anyNA(dist) || identical(dist, list(NULL))
 }
 
 #' Is x a distribution-like object? i.e. a distributional::distribution or

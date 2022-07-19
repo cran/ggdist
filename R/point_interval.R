@@ -412,6 +412,9 @@ hdi_.numeric = function(x, .width = .95, na.rm = FALSE, ...) {
   if (!na.rm && anyNA(x)) {
     return(matrix(c(NA_real_, NA_real_), ncol = 2))
   }
+  if (isTRUE(.width == 1)) {
+    return(matrix(range(x), ncol = 2))
+  }
 
   intervals = HDInterval::hdi(density(x, cut = 0, na.rm = na.rm), credMass = .width, allowSplit = TRUE)
   if (nrow(intervals) == 1) {
@@ -439,6 +442,9 @@ hdi_.distribution = function(x, .width = .95, ...) {
   }
   if (anyNA(x)) {
     return(matrix(c(NA_real_, NA_real_), ncol = 2))
+  }
+  if (isTRUE(.width == 1)) {
+    return(matrix(quantile(x, c(0, 1))[[1]], ncol = 2))
   }
 
   hilos = hdr(x, .width * 100, ...)
@@ -518,6 +524,9 @@ hdci_.numeric = function(x, .width = .95, na.rm = FALSE, ...) {
   if (!na.rm && anyNA(x)) {
     return(matrix(c(NA_real_, NA_real_), ncol = 2))
   }
+  if (isTRUE(.width == 1)) {
+    return(matrix(range(x), ncol = 2))
+  }
 
   intervals = HDInterval::hdi(x, credMass = .width)
   matrix(intervals, ncol = 2)
@@ -540,6 +549,9 @@ hdci_.distribution = function(x, .width = .95, na.rm = FALSE, ...) {
   }
   if (anyNA(x)) {
     return(matrix(c(NA_real_, NA_real_), ncol = 2))
+  }
+  if (isTRUE(.width == 1)) {
+    return(matrix(quantile(x, c(0, 1))[[1]], ncol = 2))
   }
 
   #TODO: after #114, pass na.rm to quantile here

@@ -423,6 +423,30 @@ priors %>%
     x = NULL
   )
 
+## ----prior_post, fig.width = med_width, fig.height = small_height * 2/3-----------------------------------------------
+prior_post = data.frame(
+ prior = dist_normal(0, 1),
+ posterior = dist_normal(0.1, 0.5)
+)
+
+separate_scale_plot = prior_post %>%
+  ggplot() +
+  stat_halfeye(aes(xdist = posterior)) +
+  stat_slab(aes(xdist = prior), fill = NA, color = "red") +
+  labs(
+    title = "prior (slab) + posterior (halfeye)",
+    subtitle = "default: no shared thickness scale"
+  )
+
+shared_scale_plot = prior_post %>%
+  ggplot() +
+  stat_halfeye(aes(xdist = posterior)) +
+  stat_slab(aes(xdist = prior), fill = NA, color = "#e41a1c") +
+  scale_thickness_shared() +
+  labs(subtitle = "with scale_thickness_shared()")
+
+separate_scale_plot + shared_scale_plot
+
 ## ----dist_halfeyeh_log_scale, fig.width = small_height, fig.height = small_height/1.5---------------------------------
 data.frame(dist = "lnorm", logmean = log(10), logsd = 2*log(10)) %>%
   ggplot(aes(xdist = dist, arg1 = logmean, arg2 = logsd)) +
@@ -644,41 +668,51 @@ dist_df %>%
 ## ----halfeye_filled_intervals, fig.width = med_width, fig.height = small_height---------------------------------------
 df %>%
   ggplot(aes(y = group, x = value)) +
-  stat_halfeye(aes(fill = stat(cut_cdf_qi(cdf)))) +
-  scale_fill_brewer(direction = -1) +
+  stat_halfeye(aes(fill = stat(level))) +
+  # na.translate = FALSE drops the unnecessary NA from the legend, which covers
+  # slab values outside the intervals. An alternative would be to use 
+  # na.value = ... to set the color for values outside the intervals.
+  scale_fill_brewer(na.translate = FALSE) +
   labs(
     title = "stat_halfeye()", 
-    subtitle = "aes(fill = stat(cut_cdf_qi(cdf)))",
-    fill = "Interval"
+    subtitle = "aes(fill = stat(level))",
+    fill = "interval"
   )
 
 ## ----halfeye_filled_intervals_2, fig.width = med_width, fig.height = small_height-------------------------------------
 df %>%
   ggplot(aes(y = group, x = value)) +
-  stat_halfeye(aes(fill = stat(cut_cdf_qi(
-    cdf, 
-    .width = c(.5, .8, .95),
-    labels = scales::percent_format()
-  )))) +
-  scale_fill_brewer(direction = -1, na.translate = FALSE) +
+  stat_slab(aes(fill = stat(level)), .width = c(.66, .95, 1)) +
+  stat_pointinterval() +
+  scale_fill_brewer() +
   labs(
-    title = "stat_halfeye()", 
-    subtitle = "aes(fill = stat(cut_cdf_qi(cdf, .width = c(.5, .8, .95))))",
-    fill = "Interval"
+    title = "stat_slab()", 
+    subtitle = "aes(fill = stat(level), .width = c(.66, .95, 1))",
+    fill = "interval"
   )
+
+## ----halfeye_qi_vs_hdi, fig.width = med_width, fig.height = small_height----------------------------------------------
+qi_plot = data.frame(dist = dist_beta(10, 2)) %>%
+  ggplot(aes(xdist = dist, fill = stat(level))) + 
+  stat_halfeye(point_interval = median_qi, .width = c(.5, .8, .95)) + 
+  scale_fill_brewer(na.value = "gray95") +
+  labs(subtitle = "stat_halfeye(aes(fill = stat(level)), point_interval = median_qi)")
+
+hdi_plot = data.frame(dist = dist_beta(10, 2)) %>%
+  ggplot(aes(xdist = dist, fill = stat(level))) + 
+  stat_halfeye(point_interval = mode_hdci, .width = c(.5, .8, .95)) + 
+  scale_fill_brewer(na.value = "gray95") +
+  labs(subtitle = "stat_halfeye(aes(fill = stat(level)), point_interval = mode_hdci)")
+
+qi_plot /
+  hdi_plot
 
 ## ----halfeye_filled_intervals_subgroup, fig.width = med_width, fig.height = small_height------------------------------
 df %>%
   ggplot(aes(y = group, x = value)) +
   stat_halfeye(
-    aes(
-      fill = subgroup,
-      fill_ramp = stat(cut_cdf_qi(
-        cdf, 
-        .width = c(.5, .8, .95),
-        labels = scales::percent_format()
-      ))
-    ),
+    aes(fill = subgroup, fill_ramp = stat(level)),
+    .width = c(.50, .80, .95),
     # NOTE: we use position = "dodgejust" (a dodge that respects the 
     # justification of intervals relative to slabs) instead of 
     # position = "dodge" here because it ensures the topmost slab does
@@ -687,11 +721,11 @@ df %>%
   ) +
   # a range from 1 down to 0.2 ensures the fill goes dark to light inside-out
   # and doesn't get all the way down to white (0) on the lightest color
-  scale_fill_ramp_discrete(range = c(1, 0.2), na.translate = FALSE) +
+  scale_fill_ramp_discrete(na.translate = FALSE) +
   labs(
     title = "stat_halfeye(position = 'dodgejust')", 
-    subtitle = "aes(fill = subgroup, fill_ramp = stat(cut_cdf_qi(cdf)))",
-    fill_ramp = "Interval"
+    subtitle = "aes(fill = subgroup, fill_ramp = stat(level))",
+    fill_ramp = "interval"
   )
 
 ## ----dist_interval_color_ramp, fig.width = med_width, fig.height = small_height---------------------------------------
@@ -701,6 +735,23 @@ dist_df %>%
   labs(
     title = "stat_interval()", 
     subtitle = "aes(color = subgroup, color_ramp = stat(level))"
+  )
+
+## ----raindrop, fig.width = med_width, fig.height = small_height-------------------------------------------------------
+priors %>%
+  ggplot(aes(y = dist, xdist = dist, args = args)) +
+  # must also use normalize = "groups" because min(log(pdf)) will be different for each dist
+  stat_slab(
+    aes(thickness = stat(ifelse(.width <= 0.99, log(pdf), NA))), 
+    normalize = "groups", fill = "gray85", .width = .99, side = "both"
+  ) +
+  stat_eye(
+    aes(thickness = stat(ifelse(.width <= 0.95, log(pdf), NA))), 
+    normalize = "groups"
+  ) +
+  ggtitle(
+    'stat_eye(normalize = "groups")',
+    "with aes(thickness = stat(ifelse(.width <= 0.95, log(pdf), NA)))\nand aes(thickness = stat(ifelse(.width <= 0.99, log(pdf), NA)))"
   )
 
 ## ----slab_ridge, fig.width = med_width, fig.height = small_height-----------------------------------------------------

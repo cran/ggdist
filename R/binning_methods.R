@@ -105,6 +105,8 @@ bin_dots = function(x, y, binwidth,
     bin = {
       bin_midpoints = nudge_bins(h$binning$bin_midpoints, binwidth)
       d[[x]] = bin_midpoints[h$binning$bins]
+      # maintain original data order within each bin when finding y positions
+      d = d[order(d$bin, d$order), ]
     },
     weave = {
       # keep original x positions, but re-order within bins so that overlaps
@@ -225,6 +227,8 @@ bin_dots = function(x, y, binwidth,
 #' @importFrom stats optimize
 #' @export
 find_dotplot_binwidth = function(x, maxheight, heightratio = 1, stackratio = 1) {
+  x = sort(x, na.last = TRUE)
+
   # figure out a reasonable minimum number of bins based on histogram binning
   min_nbins = if (length(x) <= 1) {
     1

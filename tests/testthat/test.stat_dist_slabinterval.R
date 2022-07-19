@@ -73,6 +73,61 @@ test_that("args and arg1...n work with named args", {
 
 })
 
+test_that("layer data is correct", {
+  p = data.frame(dist = dist_normal(0, 1)) %>%
+    ggplot(aes(xdist = dist)) +
+    stat_halfeye(n = 5, p_limits = c(0.01, 0.99))
+
+  x = seq(qnorm(0.01), qnorm(0.99), length.out = 5)
+  ref =
+    data.frame(
+      size = c(NA_real_, 1, 6, 1, NA_real_),
+      thickness = dnorm(x),
+      f = dnorm(x),
+      pdf = dnorm(x),
+      cdf = pnorm(x),
+      n = Inf,
+      x = x,
+      datatype = "slab",
+      .width = c(NA_real_, 0.95, 0.66, 0.95, NA_real_),
+      level = ordered(c(NA, 0.95, 0.66, 0.95, NA), levels = c(0.95, 0.66)),
+      .point = NA_character_,
+      .interval = NA_character_,
+      xmin = NA_real_,
+      xmax = NA_real_,
+      stringsAsFactors = FALSE
+    ) %>%
+    rbind(data.frame(
+      size = c(6, 1),
+      thickness = NA_real_,
+      f = NA_real_,
+      pdf = NA_real_,
+      cdf = NA_real_,
+      n = NA_real_,
+      x = 0,
+      datatype = "interval",
+      .width = c(0.66, 0.95),
+      level = ordered(c(0.66, 0.95), levels = c(0.95, 0.66)),
+      .point = "median",
+      .interval = "qi",
+      xmin = qnorm(c(0.17, 0.025)),
+      xmax = qnorm(c(0.83, 0.975)),
+      stringsAsFactors = FALSE
+    )) %>%
+    cbind(data.frame(
+      y = 0,
+      height = 1,
+      ymin = 0,
+      ymax = 1,
+      side = "topright",
+      scale = 0.9,
+      stringsAsFactors = FALSE
+    ))
+  ref$xdist = rep(list(dist_normal(0, 1)), 7)
+
+  expect_equal(layer_data(p)[, names(ref)], ref)
+})
+
 test_that("xdist and ydist aesthetics work", {
   skip_if_no_vdiffr()
 
@@ -281,6 +336,28 @@ test_that("scale transformation works", {
   vdiffr::expect_doppelganger("dist_halfeyeh log scale mode_hdi",
     p_log + stat_dist_halfeye(n = 20, point_interval = mode_hdi)
   )
+})
+
+test_that("scale transformation sets appropriate axis limits", {
+  p = data.frame(x = dist_lognormal(10, 0.5)) %>%
+    ggplot(aes(xdist = x)) +
+    stat_halfeye()
+
+  # without scale transformation, the lower limit of a log-normal is finite
+  # and so should be 0
+  limits = range(layer_data(p)$x)
+  expect_equal(limits[[1]], 0)
+  expect_equal(limits[[2]], qlnorm(0.999, 10, 0.5))
+
+  # with scale transformation, the lower limit is no longer finite, so it
+  # should be set to the 0.001 quantile ...
+  limits = range(layer_data(p + scale_x_log10())$x)
+  expect_equal(limits[[1]], log(qlnorm(0.001, 10, 0.5), base = 10))
+  expect_equal(limits[[2]], log(qlnorm(0.999, 10, 0.5), base = 10))
+
+  # ... but if other data is added, it should be extended to cover that point
+  limits = range(layer_data(p + scale_x_log10() + geom_point(aes(x = 2, y = 0)))$x)
+  expect_equal(limits[[1]], log(2, base = 10))
 })
 
 
@@ -627,5 +704,28 @@ test_that("stats work without attaching the ggdist namespace", {
     data.frame(x = dist_normal(0,1)) %>%
       ggplot(aes(xdist = x)) +
       ggdist::stat_halfeye()
+  )
+})
+
+
+# multiple dists with unique groups ---------------------------------------
+
+test_that("multiple dists supplied to the same group", {
+  p = data.frame(
+      y = dist_normal(c(0, 10, 20, 0, 10, 20)),
+      x = c(0,0,0,1,1,1)
+    ) %>%
+    ggplot(aes(ydist = y, x = x, group = rep(c("a","a","b"), 2)))
+
+
+  # multiple dists can be supplied to the same group with slabinterval,
+  # since they can be distinguished ...
+  vdiffr::expect_doppelganger("halfeye multiple dists per group",
+    p + stat_halfeye()
+  )
+
+  # but not to lineribbon, since they can't be distinguished
+  expect_warning(ggplot_build(p + stat_lineribbon()),
+    "Distributions passed to the `dist` aesthetic must be uniquely associated"
   )
 })

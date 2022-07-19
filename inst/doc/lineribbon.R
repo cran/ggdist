@@ -84,15 +84,37 @@ df %>%
 
 ## ----stat_lineribbon_gradient, fig.width = tiny_width, fig.height = tiny_height---------------------------------------
 df %>%
-  ggplot(aes(x = x, y = y)) +
-  stat_lineribbon(aes(fill = stat(.width)), .width = ppoints(50)) +
+  ggplot(aes(x = x, y = y, fill = stat(.width))) +
+  stat_lineribbon(.width = ppoints(50)) +
   scale_fill_distiller()
 
 ## ----stat_lineribbon_gradient_ramp, fig.width = tiny_width, fig.height = tiny_height----------------------------------
 df %>%
-  ggplot(aes(x = x, y = y)) +
-  stat_lineribbon(aes(fill_ramp = stat(.width)), .width = ppoints(50), fill = "#2171b5") +
+  ggplot(aes(x = x, y = y, fill_ramp = stat(.width))) +
+  stat_lineribbon(.width = ppoints(50), fill = "#2171b5") +
   scale_fill_ramp_continuous(range = c(1, 0))
+
+## ----stat_lineribbon_gradient_rampbar, fig.width = tiny_width, fig.height = tiny_height-------------------------------
+df %>%
+  ggplot(aes(x = x, y = y, fill_ramp = stat(.width))) +
+  stat_lineribbon(.width = ppoints(50), fill = "#2171b5") +
+  scale_fill_ramp_continuous(range = c(1, 0), guide = guide_rampbar(to = "#2171b5"))
+
+## ----stat_lineribbon_density, fig.width = tiny_width, fig.height = tiny_height----------------------------------------
+withr::with_options(list(ggdist.experimental.slab_data_in_intervals = TRUE), print(
+  df %>%
+    ggplot(aes(x = x, y = y, fill_ramp = stat(ave(pdf_min + pdf_max, .width)))) +
+    stat_lineribbon(.width = ppoints(50), fill = "#2171b5") +
+    scale_fill_ramp_continuous(name = "density", guide = guide_rampbar(to = "#2171b5"))
+))
+
+## ----stat_lineribbon_density_smooth-----------------------------------------------------------------------------------
+withr::with_options(list(ggdist.experimental.slab_data_in_intervals = TRUE), print(
+  df %>%
+    ggplot(aes(x = x, y = y, fill_ramp = stat(ave(pdf_min + pdf_max, .width)))) +
+    stat_lineribbon(.width = pnorm(seq(-2.5, 2.5, length.out = 50)), fill = "#2171b5") +
+    scale_fill_ramp_continuous(name = "density", guide = guide_rampbar(to = "#2171b5"))
+))
 
 ## ----df_2groups-------------------------------------------------------------------------------------------------------
 df_2groups = rbind(

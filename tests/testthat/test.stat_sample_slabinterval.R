@@ -245,3 +245,31 @@ test_that("trim and expand work", {
       stat_sample_slabinterval(n = 15, slab_color = "black", expand = TRUE, trim = FALSE)
   )
 })
+
+test_that("expand can take length two vector", {
+
+  df = data.frame(
+    g = c("a","a","b","b"),
+    x = c(1,2,2,3)
+  )
+
+  p = df %>%
+    ggplot(aes(x = x, y = g)) +
+    lims(x = c(0, 4))
+
+  ld = layer_data(p + stat_ccdfinterval(expand = c(TRUE, TRUE)))
+  expect_equal(min(ld$x), 0)
+  expect_equal(max(ld$x), 4)
+
+  ld = layer_data(p + stat_ccdfinterval(expand = c(TRUE, FALSE)))
+  expect_equal(min(ld$x), 0)
+  expect_equal(max(ld$x), 3)
+
+  ld = layer_data(p + stat_ccdfinterval(expand = c(FALSE, TRUE)))
+  expect_equal(min(ld$x), 1)
+  expect_equal(max(ld$x), 4)
+
+  ld = layer_data(p + stat_ccdfinterval(expand = c(FALSE, FALSE)))
+  expect_equal(min(ld$x), 1)
+  expect_equal(max(ld$x), 3)
+})

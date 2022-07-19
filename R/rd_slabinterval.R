@@ -137,12 +137,20 @@ rd_slabinterval_computed_variables = function(stat = StatSlabinterval) {
       - `xmin` or `ymin`: For intervals, the lower end of the interval from the interval function.
       - `xmax` or `ymax`: For intervals, the upper end of the interval from the interval function.
       - `.width`: For intervals, the interval width as a numeric value in `[0, 1]`.
-      - `level`: For intervals, the interval width as an ordered factor.',
+        For slabs, the width of the smallest interval containing that value of the slab.
+      - `level`: For intervals, the interval width as an ordered factor.
+        For slabs, the level of the smallest interval containing that value of the slab.
+      - `pdf`: For slabs, the probability density function (PDF).
+        If `options("ggdist.experimental.slab_data_in_intervals")` is `TRUE`:
+        For intervals, the PDF at the point summary; intervals also have `pdf_min` and `pdf_max`
+        for the PDF at the lower and upper ends of the interval.
+      - `cdf`: For slabs, the cumulative distribution function.
+        If `options("ggdist.experimental.slab_data_in_intervals")` is `TRUE`:
+        For intervals, the CDF at the point summary; intervals also have `cdf_min` and `cdf_max`
+        for the CDF at the lower and upper ends of the interval.',
     if (isTRUE(stat$default_params$show_slab)) {'
       -  `f`: For slabs, the output values from the slab function (such as the PDF, CDF, or CCDF),
         determined by `slab_type`.
-      - `pdf`: For slabs, the probability density function.
-      - `cdf`: For slabs, the cumulative distribution function.
       - `n`: For slabs, the number of data points summarized into that slab. If the slab was created from
         an analytical distribution via the `xdist`, `ydist`, or `dist` aesthetic, `n` will be `Inf`.
       '
@@ -309,7 +317,12 @@ rd_stat_slabinterval_aes = list(
 
 #' Provides documentation of aesthetics for slabintervals
 #' @noRd
-rd_slabinterval_aesthetics = function(geom_name = "slabinterval", stat = NULL, vignette = "slabinterval") {
+rd_slabinterval_aesthetics = function(
+  geom_name = "slabinterval",
+  stat = NULL,
+  vignette = "slabinterval",
+  undocumented_aes = c("width", "height", "group")
+) {
   geom = get(paste0("Geom", title_case(geom_name)))
 
   out = glue_doc('
@@ -350,6 +363,15 @@ rd_slabinterval_aesthetics = function(geom_name = "slabinterval", stat = NULL, v
       indicate which part of the geom a row in the data targets: rows with `datatype = "slab"` target the
       slab portion of the geometry and rows with `datatype = "interval"` target the interval portion of
       the geometry. This is set automatically when using ggdist `stat`s.'
+  )
+
+  # binning aesthetics for dots
+  geom_aes_sections[["Binning aesthetics"]] = list(
+    order =
+      'The order in which data points are stacked within bins. Can be used to create the effect of
+      "stacked" dots by ordering dots according to a discrete variable. If omitted (`NULL`), the
+      value of the data points themselves are used to determine stacking order. Only applies when
+      `layout = "bin"`, as the other layout methods fully determine both *x* and *y* positions.'
   )
 
   # interval-specific aesthetics
@@ -425,7 +447,7 @@ rd_slabinterval_aesthetics = function(geom_name = "slabinterval", stat = NULL, v
     geom_name, stat,
     geom_aes_sections = geom_aes_sections,
     stat_aes = rd_stat_slabinterval_aes,
-    undocumented_aes = c("width", "height", "group"),
+    undocumented_aes = undocumented_aes,
     vignette = vignette
   ))
 
