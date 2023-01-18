@@ -116,7 +116,7 @@ dists_plot = dists_df %>%
   stat_gradientinterval(data = dists_df_("gradientinterval"), scale = .5, fill_type = "gradient") +
   stat_ccdfinterval(data = dists_df_("ccdfinterval"), scale = .5) +
   stat_cdfinterval(data = dists_df_("cdfinterval"), scale = .5) +
-  stat_interval(data = dists_df_("interval"), color = "gray65", alpha = 1/3, size = 10,
+  stat_interval(data = dists_df_("interval"), color = "gray65", alpha = 1/3, linewidth = 10,
     position = position_nudge(y = -.1)) +
   stat_pointinterval(data = dists_df_("pointinterval")) +
   stat_slab(data = dists_df_("slab"), position = position_nudge(y = - 0.2)) +
@@ -168,7 +168,7 @@ blue_ = "#7570b3"
 bracket_ = function(..., x, xend = x, y, yend = y, color = red_) {
   annotate("segment",
     arrow = arrow(angle = 90, ends = "both", length = unit(3, "points")),
-    color = color, size = 0.75,
+    color = color, linewidth = 0.75,
     x = x, xend = xend, y = y, yend = yend,
     ...
   )
@@ -177,7 +177,7 @@ thickness_ = function(x) dnorm(x,4,1) * 0.9 / dnorm(4,4,1)
 thickness_bracket_ = function(x) bracket_(x = x, y = 0, yend = thickness_(x))
 refline_ = function(..., x, xend = x, y, yend = y, color = red_, linetype = "solid", alpha = 0.5) {
   annotate("segment",
-    color = color, linetype = linetype, alpha = alpha, size = 0.75,
+    color = color, linetype = linetype, alpha = alpha, linewidth = 0.75,
     x = x, xend = xend, y = y, yend = yend,
     ...
   )
@@ -201,7 +201,7 @@ arrow_ = function(..., curvature = 0, x, xend = x, y, yend = y) {
 dists_df_("halfeye") %>%
   ggplot(aes(y = 0, xdist = dist)) +
   stat_slabinterval(
-    aes(interval_size = NULL),
+    aes(linewidth = NULL),
     slab_color = "black", 
     expand = FALSE, 
     limits = c(0, 8), 
@@ -210,7 +210,7 @@ dists_df_("halfeye") %>%
     point_size = 3,
     shape = 21,
     stroke = 1.5,
-    interval_size = 3,
+    linewidth = 3,
   ) +
   
   # height
@@ -234,7 +234,7 @@ dists_df_("halfeye") %>%
   
   # slab line properties
   label_(x = 2.5, y = 0.7, 
-    label = 'slab_color = "black"\nslab_size = 1\nslab_linetype = linetype = "solid"',
+    label = 'slab_color = "black"\nslab_linewidth = 1\nslab_linetype = linetype = "solid"',
     vjust = 1, hjust = 1
   ) +
   arrow_(x = 2.52, xend = 3.08, y = 0.67, yend = thickness_(3.08) + 0.03, curvature = -0.2) +
@@ -256,7 +256,7 @@ dists_df_("halfeye") %>%
   
   # interval properties
   label_(x = 3.5, y = -0.2,
-    label = 'interval_color = color = "black"\ninterval_alpha = alpha = 1\ninterval_linetype = linetype = "solid"\ninterval_size = size = 3',
+    label = 'interval_color = color = "black"\ninterval_alpha = alpha = 1\ninterval_linetype = linetype = "solid"\nlinewidth = size = 3',
     vjust = 1, hjust = 1
   ) +
   arrow_(x = 3.3, xend = 3.4, y = -0.18, yend = -0.01, curvature = -0.1) +
@@ -481,11 +481,11 @@ tibble(
   lambda = c(13,7,4,3,2)
 ) %>%
   ggplot(aes(x = group)) +
-  stat_slab(aes(ydist = dist_poisson(lambda), fill = stat(pdf))) +
-  geom_line(aes(y = lambda, group = NA), size = 1) +
+  stat_slab(aes(ydist = dist_poisson(lambda), fill = after_stat(pdf))) +
+  geom_line(aes(y = lambda, group = NA), linewidth = 1) +
   geom_point(aes(y = lambda), size = 2.5) +
   labs(fill = "Pr(y)") +
-  ggtitle("stat_slab()", "aes(ydist = dist_poisson(lambda), fill = stat(pdf))")
+  ggtitle("stat_slab()", "aes(ydist = dist_poisson(lambda), fill = after_stat(pdf))")
 
 ## ----cdfinterval_family, fig.width = med_width, fig.height = med_width------------------------------------------------
 p = df %>%
@@ -590,13 +590,13 @@ df %>%
 ## ----ccdf_gradient, fig.width = med_width, fig.height = small_height--------------------------------------------------
 df %>%
   ggplot(aes(x = group, y = value, fill = subgroup)) +
-  stat_ccdfinterval(aes(slab_alpha = stat(f)), 
+  stat_ccdfinterval(aes(slab_alpha = after_stat(f)), 
     thickness = 1, position = "dodge", fill_type = "gradient"
   ) +
   expand_limits(y = 0) +
   # plus coord_cartesian so there is no space between bars and axis
   coord_cartesian(expand = FALSE) +
-  ggtitle("stat_ccdfinterval(thickness = 1)", "aes(slab_alpha = stat(f))")
+  ggtitle("stat_ccdfinterval(thickness = 1)", "aes(slab_alpha = after_stat(f))")
 
 ## ----norm_vs_t_highlight, fig.width = med_width, fig.height = small_height--------------------------------------------
 priors = tribble(
@@ -607,18 +607,18 @@ priors = tribble(
 
 priors %>%
   ggplot(aes(y = dist, xdist = dist, args = args)) +
-  stat_halfeye(aes(fill = stat(abs(x) < 1.5))) +
-  ggtitle("stat_halfeye()", "aes(fill = stat(abs(x) < 1.5)))") +
+  stat_halfeye(aes(fill = after_stat(abs(x) < 1.5))) +
+  ggtitle("stat_halfeye()", "aes(fill = after_stat(abs(x) < 1.5)))") +
   # we'll use a nicer palette than the default for highlighting:
   scale_fill_manual(values = c("gray85", "skyblue"))
 
 ## ----norm_vs_t_gradient_eye, fig.width = med_width, fig.height = small_height-----------------------------------------
 priors %>%
   ggplot(aes(y = dist, xdist = dist, args = args)) +
-  stat_eye(aes(slab_alpha = stat(f), fill = stat(x > 1)), fill_type = "gradient") +
+  stat_eye(aes(slab_alpha = after_stat(f), fill = after_stat(x > 1)), fill_type = "gradient") +
   ggtitle(
     "stat_eye(fill_type = 'gradient')", 
-    "aes(slab_alpha = stat(f), fill = stat(x > 1)))"
+    "aes(slab_alpha = after_stat(f), fill = after_stat(x > 1)))"
   ) +
   # we'll use a nicer palette than the default for highlighting:
   scale_fill_manual(values = c("gray75", "skyblue"))
@@ -626,23 +626,23 @@ priors %>%
 ## ----correll_gradient, fig.width = small_width, fig.height = small_height/2-------------------------------------------
 priors %>%
   ggplot(aes(y = dist, xdist = dist, args = args)) +
-  stat_gradientinterval(aes(slab_alpha = stat(-pmax(abs(1 - 2*cdf), .95))),
+  stat_gradientinterval(aes(slab_alpha = after_stat(-pmax(abs(1 - 2*cdf), .95))),
     fill_type = "gradient"
   ) +
   scale_slab_alpha_continuous(guide = "none") +
   ggtitle(
     "stat_gradientinterval(fill_type = 'gradient')",
-    "aes(slab_alpha = stat(-pmax(abs(1 - 2*cdf), .95)))"
+    "aes(slab_alpha = after_stat(-pmax(abs(1 - 2*cdf), .95)))"
   )
 
 ## ----helske_gradient_eye, fig.width = med_width, fig.height = small_height--------------------------------------------
 priors %>%
   ggplot(aes(y = dist, xdist = dist, args = args)) +
-  stat_eye(aes(slab_alpha = stat(-pmax(abs(1 - 2*cdf), .95))), fill_type = "gradient") +
+  stat_eye(aes(slab_alpha = after_stat(-pmax(abs(1 - 2*cdf), .95))), fill_type = "gradient") +
   scale_slab_alpha_continuous(guide = "none") +
   ggtitle(
     "stat_eye(fill_type = 'gradient')",
-    "aes(slab_alpha = stat(-pmax(abs(1 - 2*cdf), .95)))"
+    "aes(slab_alpha = after_stat(-pmax(abs(1 - 2*cdf), .95)))"
   )
 
 ## ----tukey_pencils, fig.width = small_height * 1.25, fig.height = small_height----------------------------------------
@@ -650,8 +650,8 @@ dist_df %>%
   ggplot(aes(x = group, ydist = dist_normal(mean, sd), fill = subgroup)) +
   stat_slab(
     aes(
-      thickness = stat(pmax(0, abs(1 - 2*cdf) - .95)), 
-      fill_ramp = stat(pmax(0, abs(1 - 2*cdf) - .95))
+      thickness = after_stat(pmax(0, abs(1 - 2*cdf) - .95)), 
+      fill_ramp = after_stat(pmax(0, abs(1 - 2*cdf) - .95))
     ),
     side = "both", position = "dodge", fill_type = "gradient"
   ) +
@@ -659,7 +659,7 @@ dist_df %>%
     title = 'stat_slab(side = "both")', 
     subtitle = paste0(
       "aes(fill = subgroup,\n       ",
-      "fill_ramp and thickness = stat(pmax(0, abs(1 - 2*cdf) - .95)))"
+      "fill_ramp and thickness = after_stat(pmax(0, abs(1 - 2*cdf) - .95)))"
     )
   ) +
   guides(fill_ramp = "none") +
@@ -668,41 +668,41 @@ dist_df %>%
 ## ----halfeye_filled_intervals, fig.width = med_width, fig.height = small_height---------------------------------------
 df %>%
   ggplot(aes(y = group, x = value)) +
-  stat_halfeye(aes(fill = stat(level))) +
+  stat_halfeye(aes(fill = after_stat(level))) +
   # na.translate = FALSE drops the unnecessary NA from the legend, which covers
   # slab values outside the intervals. An alternative would be to use 
   # na.value = ... to set the color for values outside the intervals.
   scale_fill_brewer(na.translate = FALSE) +
   labs(
     title = "stat_halfeye()", 
-    subtitle = "aes(fill = stat(level))",
+    subtitle = "aes(fill = after_stat(level))",
     fill = "interval"
   )
 
 ## ----halfeye_filled_intervals_2, fig.width = med_width, fig.height = small_height-------------------------------------
 df %>%
   ggplot(aes(y = group, x = value)) +
-  stat_slab(aes(fill = stat(level)), .width = c(.66, .95, 1)) +
+  stat_slab(aes(fill = after_stat(level)), .width = c(.66, .95, 1)) +
   stat_pointinterval() +
   scale_fill_brewer() +
   labs(
     title = "stat_slab()", 
-    subtitle = "aes(fill = stat(level), .width = c(.66, .95, 1))",
+    subtitle = "aes(fill = after_stat(level), .width = c(.66, .95, 1))",
     fill = "interval"
   )
 
 ## ----halfeye_qi_vs_hdi, fig.width = med_width, fig.height = small_height----------------------------------------------
 qi_plot = data.frame(dist = dist_beta(10, 2)) %>%
-  ggplot(aes(xdist = dist, fill = stat(level))) + 
+  ggplot(aes(xdist = dist, fill = after_stat(level))) + 
   stat_halfeye(point_interval = median_qi, .width = c(.5, .8, .95)) + 
   scale_fill_brewer(na.value = "gray95") +
-  labs(subtitle = "stat_halfeye(aes(fill = stat(level)), point_interval = median_qi)")
+  labs(subtitle = "stat_halfeye(aes(fill = after_stat(level)), point_interval = median_qi)")
 
 hdi_plot = data.frame(dist = dist_beta(10, 2)) %>%
-  ggplot(aes(xdist = dist, fill = stat(level))) + 
+  ggplot(aes(xdist = dist, fill = after_stat(level))) + 
   stat_halfeye(point_interval = mode_hdci, .width = c(.5, .8, .95)) + 
   scale_fill_brewer(na.value = "gray95") +
-  labs(subtitle = "stat_halfeye(aes(fill = stat(level)), point_interval = mode_hdci)")
+  labs(subtitle = "stat_halfeye(aes(fill = after_stat(level)), point_interval = mode_hdci)")
 
 qi_plot /
   hdi_plot
@@ -711,7 +711,7 @@ qi_plot /
 df %>%
   ggplot(aes(y = group, x = value)) +
   stat_halfeye(
-    aes(fill = subgroup, fill_ramp = stat(level)),
+    aes(fill = subgroup, fill_ramp = after_stat(level)),
     .width = c(.50, .80, .95),
     # NOTE: we use position = "dodgejust" (a dodge that respects the 
     # justification of intervals relative to slabs) instead of 
@@ -724,17 +724,17 @@ df %>%
   scale_fill_ramp_discrete(na.translate = FALSE) +
   labs(
     title = "stat_halfeye(position = 'dodgejust')", 
-    subtitle = "aes(fill = subgroup, fill_ramp = stat(level))",
+    subtitle = "aes(fill = subgroup, fill_ramp = after_stat(level))",
     fill_ramp = "interval"
   )
 
 ## ----dist_interval_color_ramp, fig.width = med_width, fig.height = small_height---------------------------------------
 dist_df %>%
   ggplot(aes(x = group, ydist = dist_normal(mean, sd), color = subgroup)) +
-  stat_interval(aes(color_ramp = stat(level)), position = "dodge") +
+  stat_interval(aes(color_ramp = after_stat(level)), position = "dodge") +
   labs(
     title = "stat_interval()", 
-    subtitle = "aes(color = subgroup, color_ramp = stat(level))"
+    subtitle = "aes(color = subgroup, color_ramp = after_stat(level))"
   )
 
 ## ----raindrop, fig.width = med_width, fig.height = small_height-------------------------------------------------------
@@ -742,16 +742,16 @@ priors %>%
   ggplot(aes(y = dist, xdist = dist, args = args)) +
   # must also use normalize = "groups" because min(log(pdf)) will be different for each dist
   stat_slab(
-    aes(thickness = stat(ifelse(.width <= 0.99, log(pdf), NA))), 
+    aes(thickness = after_stat(ifelse(.width <= 0.99, log(pdf), NA))), 
     normalize = "groups", fill = "gray85", .width = .99, side = "both"
   ) +
   stat_eye(
-    aes(thickness = stat(ifelse(.width <= 0.95, log(pdf), NA))), 
+    aes(thickness = after_stat(ifelse(.width <= 0.95, log(pdf), NA))), 
     normalize = "groups"
   ) +
   ggtitle(
     'stat_eye(normalize = "groups")',
-    "with aes(thickness = stat(ifelse(.width <= 0.95, log(pdf), NA)))\nand aes(thickness = stat(ifelse(.width <= 0.99, log(pdf), NA)))"
+    "with aes(thickness = after_stat(ifelse(.width <= 0.95, log(pdf), NA)))\nand aes(thickness = after_stat(ifelse(.width <= 0.99, log(pdf), NA)))"
   )
 
 ## ----slab_ridge, fig.width = med_width, fig.height = small_height-----------------------------------------------------
@@ -771,8 +771,8 @@ ridges_df %>%
 ridges_df %>%
   ggplot(aes(
     y = group, x = x, 
-    fill = group, fill_ramp = stat(abs(x)), 
-    color_ramp = stat(-dnorm(x, 0, 2))
+    fill = group, fill_ramp = after_stat(abs(x)), 
+    color_ramp = after_stat(-dnorm(x, 0, 2))
   )) +
   stat_slab(
     height = 2, color = "gray15", 
@@ -783,7 +783,7 @@ ridges_df %>%
   geom_vline(xintercept = 0, color = "gray85", linetype = "dashed") +
   ggtitle(
     'stat_slab(height = 2, color = "black", expand = TRUE, trim = FALSE)',
-    'aes(fill = group, fill_ramp = stat(abs(x)), color_ramp = stat(-dnorm(x, 0, 2)))'
+    'aes(fill = group, fill_ramp = after_stat(abs(x)), color_ramp = after_stat(-dnorm(x, 0, 2)))'
   ) +
   scale_fill_viridis_d()
 

@@ -130,10 +130,8 @@ test_that("pdf and cdf aesthetics work", {
     ggplot(aes(x = x, y = y))
 
   vdiffr::expect_doppelganger("pdf and cdf on a sample slabinterval",
-    p + stat_sample_slabinterval(aes(fill = x, thickness = stat(pdf), slab_alpha = stat(cdf)), n = 15)
+    p + stat_sample_slabinterval(aes(fill = x, thickness = after_stat(pdf), slab_alpha = after_stat(cdf)), n = 15)
   )
-
-  expect_error(weighted_ecdf(NULL), "Need at least 1 or more values")
 })
 
 test_that("constant distributions work", {
@@ -201,7 +199,7 @@ test_that("n is calculated correctly", {
 
   vdiffr::expect_doppelganger("pdf*n for different-sized groups",
     df %>%
-      ggplot(aes(x = x, y = g, thickness = stat(pdf*n), fill = stat(n))) +
+      ggplot(aes(x = x, y = g, thickness = after_stat(pdf*n), fill = after_stat(n))) +
       stat_sample_slabinterval(n = 15)
   )
 })
@@ -272,4 +270,38 @@ test_that("expand can take length two vector", {
   ld = layer_data(p + stat_ccdfinterval(expand = c(FALSE, FALSE)))
   expect_equal(min(ld$x), 1)
   expect_equal(max(ld$x), 3)
+})
+
+
+# discrete distributions --------------------------------------------------
+
+test_that("characters work", {
+  p = ggplot_build(
+    ggplot() +
+      stat_slabinterval(aes(x = c("a","a","a","b","b","c"), group = NA))
+  )
+
+  slab_ref = data.frame(
+    thickness = c(3,3,3,3, 2,2,2,2, 1,1,1,1)/6,
+    pdf = c(3,3,3,3, 2,2,2,2, 1,1,1,1)/6,
+    cdf = c(0,0, 3,3,3,3, 5,5,5,5, 6,6)/6,
+    f = c(3,3,3,3, 2,2,2,2, 1,1,1,1)/6,
+    n = 6,
+    datatype = "slab",
+    .width = c(NA, .66,.66,.66,.66,.66,.66, .95,.95, NA,NA,NA),
+    stringsAsFactors = FALSE
+  )
+  slab_ref$x = ggplot2:::mapped_discrete(c(.5, 1,1, 1.5,1.5, 2,2, 2.5,2.5, 3,3, 3.5))
+  expect_equal(p$data[[1]][p$data[[1]]$datatype == "slab", names(slab_ref)], slab_ref)
+
+  interval_ref = data.frame(
+    datatype = "interval",
+    .width = c(0.66, 0.95),
+    stringsAsFactors = FALSE
+  )
+  interval_ref$xmin = ggplot2:::mapped_discrete(c(1, 1))
+  interval_ref$xmax = ggplot2:::mapped_discrete(c(2.15, 2.875))
+  interval_ref$x = ggplot2:::mapped_discrete(c(1.5, 1.5))
+  attr(interval_ref, "row.names") = c(13L, 14L)
+  expect_equal(p$data[[1]][p$data[[1]]$datatype == "interval", names(interval_ref)], interval_ref)
 })

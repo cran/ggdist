@@ -60,7 +60,7 @@ df %>%
   group_by(x) %>%
   median_qi(y) %>%
   ggplot(aes(x = x, y = y, ymin = .lower, ymax = .upper)) +
-  geom_lineribbon(fill = "gray65")
+  geom_lineribbon(fill = "gray65") 
 
 ## ----geom_lineribbon, fig.width = tiny_width, fig.height = tiny_height------------------------------------------------
 df %>%
@@ -68,7 +68,7 @@ df %>%
   median_qi(y, .width = c(.50, .80, .95)) %>%
   ggplot(aes(x = x, y = y, ymin = .lower, ymax = .upper)) +
   geom_lineribbon() +
-  scale_fill_brewer()
+  scale_fill_brewer() 
 
 ## ----stat_lineribbon, fig.width = tiny_width, fig.height = tiny_height------------------------------------------------
 df %>%
@@ -84,36 +84,53 @@ df %>%
 
 ## ----stat_lineribbon_gradient, fig.width = tiny_width, fig.height = tiny_height---------------------------------------
 df %>%
-  ggplot(aes(x = x, y = y, fill = stat(.width))) +
+  ggplot(aes(x = x, y = y, fill = after_stat(.width))) +
   stat_lineribbon(.width = ppoints(50)) +
-  scale_fill_distiller()
+  scale_fill_distiller() +
+  labs(title = "stat_lineribbon(.width = ppoints(50))")
 
 ## ----stat_lineribbon_gradient_ramp, fig.width = tiny_width, fig.height = tiny_height----------------------------------
 df %>%
-  ggplot(aes(x = x, y = y, fill_ramp = stat(.width))) +
+  ggplot(aes(x = x, y = y, fill_ramp = after_stat(.width))) +
   stat_lineribbon(.width = ppoints(50), fill = "#2171b5") +
-  scale_fill_ramp_continuous(range = c(1, 0))
+  scale_fill_ramp_continuous(range = c(1, 0)) +
+  labs(
+    title = "stat_lineribbon(.width = ppoints(50))",
+    subtitle = "aes(fill_ramp = after_stat(.width))"
+  )
 
 ## ----stat_lineribbon_gradient_rampbar, fig.width = tiny_width, fig.height = tiny_height-------------------------------
 df %>%
-  ggplot(aes(x = x, y = y, fill_ramp = stat(.width))) +
+  ggplot(aes(x = x, y = y, fill_ramp = after_stat(.width))) +
   stat_lineribbon(.width = ppoints(50), fill = "#2171b5") +
-  scale_fill_ramp_continuous(range = c(1, 0), guide = guide_rampbar(to = "#2171b5"))
+  scale_fill_ramp_continuous(range = c(1, 0), guide = guide_rampbar(to = "#2171b5")) +
+  labs(
+    title = "stat_lineribbon(.width = ppoints(50))",
+    subtitle = 'aes(fill_ramp = after_stat(.width)) +\nscale_fill_ramp_continuous(guide = "rampbar")'
+  )
 
 ## ----stat_lineribbon_density, fig.width = tiny_width, fig.height = tiny_height----------------------------------------
 withr::with_options(list(ggdist.experimental.slab_data_in_intervals = TRUE), print(
   df %>%
-    ggplot(aes(x = x, y = y, fill_ramp = stat(ave(pdf_min + pdf_max, .width)))) +
+    ggplot(aes(x = x, y = y, fill_ramp = after_stat(ave(pdf_min + pdf_max, .width)))) +
     stat_lineribbon(.width = ppoints(50), fill = "#2171b5") +
-    scale_fill_ramp_continuous(name = "density", guide = guide_rampbar(to = "#2171b5"))
+    scale_fill_ramp_continuous(name = "density", guide = guide_rampbar(to = "#2171b5")) +
+    labs(
+      title = "stat_lineribbon(.width = ppoints(50))",
+      subtitle = 'aes(fill_ramp = after_stat(ave(pdf_min + pdf_max, .width)))'
+    )
 ))
 
-## ----stat_lineribbon_density_smooth-----------------------------------------------------------------------------------
+## ----stat_lineribbon_density_smooth, fig.width = tiny_width, fig.height = tiny_height---------------------------------
 withr::with_options(list(ggdist.experimental.slab_data_in_intervals = TRUE), print(
   df %>%
-    ggplot(aes(x = x, y = y, fill_ramp = stat(ave(pdf_min + pdf_max, .width)))) +
+    ggplot(aes(x = x, y = y, fill_ramp = after_stat(ave(pdf_min + pdf_max, .width)))) +
     stat_lineribbon(.width = pnorm(seq(-2.5, 2.5, length.out = 50)), fill = "#2171b5") +
-    scale_fill_ramp_continuous(name = "density", guide = guide_rampbar(to = "#2171b5"))
+    scale_fill_ramp_continuous(name = "density", guide = guide_rampbar(to = "#2171b5")) +
+    labs(
+      title = "stat_lineribbon(.width = pnorm(seq(-2.5, 2.5, length.out = 50)))",
+      subtitle = 'aes(fill_ramp = after_stat(ave(pdf_min + pdf_max, .width)))'
+    )
 ))
 
 ## ----df_2groups-------------------------------------------------------------------------------------------------------
@@ -131,12 +148,14 @@ df_2groups %>%
 ## ----stat_lineribbon_2groups_alpha, fig.width = tiny_width, fig.height = tiny_height----------------------------------
 df_2groups %>%
   ggplot(aes(x = x, y = y, fill = g)) +
-  stat_lineribbon(alpha = 1/4)
+  stat_lineribbon(alpha = 1/4) +
+  labs(title = "stat_lineribbon(aes(fill = g), alpha = 1/4)")
 
 ## ----stat_lineribbon_2groups_ramp, fig.width = tiny_width, fig.height = tiny_height-----------------------------------
 df_2groups %>%
   ggplot(aes(x = x, y = y, fill = g)) +
-  stat_lineribbon(aes(fill_ramp = stat(level)))
+  stat_lineribbon(aes(fill_ramp = after_stat(level))) +
+  labs(title = "stat_lineribbon(aes(fill = g, fill_ramp = after_stat(level)))")
 
 ## ----analytical_df----------------------------------------------------------------------------------------------------
 analytical_df = tibble(

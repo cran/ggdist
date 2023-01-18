@@ -123,9 +123,16 @@ test_that("two-group stat_lineribbons work", {
     stat_lineribbon(aes(color = g, linetype = g), .width = c(.50, .75, .90)) + scale_fill_brewer() +
     guides(fill = guide_legend(order = 1), color = guide_legend(order = 2), linetype = guide_legend(order = 2))
   )
+  expect_warning(
+    vdiffr::expect_doppelganger("two-group stats grouped by color and linewidth",
+      p +
+        stat_lineribbon(aes(color = g, linewidth = g), .width = c(.50, .75, .90)) + scale_fill_brewer() +
+        guides(fill = guide_legend(order = 1), color = guide_legend(order = 2), linetype = guide_legend(order = 2))
+    )
+  )
   vdiffr::expect_doppelganger("two-group stats grouped by fill with ramp",
     p +
-      stat_lineribbon(aes(fill = g, fill_ramp = stat(level)), .width = c(.50, .75, .90)) +
+      stat_lineribbon(aes(fill = g, fill_ramp = after_stat(level)), .width = c(.50, .75, .90)) +
       # testing range = c(0,1) here because it ensures both groups ramp all the
       # way to the same color ("gray85"), which will cause problems if the ribbons
       # are not properly grouped by the original (un-ramped) color as well.

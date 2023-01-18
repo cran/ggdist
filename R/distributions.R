@@ -14,51 +14,97 @@
 #' @param fun For \pkg{distributional} objects and `rvar`s, the function to apply (e.g.
 #' [`pdf`], [`cdf`], [`quantile`], or [`generate`]).
 #' @noRd
-distr_function = function(dist, fun) {
+distr_function = function(dist, fun, ...) {
   UseMethod("distr_function")
 }
 #' @export
-distr_function.default = function(dist, fun) {
+distr_function.default = function(dist, fun, ...) {
   stop0("The `dist` aesthetic does not support objects of type ", deparse0(class(dist)))
 }
 #' @export
-distr_function.list = function(dist, fun) {
+distr_function.list = function(dist, fun, ...) {
   if (length(dist) > 1) stop(
     "lists of distributions should never have length > 1 here.\n",
     "Please report this bug at https://github.com/mjskay/ggdist/issues"
   )
-  distr_function(dist[[1]], fun)
+  distr_function(dist[[1]], fun, ...)
 }
+#' @importFrom stats stepfun
 #' @export
-distr_function.distribution = function(dist, fun) {
+distr_function.distribution = function(dist, fun, ..., categorical_okay = FALSE) {
   if (length(dist) > 1) stop(
     "distributional objects should never have length > 1 here.\n",
     "Please report this bug at https://github.com/mjskay/ggdist/issues"
   )
+
+  if (fun == "quantile" && categorical_okay && distr_is_factor_like(dist)) {
+    # for categorical distributions --- but only when requested --- treat
+    # them as ordinal so we can generate values in their bins. This is used
+    # for stat_dots to put dots in bins approximately proportional to bin probs.
+    levels = distr_levels(dist)
+    probs = distr_probs(dist)
+    Finv = stepfun(c(0, cumsum(probs)), c(1, seq_along(probs), length(probs)))
+    return(function(x, ...) levels[Finv(x)])
+  }
   # eat up extra args as they are ignored anyway
   # (and can cause problems, e.g. with cdf())
   # TODO: at least until #114 / distributional/#72
+  fun = match.fun(fun)
   function(x, ...) unlist(fun(dist[[1]], x))
 }
 #' @export
-distr_function.rvar = distr_function.distribution
+distr_function.rvar = function(dist, fun, ...) {
+  if (length(dist) > 1) stop(
+    "rvars should never have length > 1 here.\n",
+    "Please report this bug at https://github.com/mjskay/ggdist/issues"
+  )
 
-distr_pdf = function(dist) {
-  distr_function(dist, density)
+  fun = match.fun(fun)
+  function(x, ...) unlist(fun(dist[[1]], x, ...))
+}
+#' @export
+distr_function.rvar_factor = function(dist, fun, ...) {
+  if (!inherits(dist, "rvar_ordered") && fun %in% c("cdf", "quantile")) {
+    # cdf and quantile are undefined on unordered dists, so just return NA
+    function(x, ...) {
+      rep_len(NA_real_, length(x))
+    }
+  } else if (fun %in% c("density", "cdf")) {
+    # for density and cdf we must translate numeric input to factor levels
+    f = force(NextMethod())
+    levels = levels(dist)
+    function(x, ...) {
+      # only x values > 0 are valid; values <= 0 are 0s
+      gt_0 = x > 0
+      x_gt_0_levels = levels[x[gt_0]]
+      f = numeric(length(x))
+      f[gt_0] = f(x_gt_0_levels, ...)
+      f
+    }
+  } else {
+    NextMethod()
+  }
+}
+
+distr_pdf = function(dist, ...) {
+  distr_function(dist, "density", ...)
 }
 
 #' @importFrom distributional cdf
-distr_cdf = function(dist) {
-  distr_function(dist, cdf)
+distr_cdf = function(dist, ...) {
+  distr_function(dist, "cdf", ...)
 }
 
-distr_quantile = function(dist) {
-  distr_function(dist, quantile)
+#' @param categorical_okay if TRUE, categorical dists are treated as ordinal
+#' in order to generate values in bins (e.g. for use with stat_dots)
+#' @noRd
+distr_quantile = function(dist, ..., categorical_okay = FALSE) {
+  distr_function(dist, "quantile", ..., categorical_okay = categorical_okay)
 }
 
 #' @importFrom distributional generate
-distr_random = function(dist) {
-  distr_function(dist, generate)
+distr_random = function(dist, ...) {
+  distr_function(dist, "generate", ...)
 }
 
 
@@ -76,6 +122,15 @@ distr_point_interval.NULL = function(dist, point_interval, trans, ...) {
 #' @export
 distr_point_interval.numeric = function(dist, point_interval, trans, ...) {
   point_interval(trans$transform(dist), .simple_names = TRUE, ...)
+}
+#' @export
+distr_point_interval.factor = function(dist, point_interval, trans, ...) {
+  # cannot calculate intervals on categorical distributions
+  distr_point_interval(NA_real_, point_interval, trans, ...)
+}
+#' @export
+distr_point_interval.ordered = function(dist, point_interval, trans, ...) {
+  distr_point_interval(as.numeric(dist), point_interval, trans, ...)
 }
 #' @export
 distr_point_interval.list = function(dist, point_interval, trans, ...) {
@@ -103,13 +158,106 @@ distr_point_interval.rvar = distr_point_interval.distribution
 #' Is a distribution discrete?
 #' @noRd
 distr_is_discrete = function(dist) {
+  if (inherits(dist, "rvar_factor")) {
+    return(TRUE)
+  }
   if (inherits(dist, "rvar")) {
-    is.integer(posterior::draws_of(dist))
-  } else {
-    withr::with_seed(1, {
-      one_value_from_dist = distr_random(dist)(1)
-      is.integer(one_value_from_dist)
+    return(is.integer(posterior::draws_of(dist)))
+  }
+  if (is_distribution(dist) && inherits(vec_data(dist)[[1]], "dist_mixture")) {
+    if (length(dist) > 1) stop(
+      "lists of distributions should never have length > 1 here.\n",
+      "Please report this bug at https://github.com/mjskay/ggdist/issues"
+    )
+    # special case: discrete mixtures can't be reliably detected by the
+    # method below, so we do it by asking if all components of the mixture are discrete
+    dists = vec_restore(vec_data(dist)[[1]]$dist, dist_missing())
+    is_discrete = map_lgl_(dists, distr_is_discrete)
+    return(all(is_discrete))
+  }
+
+  withr::with_seed(1, {
+    one_value_from_dist = distr_random(dist)(1)
+    is.integer(one_value_from_dist) || is.logical(one_value_from_dist) || is.character(one_value_from_dist)
+  })
+}
+
+#' Is a distribution logical?
+#' @noRd
+distr_is_logical = function(dist) {
+  if (inherits(dist, "rvar")) {
+    return(is.logical(posterior::draws_of(dist)))
+  }
+  if (is_distribution(dist) && inherits(vec_data(dist)[[1]], "dist_mixture")) {
+    if (length(dist) > 1) stop(
+      "lists of distributions should never have length > 1 here.\n",
+      "Please report this bug at https://github.com/mjskay/ggdist/issues"
+    )
+    # special case: logical mixtures can't be reliably detected by the
+    # method below, so we do it by asking if all components of the mixture are logical
+    dists = vec_restore(vec_data(dist)[[1]]$dist, dist_missing())
+    is_logical = map_lgl_(dists, distr_is_logical)
+    return(all(is_logical))
+  }
+
+  withr::with_seed(1, {
+    one_value_from_dist = distr_random(dist)(1)
+    is.logical(one_value_from_dist)
+  })
+}
+
+#' Is a distribution a non-numeric discrete dist? e.g. character, factor
+#' @noRd
+distr_is_factor_like = function(dist) {
+  inherits(dist, "rvar_factor") || if (inherits(dist, "distribution")) {
+    is_factor_like = map_lgl_(vctrs::vec_data(dist), function(d) {
+      inherits(d, c("dist_categorical", "ggdist__wrapped_categorical")) ||
+        (inherits(d, "dist_sample") && inherits(distr_get_sample(d), c("character", "factor"))) ||
+        is.character(vctrs::field(support(vec_restore(list(d), dist_missing())), "x")[[1]])
     })
+    all(is_factor_like)
+  } else {
+    FALSE
+  }
+}
+
+#' For factor-like distributions, get their levels
+#' @noRd
+distr_levels = function(dist) {
+  if (inherits(dist, "rvar_factor")) {
+    levels(dist)
+  } else if (inherits(dist, "distribution")) {
+    levels = lapply(vec_data(dist), distr_levels)
+    unique(do.call(c, levels))
+  } else if (inherits(dist, "dist_categorical")) {
+    as.character(dist[["x"]] %||% seq_along(dist[["p"]]))
+  } else if (inherits(dist, "ggdist__wrapped_categorical")) {
+    distr_levels(dist[["wrapped_dist"]])
+  } else if (inherits(dist, "dist_sample")) {
+    s = distr_get_sample(dist)
+    if (is.factor(s)) {
+      levels(s)
+    } else {
+      unique(s)
+    }
+  } else {
+    warning("Don't know how to determine the levels of distribution: ", format(dist))
+    NULL
+  }
+}
+
+#' For categorical distributions, get their probabilities
+#' @noRd
+distr_probs = function(dist) {
+  if (inherits(dist, "distribution") && length(dist) == 1) {
+    distr_probs(vec_data(dist)[[1]])
+  } else if (inherits(dist, "dist_categorical")) {
+    dist[["p"]]
+  } else if (inherits(dist, "ggdist__wrapped_categorical")) {
+    distr_probs(dist[["wrapped_dist"]])
+  } else {
+    warning("Don't know how to determine the category probabilities of distribution: ", format(dist))
+    NULL
   }
 }
 
@@ -154,13 +302,29 @@ distr_get_sample = function(dist) {
 distr_is_constant = function(dist) {
   if (distr_is_sample(dist)) {
     x = distr_get_sample(dist)
-    length(unique(x)) == 1
-  } else {
-    quantile_fun = distr_quantile(dist)
-    lower = quantile_fun(.Machine$double.eps)
-    upper = quantile_fun(1 - .Machine$double.neg.eps)
-    isTRUE(lower == upper)
+    return(length(unique(x)) == 1)
   }
+  if (is_distribution(dist) && inherits(vec_data(dist)[[1]], "dist_mixture")) {
+    if (length(dist) > 1) stop(
+      "lists of distributions should never have length > 1 here.\n",
+      "Please report this bug at https://github.com/mjskay/ggdist/issues"
+    )
+    # special case: discrete constant distributions can't be reliably detected by the
+    # method below, so we do it by asking if all components of the mixture are constant
+    # and equal
+    dists = vec_restore(vec_data(dist)[[1]]$dist, dist_missing())
+    is_constant = map_lgl_(dists, distr_is_constant)
+    if (all(is_constant)) {
+      means = mean(dists)
+      return(all(means == means[[1]]))
+    }
+    return(FALSE)
+  }
+
+  quantile_fun = distr_quantile(dist)
+  lower = quantile_fun(.Machine$double.eps)
+  upper = quantile_fun(1 - .Machine$double.neg.eps)
+  isTRUE(lower == upper)
 }
 
 #' Is a distribution missing / NA (or equivalent)?
@@ -175,6 +339,50 @@ distr_is_missing = function(dist) {
 is_dist_like = function(x) {
   inherits(x, c("distribution", "rvar"))
 }
+
+
+# custom distributions ----------------------------------------------------
+
+#' A wrapped categorical distribution with a different level set
+#' @noRd
+.dist_wrapped_categorical = function(wrapped_dist, new_levels) {
+  distributional::new_dist(
+    wrapped_dist = unclass(wrapped_dist),
+    new_levels = list(new_levels),
+    class = "ggdist__wrapped_categorical"
+  )
+}
+
+#' @export
+density.ggdist__wrapped_categorical = function(x, at, ...) {
+  gt_0 = at > 0
+  at_gt_0_levels = x[["new_levels"]][at[gt_0]]
+  if (is.null(x[["wrapped_dist"]]$x)) {
+    # TODO: hack: when x (levels) are missing from the wrapped dist, then the levels are
+    # actually the numeric indices of the probability vector, so convert
+    # to numeric
+    at_gt_0_levels = as.numeric(at_gt_0_levels)
+  }
+  f = numeric(length(at))
+  f[gt_0] = density(x[["wrapped_dist"]], at_gt_0_levels, ...)
+  f
+}
+
+#' @export
+cdf.ggdist__wrapped_categorical = function(x, q, ...) {
+  rep_len(NA_real_, length(q))
+}
+
+#' @export
+quantile.ggdist__wrapped_categorical = function(x, p, ...) {
+  rep_len(NA_real_, length(p))
+}
+
+#' @export
+generate.ggdist__wrapped_categorical = function(x, ...) {
+  generate(x[["wrapped_dist"]], ...)
+}
+
 
 
 # transforming density functions ------------------------------------------

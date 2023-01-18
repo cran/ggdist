@@ -76,7 +76,7 @@ rd_slabinterval_shortcut_stat = function(
     rd_shortcut_stat(stat_name, geom_name),
     '@inheritParams stat_slabinterval',
     '@inheritParams geom_slabinterval',
-    rd_slabinterval_params(geom_name, stat, as_dots = TRUE),
+    rd_layer_params(geom_name, stat, as_dots = TRUE),
     glue_doc('
       @param geom Use to override the default connection between
       [stat_<<stat_name>>()] and [geom_<<geom_name>>()]'),
@@ -125,12 +125,15 @@ rd_slabinterval_shortcut_stat = function(
   )
 }
 
+
+# computed variables ------------------------------------------------------
+
 rd_slabinterval_computed_variables = function(stat = StatSlabinterval) {
   out = glue_doc('
       @section Computed Variables:
       The following variables are computed by this stat and made available for
-      use in aesthetic specifications ([aes()]) using the [stat()] or [after_stat()]
-      functions:
+      use in aesthetic specifications ([aes()]) using the [after_stat()]
+      function or the `after_stat` argument of [stage()]:
 
       - `x` or `y`: For slabs, the input values to the slab function.
         For intervals, the point summary from the interval function. Whether it is `x` or `y` depends on `orientation`
@@ -160,170 +163,16 @@ rd_slabinterval_computed_variables = function(stat = StatSlabinterval) {
   out
 }
 
-#' Provides documentation of params for slabinterval geoms
-#' @noRd
-rd_slabinterval_params = function(geom_name = "slabinterval", stat = NULL, as_dots = FALSE) {
-  geom = get(paste0("Geom", title_case(geom_name)))
 
-  params = list(
-
-    # BASE PARAMS
-    orientation = glue_doc('
-      Whether this geom is drawn horizontally or vertically. One of:
-      \\itemize{
-        \\item `NA` (default): automatically detect the orientation based on how the aesthetics
-          are assigned. Automatic detection works most of the time.
-        \\item `"horizontal"` (or `"y"`): draw horizontally, using the `y` aesthetic to identify different
-          groups. For each group, uses the `x`, `xmin`, `xmax`, and `thickness` aesthetics to
-          draw points, intervals, and slabs.
-        \\item `"vertical"` (or `"x"`): draw vertically, using the `x` aesthetic to identify different
-          groups. For each group, uses the `y`, `ymin`, `ymax`, and `thickness` aesthetics to
-          draw points, intervals, and slabs.
-      }
-      For compatibility with the base ggplot naming scheme for `orientation`, `"x"` can be used as an alias
-      for `"vertical"` and `"y"` as an alias for `"horizontal"` (tidybayes had an `orientation` parameter
-      before base ggplot did, hence the discrepancy).
-      '),
-
-    # SLAB PARAMS
-    normalize = glue_doc('
-      How to normalize heights of functions input to the `thickness` aesthetic. One of:
-      \\itemize{
-        \\item `"all"`: normalize so that the maximum height across all data is `1`.
-        \\item `"panels"`: normalize within panels so that the maximum height in each panel is `1`.
-        \\item `"xy"`: normalize within the x/y axis opposite the `orientation` of this geom so
-          that the maximum height at each value of the opposite axis is `1`.
-        \\item `"groups"`: normalize within values of the opposite axis and within each
-          group so that the maximum height in each group is `1`.
-        \\item `"none"`: values are taken as is with no normalization (this should probably
-          only be used with functions whose values are in \\[0,1\\], such as CDFs).
-      }
-      '),
-    fill_type = glue_doc('
-      What type of fill to use when the fill color or alpha varies within a slab. One of:
-      \\itemize{
-        \\item `"segments"`: breaks up the slab geometry into segments for each unique combination of fill color and
-          alpha value. This approach is supported by all graphics devices and works well for sharp cutoff values,
-          but can give ugly results if a large number of unique fill colors are being used (as in gradients,
-          like in [stat_gradientinterval()]).
-        \\item `"gradient"`: a `grid::linearGradient()` is used to create a smooth gradient fill. This works well for
-          large numbers of unique fill colors, but requires R >= 4.1 and is not yet supported on all graphics devices.
-          As of this writing, the `png()` graphics device with `type = "cairo"`, the `svg()` device, the `pdf()`
-          device, and the `ragg::agg_png()` devices are known to support this option. On R < 4.1, this option
-          will fall back to `fill_type = "segment"` with a message.
-        \\item `"auto"`: attempts to use `fill_type = "gradient"` if support for it can be auto-detected. On R >= 4.2,
-          support for gradients can be auto-detected on some graphics devices; if support is not detected, this
-          option will fall back to `fill_type = "segments"` (in case of a false negative, `fill_type = "gradient"`
-          can be set explicitly). On R < 4.2, support for gradients cannot be auto-detected, so this will always
-          fall back to `fill_type = "segments"`, in which case you can set `fill_type = "gradient"` explicitly
-          if you are using a graphics device that support gradients.
-      }
-      '),
-
-    # INTERVAL PARAMS
-    interval_size_domain = glue_doc('
-      A length-2 numeric vector giving the minimum and maximum of the values of the size aesthetic that will be
-      translated into actual sizes for intervals drawn according to `interval_size_range` (see the documentation
-      for that argument.)
-      '),
-    interval_size_range = glue_doc('
-      A length-2 numeric vector. This geom scales the raw size aesthetic values when drawing interval and point
-      sizes, as they tend to be too thick when using the default settings of [scale_size_continuous()], which give
-      sizes with a range of `c(1, 6)`. The `interval_size_domain` value indicates the input domain of raw size
-      values (typically this should be equal to the value of the `range` argument of the [scale_size_continuous()]
-      function), and `interval_size_range` indicates the desired output range of the size values (the min and max of
-      the actual sizes used to draw intervals). Most of the time it is not recommended to change the value of this
-      argument, as it may result in strange scaling of legends; this argument is a holdover from earlier versions
-      that did not have size aesthetics targeting the point and interval separately. If you want to adjust the
-      size of the interval or points separately, you can instead use the `interval_size` or `point_size`
-      aesthetics; see [scales].
-      '),
-    fatten_point = glue_doc('
-      A multiplicative factor used to adjust the size of the point relative to the size of the
-      thickest interval line. If you wish to specify point sizes directly, you can also use the `point_size`
-      aesthetic and [scale_point_size_continuous()] or [scale_point_size_discrete()]; sizes
-      specified with that aesthetic will not be adjusted using `fatten_point`.
-      '),
-
-    # LINERIBBON PARAMS
-    step = glue_doc('
-      Should the line/ribbon be drawn as a step function? One of:
-      \\itemize{
-        \\item `FALSE` (default): do not draw as a step function.
-        \\item `"mid"` (or `TRUE`): draw steps midway between adjacent x values.
-        \\item `"hv"`: draw horizontal-then-vertical steps.
-        \\item `"vh"`: draw as vertical-then-horizontal steps.
-      }
-      `TRUE` is an alias for `"mid"` because for a step function with ribbons, `"mid"` is probably what you want
-      (for the other two step approaches the ribbons at either the very first or very last x value will not be
-      visible).
-      '),
-
-    # SUB_GEOMETRY FLAGS
-    show_slab = 'Should the slab portion of the geom be drawn?',
-    show_point = 'Should the point portion of the geom be drawn?',
-    show_interval = 'Should the interval portion of the geom be drawn?',
-
-    # BASE PARAMS
-    na.rm = glue_doc('
-      If `FALSE`, the default, missing values are removed with a warning. If `TRUE`, missing
-      values are silently removed.
-      ')
-  )
-
-  # filter out hidden params or ones defined in the stat
-  param_names = setdiff(
-    names(geom$default_params),
-    c(names(stat$default_params), geom$hidden_params, stat$hidden_params)
-  )
-  params = params[param_names]
-
-  missing_docs = sapply(params, is.null)
-  if (any(missing_docs)) {
-    stop("Missing docs for params: ", paste0(param_names[missing_docs], collapse = ", "))
-  }
-
-  if (length(params)) {
-    if (as_dots) {
-      glue_doc('
-        @param ...  Other arguments passed to [layer()]. These are often aesthetics, used to set an aesthetic
-          to a fixed value, like `colour = "red"` or `size = 3` (see **Aesthetics**, below). They may also be
-          parameters to the paired geom/stat. When paired with the default geom, [geom_<<geom_name>>()],
-          these include:
-          <<rd_describe_list(params)>>
-        ')
-    } else {
-      glue_doc('@param <<names(params)>> <<params>>')
-    }
-  }
-}
-
-#' docstrings for the stat_slabinterval aesthetics
-#' @noRd
-rd_stat_slabinterval_aes = list(
-  x = 'x position of the geometry (when orientation = `"vertical"`); or sample data to be summarized
-    (when `orientation = "horizontal"` with sample data).',
-  y = 'y position of the geometry (when orientation = `"horizontal"`); or sample data to be summarized
-    (when `orientation = "vertical"` with sample data).',
-  xdist = 'When using analytical distributions, distribution to map on the x axis: a \\pkg{distributional}
-    object (e.g. [dist_normal()]) or a [posterior::rvar()] object.',
-  ydist = 'When using analytical distributions, distribution to map on the y axis: a \\pkg{distributional}
-    object (e.g. [dist_normal()]) or a [posterior::rvar()] object.',
-  dist = 'When using analytical distributions, a name of a distribution (e.g. `"norm"`), a
-    \\pkg{distributional} object (e.g. [dist_normal()]), or a [posterior::rvar()] object. See **Details**.',
-  args = 'Distribution arguments (`args` or `arg1`, ... `arg9`). See **Details**.'
-)
-
+# aesthetics --------------------------------------------------------------
 
 #' Provides documentation of aesthetics for slabintervals
 #' @noRd
 rd_slabinterval_aesthetics = function(
   geom_name = "slabinterval",
   stat = NULL,
-  vignette = "slabinterval",
-  undocumented_aes = c("width", "height", "group")
+  vignette = "slabinterval"
 ) {
-  geom = get(paste0("Geom", title_case(geom_name)))
 
   out = glue_doc('
     @section Aesthetics:
@@ -333,123 +182,14 @@ rd_slabinterval_aesthetics = function(
 
     ')
 
-  # Build sections for the geom-specific aesthetics ...
-  geom_aes_sections = list()
-
-  # slab-specific aesthetics
-  if (isTRUE(geom$default_params$show_slab)) geom_aes_sections[["Slab-specific aesthetics"]] = list(
-    thickness =
-      'The thickness of the slab at each `x` value (if `orientation = "horizontal"`) or
-      `y` value (if `orientation = "vertical"`) of the slab.',
-    side =
-      'Which side to place the slab on. `"topright"`, `"top"`, and `"right"` are synonyms
-      which cause the slab to be drawn on the top or the right depending on if `orientation` is `"horizontal"`
-      or `"vertical"`. `"bottomleft"`, `"bottom"`, and `"left"` are synonyms which cause the slab
-      to be drawn on the bottom or the left depending on if `orientation` is `"horizontal"` or
-      `"vertical"`. `"topleft"` causes the slab to be drawn on the top or the left, and `"bottomright"`
-      causes the slab to be drawn on the bottom or the right. `"both"` draws the slab mirrored on both
-      sides (as in a violin plot).',
-    scale =
-      'What proportion of the region allocated to this geom to use to draw the slab. If `scale = 1`,
-      slabs that use the maximum range will just touch each other. Default is `0.9` to leave some space.',
-    justification =
-      'Justification of the interval relative to the slab, where `0` indicates bottom/left
-      justification and `1` indicates top/right justification (depending on `orientation`). If `justification`
-      is `NULL` (the default), then it is set automatically based on the value of `side`: when `side` is
-      `"top"`/`"right"` `justification` is set to `0`, when `side` is `"bottom"`/`"left"`
-      `justification` is set to `1`, and when `side` is `"both"` `justification` is set to 0.5.',
-    datatype =
-      'When using composite geoms directly without a `stat` (e.g. [geom_slabinterval()]), `datatype` is used to
-      indicate which part of the geom a row in the data targets: rows with `datatype = "slab"` target the
-      slab portion of the geometry and rows with `datatype = "interval"` target the interval portion of
-      the geometry. This is set automatically when using ggdist `stat`s.'
-  )
-
-  # binning aesthetics for dots
-  geom_aes_sections[["Binning aesthetics"]] = list(
-    order =
-      'The order in which data points are stacked within bins. Can be used to create the effect of
-      "stacked" dots by ordering dots according to a discrete variable. If omitted (`NULL`), the
-      value of the data points themselves are used to determine stacking order. Only applies when
-      `layout = "bin"`, as the other layout methods fully determine both *x* and *y* positions.'
-  )
-
-  # interval-specific aesthetics
-  if (isTRUE(geom$default_params$show_interval)) geom_aes_sections[["Interval-specific aesthetics"]] = list(
-    xmin = 'Left end of the interval sub-geometry (if `orientation = "horizontal"`).',
-    xmax = 'Right end of the interval sub-geometry (if `orientation = "horizontal"`).',
-    ymin = 'Lower end of the interval sub-geometry (if `orientation = "vertical"`).',
-    ymax = 'Upper end of the interval sub-geometry (if `orientation = "vertical"`).'
-  )
-
-  # point-specific aesthetics
-  if (isTRUE(geom$default_params$show_point)) geom_aes_sections[["Point-specific aesthetics"]] = list(
-    shape = 'Shape type used to draw the **point** sub-geometry.'
-  )
-
-  # color aesthetics
-  geom_aes_sections[["Color aesthetics"]] = list(
-    colour = '(or `color`) The color of the **interval** and **point** sub-geometries.
-     Use the `slab_color`, `interval_color`, or `point_color` aesthetics (below) to
-     set sub-geometry colors separately.',
-    fill = 'The fill color of the **slab** and **point** sub-geometries. Use the `slab_fill`
-     or `point_fill` aesthetics (below) to set sub-geometry colors separately.',
-    alpha = 'The opacity of the **slab**, **interval**, and **point** sub-geometries. Use the `slab_alpha`,
-     `interval_alpha`, or `point_alpha` aesthetics (below) to set sub-geometry colors separately.',
-    colour_ramp = '(or `color_ramp`) A secondary scale that modifies the `color`
-     scale to "ramp" to another color. See [scale_colour_ramp()] for examples.',
-    fill_ramp = 'A secondary scale that modifies the `fill`
-     scale to "ramp" to another color. See [scale_fill_ramp()] for examples.'
-  )
-
-  # line aesthetics
-  geom_aes_sections[["Line aesthetics"]] = list(
-    size = 'Width of the outline around the **slab** (if visible). Also determines the width of
-     the line used to draw the **interval** and the size of the **point**, but raw
-     `size` values are transformed according to the `interval_size_domain`, `interval_size_range`,
-     and `fatten_point` parameters of the `geom` (see above). Use the `slab_size`,
-     `interval_size`, or `point_size` aesthetics (below) to set sub-geometry line widths separately
-     (note that when size is set directly using the override aesthetics, interval and point
-     sizes are not affected by `interval_size_domain`, `interval_size_range`, and `fatten_point`).',
-    stroke = 'Width of the outline around the **point** sub-geometry.',
-    linetype = 'Type of line (e.g., `"solid"`, `"dashed"`, etc) used to draw the **interval**
-     and the outline of the **slab** (if it is visible). Use the `slab_linetype` or
-     `interval_linetype` aesthetics (below) to set sub-geometry line types separately.'
-  )
-
-  # slab override aesthetics
-  if (isTRUE(geom$default_params$show_slab)) geom_aes_sections[["Slab-specific color/line override aesthetics"]] = list(
-    slab_fill = 'Override for `fill`: the fill color of the slab.',
-    slab_colour = '(or `slab_color`) Override for `colour`/`color`: the outline color of the slab.',
-    slab_alpha = 'Override for `alpha`: the opacity of the slab.',
-    slab_size = 'Override for `size`: the width of the outline of the slab.',
-    slab_linetype = 'Override for `linetype`: the line type of the outline of the slab.',
-    slab_shape = 'Override for `shape`: the shape of the dots used to draw the dotplot slab.'
-  )
-
-  # interval override aesthetics
-  if (isTRUE(geom$default_params$show_interval)) geom_aes_sections[["Interval-specific color/line override aesthetics"]] = list(
-    interval_colour = '(or `interval_color`) Override for `colour`/`color`: the color of the interval.',
-    interval_alpha = 'Override for `alpha`: the opacity of the interval.',
-    interval_size = 'Override for `size`: the line width of the interval.',
-    interval_linetype = 'Override for `linetype`: the line type of the interval.'
-  )
-
-  # point override aesthetics
-  if (isTRUE(geom$default_params$show_point)) geom_aes_sections[["Point-specific color/line override aesthetics"]] = list(
-    point_fill = 'Override for `fill`: the fill color of the point.',
-    point_colour = '(or `point_color`) Override for `colour`/`color`: the outline color of the point.',
-    point_alpha = 'Override for `alpha`: the opacity of the point.',
-    point_size = 'Override for `size`: the size of the point.'
-  )
-
-  out = c(out, rd_aesthetics_sections(
-    geom_name, stat,
-    geom_aes_sections = geom_aes_sections,
-    stat_aes = rd_stat_slabinterval_aes,
-    undocumented_aes = undocumented_aes,
-    vignette = vignette
-  ))
+  out = c(out, rd_aesthetics_sections(geom_name, stat, vignette = vignette))
 
   glue_collapse(out, "\n")
+}
+
+
+# shared parameter docs ---------------------------------------------------
+
+rd_param_slab_side = function() {
+  paste0("@param side ", GeomSlabinterval$get_aes_docs()[["Slab-specific aesthetics"]]$side)
 }

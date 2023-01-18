@@ -19,6 +19,13 @@ compute_limits_slabinterval = function(
     return(data.frame(.lower = NA, .upper = NA))
   }
 
+  if (distr_is_factor_like(dist)) {
+    # limits on factor-like dists are determined by the scale, which will
+    # have been set earlier (in layer_slabinterval()), so we don't have to
+    # do it here
+    return(data.frame(.lower = NA, .upper = NA))
+  }
+
   if (distr_is_sample(dist)) {
     sample = distr_get_sample(dist)
     return(compute_limits_sample(sample, trans, trim, adjust))
@@ -80,7 +87,7 @@ compute_limits_sample = function(x, trans, trim, adjust) {
 #' StatSlabinterval$compute_slab()
 #' @noRd
 compute_slab_slabinterval = function(
-  self, data, trans, input, orientation,
+  self, data, scales, trans, input, orientation,
   slab_type, limits, n,
   adjust, trim, expand, breaks, outline_bars,
   ...
@@ -108,11 +115,12 @@ compute_slab_slabinterval = function(
       pdf = pdf[-c(1,5)]
       cdf = cdf[-c(1,5)]
     }
-  } else if (distr_is_sample(dist)) {
+  } else if (!distr_is_factor_like(dist) && distr_is_sample(dist)) {
     return(compute_slab_sample(
-      trans$transform(distr_get_sample(dist)), trans, input,
+      trans$transform(distr_get_sample(dist)), scales, trans, input,
       slab_type = slab_type, limits = limits, n = n,
-      adjust = adjust, trim = trim, expand = expand, breaks = breaks, outline_bars = outline_bars
+      adjust = adjust, trim = trim, expand = expand, breaks = breaks, outline_bars = outline_bars,
+      ...
     ))
   } else if (trans$name == "identity") {
     pdf_fun = distr_pdf(dist)
@@ -179,12 +187,22 @@ compute_slab_slabinterval = function(
 #' @importFrom graphics hist
 #' @noRd
 compute_slab_sample = function(
-  x, trans, input,
+  x, scales, trans, input,
   slab_type, limits, n,
-  adjust, trim, expand, breaks, outline_bars
+  adjust, trim, expand, breaks, outline_bars,
+  density,
+  ...
 ) {
-  # calculate the density first, since we'll use the x values from it
-  # to calculate the cdf
+  density = match_function(density, prefix = "density_")
+
+  if (is.integer(x) || inherits(x, "mapped_discrete")) {
+    # discrete variables are always displayed as histograms
+    slab_type = "histogram"
+    breaks = seq(min(x, na.rm = TRUE), max(x, na.rm = TRUE) + 1) - 0.5
+  }
+
+  # calculate pdf and cdf
+  cdf_fun = weighted_ecdf(x)
   slab_df = if (slab_type == "histogram") {
     # when using a histogram slab, that becomes the density function value
     # TODO: this is a hack for now until we make it so that density estimators
@@ -192,37 +210,40 @@ compute_slab_sample = function(
     h = hist(x, breaks = breaks, plot = FALSE)
     input_1 = h$breaks[-length(h$breaks)]  # first edge of bin
     input_2 = h$breaks[-1]                 # second edge of bin
+    input_ = (input_1 + input_2)/2   # center of bin
+    cdf_1 = cdf_fun(input_1)
+    cdf_2 = cdf_fun(input_2)
+    cdf_ = cdf_fun(input_)
 
     if (!outline_bars) {
       # as.vector(rbind(x, y)) interleaves vectors input_1 and input_2, giving
       # us the bin endpoints --- then just need to repeat the same value of density
       # for both endpoints of the same bin
-      .input = trans$inverse(as.vector(rbind(input_1, input_2)))
-      pdf = rep(h$density, each = 2)
+      data.frame(
+        .input = trans$inverse(as.vector(rbind(input_1, input_, input_, input_2))),
+        pdf = rep(h$density, each = 4),
+        cdf = as.vector(rbind(cdf_1, cdf_1, cdf_, cdf_2))
+      )
     } else {
       # have to return to 0 in between each bar so that bar outlines are drawn
-      .input = trans$inverse(as.vector(rbind(input_1, input_1, input_2, input_2)))
-      pdf = as.vector(rbind(0, h$density, h$density, 0))
+      data.frame(
+        .input = trans$inverse(as.vector(rbind(input_1, input_1, input_, input_, input_2, input_2))),
+        pdf = as.vector(rbind(0, h$density, h$density, h$density, h$density, 0)),
+        cdf = as.vector(rbind(cdf_1, cdf_1, cdf_1, cdf_, cdf_2, cdf_2))
+      )
     }
-    data.frame(
-      .input = .input,
-      pdf = pdf
-    )
   } else {
     # all other slab types use the density function as the pdf
-    cut = if (trim) 0 else 3
+    # calculate the density first, since we'll use the x values from it
+    # to calculate the cdf
     # calculate on the transformed scale to ensure density is correct
-    d = density(x, n = n, adjust = adjust, cut = cut)
+    d = density(x, n = n, adjust = adjust, trim = trim)
     data.frame(
       .input = trans$inverse(d$x),
-      pdf = d$y
+      pdf = d$y,
+      cdf = cdf_fun(d$x)
     )
   }
-
-  # calculate cdf
-  trans_input = trans$transform(slab_df$.input)
-  cdf_fun = weighted_ecdf(x)
-  slab_df$cdf = cdf_fun(trans_input)
 
   # extend x values to the range of the plot. To do that we have to include
   # x values requested from the original `input` if they are outside the
@@ -260,36 +281,6 @@ compute_slab_sample = function(
 
   slab_df$n = length(x)
   slab_df
-}
-
-#' @importFrom stats approxfun
-weighted_ecdf = function(x, weights = NULL) {
-  n = length(x)
-  if (n < 1) stop("Need at least 1 or more values to calculate an ECDF")
-
-  #sort x
-  sort_order = order(x)
-  x = x[sort_order]
-
-  # calculate weighted cumulative probabilities
-  weights = if (is.null(weights)) rep(1, n) else weights
-  weights = weights[sort_order]
-  p = cumsum(weights) / sum(weights)
-
-  # need to manually do tie removal before passing to approxfun, otherwise it
-  # will fail when all x values are equal
-  unique_x = unique(x)
-  if (length(unique_x) < length(x)) {
-    # if x[i] ... x[i + k] are all equal ("tied"), collapse to a single x
-    # value and let corresponding value in p = max(p[i] ... p[i + k])
-    p = as.vector(tapply(p, match(x, x), max))
-    x = unique_x
-    stopifnot(length(p) == length(x))
-  }
-
-  method = "constant"
-
-  approxfun(x, p, yleft = 0, yright = 1, ties = "ordered", method = method)
 }
 
 
@@ -347,7 +338,7 @@ compute_interval_slabinterval = function(
 #' @template details-x-y-xdist-ydist
 #' @eval rd_slabinterval_computed_variables(stat = StatSlabinterval)
 #' @eval rd_slabinterval_aesthetics(stat = StatSlabinterval)
-#' @eval rd_slabinterval_params(stat = StatSlabinterval, as_dots = TRUE)
+#' @eval rd_layer_params("slabinterval", stat = StatSlabinterval, as_dots = TRUE)
 #'
 #' @inheritParams geom_slabinterval
 #' @param geom Use to override the default connection between
@@ -367,6 +358,14 @@ compute_interval_slabinterval = function(
 #' if outlines in between the bars are drawn when the `slab_color` aesthetic is used. If `FALSE`
 #' (the default), the outline is drawn only along the tops of the bars; if `TRUE`, outlines in between
 #' bars are also drawn.
+#' @param density Density estimator for sample data. One of:
+#'  - A function which takes a numeric vector and returns a list with elements
+#'    `x` (giving grid points for the density estimator) and `y` (the
+#'    corresponding densities). \pkg{ggdist} provides a family of functions
+#'    following this format, including [density_unbounded()] and
+#'    [density_bounded()]. This format is also compatible with [stats::density()].
+#'  - A string giving the suffix of a function name that starts with `"density_"`;
+#'    e.g. `"bounded"` for `[density_bounded()]`.
 #' @param adjust If `slab_type` is `"pdf"`, bandwidth for the density estimator for sample data
 #' is adjusted by multiplying it by this value. See [density()] for more information.
 #' @param trim For sample data, should the density estimate be trimmed to the range of the
@@ -428,10 +427,10 @@ compute_interval_slabinterval = function(
 #' # a reference (e.g. a prior distribution).
 #' # But you may wish to account for sample size if using these geoms
 #' # for something other than visualizing posteriors; in which case
-#' # you can use stat(f*n):
+#' # you can use after_stat(f*n):
 #' df %>%
 #'   ggplot(aes(x = group, y = value)) +
-#'   stat_eye(aes(thickness = stat(pdf*n)))
+#'   stat_eye(aes(thickness = after_stat(pdf*n)))
 #'
 #'
 #' # EXAMPLES ON ANALYTICAL DISTRIBUTIONS
@@ -476,7 +475,7 @@ compute_interval_slabinterval = function(
 #' # see vignette("slabinterval") for many more examples.
 #'
 #' @name stat_slabinterval
-#' @importFrom distributional dist_wrap dist_missing dist_sample
+#' @importFrom distributional dist_wrap dist_missing dist_sample is_distribution
 NULL
 
 #' @rdname ggdist-ggproto
@@ -484,6 +483,20 @@ NULL
 #' @usage NULL
 #' @export
 StatSlabinterval = ggproto("StatSlabinterval", AbstractStatSlabinterval,
+  aes_docs = defaults(list(
+    x = 'x position of the geometry (when orientation = `"vertical"`); or sample data to be summarized
+    (when `orientation = "horizontal"` with sample data).',
+    y = 'y position of the geometry (when orientation = `"horizontal"`); or sample data to be summarized
+    (when `orientation = "vertical"` with sample data).',
+    xdist = 'When using analytical distributions, distribution to map on the x axis: a \\pkg{distributional}
+    object (e.g. [dist_normal()]) or a [posterior::rvar()] object.',
+    ydist = 'When using analytical distributions, distribution to map on the y axis: a \\pkg{distributional}
+    object (e.g. [dist_normal()]) or a [posterior::rvar()] object.',
+    dist = 'When using analytical distributions, a name of a distribution (e.g. `"norm"`), a
+    \\pkg{distributional} object (e.g. [dist_normal()]), or a [posterior::rvar()] object. See **Details**.',
+    args = 'Distribution arguments (`args` or `arg1`, ... `arg9`). See **Details**.'
+  ), AbstractStatSlabinterval$aes_docs),
+
   default_aes = defaults(aes(
     xdist = NULL,
     ydist = NULL,
@@ -510,6 +523,7 @@ StatSlabinterval = ggproto("StatSlabinterval", AbstractStatSlabinterval,
   default_params = defaults(list(
     slab_type = "pdf",
     p_limits = c(NA, NA),
+    density = "unbounded",
     adjust = 1,
     trim = TRUE,
     expand = FALSE,
@@ -518,6 +532,8 @@ StatSlabinterval = ggproto("StatSlabinterval", AbstractStatSlabinterval,
 
     point_interval = "median_qi"
   ), AbstractStatSlabinterval$default_params),
+
+  layer_function = "layer_slabinterval",
 
   # orientation auto-detection here is different from base AbstractStatSlabinterval
   # (main_is_orthogonal needs to be FALSE)
@@ -596,12 +612,45 @@ StatSlabinterval = ggproto("StatSlabinterval", AbstractStatSlabinterval,
 
       data = remove_missing(data, na.rm, x, name = "stat_slabinterval")
 
+      if (inherits(data[[x]], "mapped_discrete") && is_integerish(data[[x]])) {
+        # integer-like mapped discrete data needs to be converted to integer here
+        # so that it will be treated as a discrete distribution later
+        # (e.g. by distr_is_discrete())
+        data[[x]] = as.integer(data[[x]])
+      }
+
       # dist aesthetic is not provided but x aesthetic is, and x is not a dist
       # this means we need to wrap it as a dist_sample
       data = summarise_by(data, c("PANEL", y, "group"), function(d) {
-        data.frame(dist = dist_sample(list(trans$inverse(as.numeric(d[[x]])))))
+        data.frame(dist = dist_sample(list(trans$inverse(d[[x]]))))
       })
       data[[x]] = median(data$dist)
+    }
+
+    # handle logical distributions: logical distributions don't play well with
+    # numeric scales, so we use a bit of a hack and convert them to integers
+    # by adding 0L to them
+    if (is_distribution(data$dist)) {
+      is_logical = map_lgl_(data$dist, distr_is_logical)
+      data$dist[is_logical] = data$dist[is_logical] + 0L
+    }
+
+    # handle rvar factors / categorical dists: our modified version of Layer$compute_aesthetics will
+    # already have ensured the scale is discrete with appropriate limits, we
+    # just need to adjust the rvar (or wrap the distribution) to have the same levels as the scale limits
+    # (in case levels have been re-ordered / added / removed)
+    if (inherits(data$dist, "rvar_factor")) {
+      data$dist = posterior::rvar_factor(
+        data$dist,
+        levels = scales[[x]]$get_limits(),
+        ordered = inherits(data$dist, "rvar_ordered")
+      )
+    } else if (distr_is_factor_like(data$dist)) {
+      new_levels = scales[[x]]$get_limits()
+      data$dist = .dist_wrapped_categorical(
+        data$dist,
+        new_levels = new_levels
+      )
     }
 
     ggproto_parent(AbstractStatSlabinterval, self)$compute_panel(
@@ -623,6 +672,40 @@ StatSlabinterval = ggproto("StatSlabinterval", AbstractStatSlabinterval,
 stat_slabinterval = make_stat(StatSlabinterval, geom = "slabinterval")
 
 
+# layer for slabinterval --------------------------------------------------
+
+#' Alternative to ggplot2::layer() which adds necessary hooks to the Layer for
+#' stat_slabinterval. See the layer_function property of StatSlabinterval
+#' @noRd
+layer_slabinterval = function(...) {
+  l = layer(...)
+  ggproto(NULL, l,
+    compute_aesthetics = function(self, data, plot) {
+      data = ggproto_parent(l, self)$compute_aesthetics(data, plot)
+
+      # factor-like dists: must be handled in a two-step process: first, here
+      # we have to ensure the x/y scale is setup correctly as a discrete scale
+      # with levels from the distribution. Then, in compute_panel, we will convert
+      # factor-like dists and rvars to integers using the x/y scale.
+      for (xy in c("x", "y")) {
+        dist = paste0(xy, "dist")
+        if (distr_is_factor_like(data[[dist]])) {
+          # ensure a discrete scale has been added to the plot with appropriate limits
+          scale = plot$scales$get_scales(xy)
+          if (is.null(scale)) {
+            scale = utils::getFromNamespace(paste0("scale_", xy, "_discrete"), "ggplot2")()
+            plot$scales$add(scale)
+          }
+          scale$limits = scale$limits %||% distr_levels(data[[dist]])
+          scale$train(posterior::draws_of(data[[dist]]))
+        }
+      }
+      data
+    }
+  )
+}
+
+
 # shortcut stats ----------------------------------------------------------
 
 StatHalfeye = StatSlabinterval
@@ -634,7 +717,7 @@ stat_halfeye = stat_slabinterval
 
 StatEye = ggproto("StatEye", StatSlabinterval,
   default_aes = defaults(aes(
-    side = stat("both"),
+    side = after_stat("both"),
   ), StatSlabinterval$default_aes)
 )
 #' @eval rd_slabinterval_shortcut_stat("eye", "eye (violin + interval)", geom_name = "slabinterval")
@@ -643,9 +726,9 @@ stat_eye = make_stat(StatEye, geom = "slabinterval")
 
 StatCcdfinterval = ggproto("StatCcdfinterval", StatSlabinterval,
   default_aes = defaults(aes(
-    thickness = stat(thickness(1 - cdf)),
-    justification = stat(0.5),
-    side = stat("topleft"),
+    thickness = after_stat(thickness(1 - cdf)),
+    justification = after_stat(0.5),
+    side = after_stat("topleft"),
   ), StatSlabinterval$default_aes),
 
   default_params = defaults(list(
@@ -660,7 +743,7 @@ stat_ccdfinterval = make_stat(StatCcdfinterval, geom = "slabinterval")
 
 StatCdfinterval = ggproto("StatCdfinterval", StatCcdfinterval,
   default_aes = defaults(aes(
-    thickness = stat(thickness(cdf)),
+    thickness = after_stat(thickness(cdf)),
   ), StatCcdfinterval$default_aes),
 
   default_params = defaults(list(
@@ -673,9 +756,9 @@ stat_cdfinterval = make_stat(StatCdfinterval, geom = "slabinterval")
 
 StatGradientinterval = ggproto("StatGradientinterval", StatSlabinterval,
   default_aes = defaults(aes(
-    justification = stat(0.5),
-    thickness = stat(thickness(1)),
-    slab_alpha = stat(f)
+    justification = after_stat(0.5),
+    thickness = after_stat(thickness(1)),
+    slab_alpha = after_stat(f)
   ), StatSlabinterval$default_aes),
 
   default_params = defaults(list(

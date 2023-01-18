@@ -10,10 +10,11 @@ bin_dots(
   binwidth,
   heightratio = 1,
   stackratio = 1,
-  layout = c("bin", "weave", "swarm"),
+  layout = c("bin", "weave", "hex", "swarm"),
   side = c("topright", "top", "right", "bottomleft", "bottom", "left", "topleft",
     "bottomright", "both"),
-  orientation = c("horizontal", "vertical", "y", "x")
+  orientation = c("horizontal", "vertical", "y", "x"),
+  overlaps = "nudge"
 )
 }
 \arguments{
@@ -28,18 +29,21 @@ bin_dots(
 \item{stackratio}{ratio of dot height to vertical distance between dot
 centers}
 
-\item{layout}{The layout method used for the dots:
-\itemize{
+\item{layout}{The layout method used
+for the dots: \itemize{
 \item \code{"bin"} (default): places dots on the off-axis at the midpoint of their bins as in the classic Wilkinson dotplot.
 This maintains the alignment of rows and columns in the dotplot. This layout is slightly different from the
 classic Wilkinson algorithm in that: (1) it nudges bins slightly to avoid overlapping bins and (2) if
 the input data are symmetrical it will return a symmetrical layout.
 \item \code{"weave"}: uses the same basic binning approach of \code{"bin"}, but places dots in the off-axis at their actual
-positions (modulo overlaps, which are nudged out of the way). This maintains the alignment of rows but does not
-align dots within columns. Does not work well when \code{side = "both"}.
+positions (unless \code{overlaps = "nudge"}, in which case overlaps may be nudged out of the way). This maintains
+the alignment of rows but does not align dots within columns.
+\item \code{"hex"}: uses the same basic binning approach of \code{"bin"}, but alternates placing dots \code{+ binwidth/4} or
+\code{- binwidth/4} in the off-axis from the bin center. This allows hexagonal packing by setting a \code{stackratio}
+less than 1 (something like \code{0.9} tends to work).
 \item \code{"swarm"}: uses the \code{"compactswarm"} layout from \code{\link[beeswarm:beeswarm]{beeswarm::beeswarm()}}. Does not maintain alignment of rows or
 columns, but can be more compact and neat looking, especially for sample data (as opposed to quantile
-dotplots of theoretical distributions, which may look better with \code{"bin"} or \code{"weave"}).
+dotplots of theoretical distributions, which may look better with \code{"bin"}, \code{"weave"}, or \code{"hex"}).
 }}
 
 \item{side}{Which side to place the slab on. \code{"topright"}, \code{"top"}, and \code{"right"} are synonyms
@@ -62,6 +66,20 @@ variable and that dots will be stacked up in the \code{x} direction.
 For compatibility with the base ggplot naming scheme for \code{orientation},
 \code{"x"} can be used as an alias for \code{"vertical"} and \code{"y"} as an alias for
 \code{"horizontal"}.}
+
+\item{overlaps}{How to handle overlapping dots or bins in the \code{"bin"},
+\code{"weave"}, and \code{"hex"} layouts (dots never overlap in the \code{"swarm"} layout).
+For the purposes of this argument, dots are only considered to be overlapping
+if they would be overlapping when \code{dotsize = 1} and \code{stackratio = 1}; i.e.
+if you set those arguments to other values, overlaps may still occur.
+One of: \itemize{
+\item \code{"keep"}: leave overlapping dots as they are. Dots may overlap
+(usually only slightly) in the \code{"bin"}, \code{"weave"}, and \code{"hex"} layouts.
+\item \code{"nudge"}: nudge overlapping dots out of the way. Overlaps are avoided
+using a constrained optimization which minimizes the squared distance of
+dots to their desired positions, subject to the constraint that adjacent
+dots do not overlap.
+}}
 }
 \value{
 A \code{data.frame} with three columns:

@@ -18,14 +18,11 @@ test_that("slabinterval aesthetic documention generator works", {
   expect_match(geom_stat_output, "@section Aesthetics:")
   expect_match(geom_stat_output, "\\itemize", fixed = TRUE)
   expect_match(geom_stat_output, "\\item{`group`", fixed = TRUE)
-
-  aesthetic_output = rd_aesthetics_sections(geom_aes_sections = list("Color" = list("colour" = "foo")))
-  expect_match(aesthetic_output, "\\item{`colour`: foo}", fixed = TRUE)
 })
 
 test_that("slabinterval parameter documention generator works", {
 
-  geom_output = paste0(rd_slabinterval_params("slabinterval"), collapse = "\n")
+  geom_output = paste0(rd_layer_params("slabinterval"), collapse = "\n")
   expect_match(geom_output, "@param na.rm", fixed = TRUE)
 
   # parameters without documentation raise a warning
@@ -34,7 +31,7 @@ test_that("slabinterval parameter documention generator works", {
       foo = "bar"
     ), GeomSlabinterval$default_params)
   )
-  expect_error(rd_slabinterval_params("test"), "Missing docs for params: foo")
+  expect_error(rd_layer_params("test"), "Missing docs for params: foo")
 
 })
 
@@ -58,4 +55,8 @@ test_that("shortcut geom_slabinterval documentation generator works", {
   expect_match(geom_output, "@title Multiple-interval plot (shortcut geom)", fixed = TRUE)
   expect_match(geom_output, "interval_size_range = c(1, 6)", fixed = TRUE)
 
+})
+
+test_that("param docs work", {
+  expect_match(rd_param_slab_side(), "@param side")
 })

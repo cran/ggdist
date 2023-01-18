@@ -19,10 +19,10 @@ geom_interval(
 )
 }
 \arguments{
-\item{mapping}{Set of aesthetic mappings created by \code{\link[ggplot2:aes]{aes()}} or
-\code{\link[ggplot2:aes_]{aes_()}}. If specified and \code{inherit.aes = TRUE} (the
-default), it is combined with the default mapping at the top level of the
-plot. You must supply \code{mapping} if there is no plot mapping.}
+\item{mapping}{Set of aesthetic mappings created by \code{\link[ggplot2:aes]{aes()}}. If specified and
+\code{inherit.aes = TRUE} (the default), it is combined with the default mapping
+at the top level of the plot. You must supply \code{mapping} if there is no plot
+mapping.}
 
 \item{data}{The data to be displayed in this layer. There are three
 options:
@@ -40,14 +40,16 @@ will be used as the layer data. A \code{function} can be created
 from a \code{formula} (e.g. \code{~ head(.x, 10)}).}
 
 \item{stat}{The statistical transformation to use on the data for this
-layer, as a string.}
+layer, either as a \code{ggproto} \code{Geom} subclass or as a string naming the
+stat stripped of the \code{stat_} prefix (e.g. \code{"count"} rather than
+\code{"stat_count"})}
 
 \item{position}{Position adjustment, either as a string, or the result of a call to a position adjustment function.
 Setting this equal to \code{"dodge"} (\code{\link[=position_dodge]{position_dodge()}}) or \code{"dodgejust"} (\code{\link[=position_dodgejust]{position_dodgejust()}}) can be useful if
 you have overlapping geometries.}
 
 \item{...}{Other arguments passed to \code{\link[=layer]{layer()}}. These are often aesthetics, used to set an aesthetic
-to a fixed value, like \code{colour = "red"} or \code{size = 3} (see \strong{Aesthetics}, below). They may also be
+to a fixed value, like \code{colour = "red"} or \code{linewidth = 3} (see \strong{Aesthetics}, below). They may also be
 parameters to the paired geom/stat.}
 
 \item{orientation}{Whether this geom is drawn horizontally or vertically. One of:
@@ -62,7 +64,7 @@ groups. For each group, uses the \code{y}, \code{ymin}, \code{ymax}, and \code{t
 draw points, intervals, and slabs.
 }
 For compatibility with the base ggplot naming scheme for \code{orientation}, \code{"x"} can be used as an alias
-for \code{"vertical"} and \code{"y"} as an alias for \code{"horizontal"} (tidybayes had an \code{orientation} parameter
+for \code{"vertical"} and \code{"y"} as an alias for \code{"horizontal"} (\pkg{ggdist} had an \code{orientation} parameter
 before base ggplot did, hence the discrepancy).}
 
 \item{interval_size_range}{A length-2 numeric vector. This geom scales the raw size aesthetic values when drawing interval and point
@@ -73,10 +75,10 @@ function), and \code{interval_size_range} indicates the desired output range of 
 the actual sizes used to draw intervals). Most of the time it is not recommended to change the value of this
 argument, as it may result in strange scaling of legends; this argument is a holdover from earlier versions
 that did not have size aesthetics targeting the point and interval separately. If you want to adjust the
-size of the interval or points separately, you can instead use the \code{interval_size} or \code{point_size}
+size of the interval or points separately, you can also use the \code{linewidth} or \code{point_size}
 aesthetics; see \link{scales}.}
 
-\item{interval_size_domain}{A length-2 numeric vector giving the minimum and maximum of the values of the size aesthetic that will be
+\item{interval_size_domain}{A length-2 numeric vector giving the minimum and maximum of the values of the \code{size} and \code{linewidth} aesthetics that will be
 translated into actual sizes for intervals drawn according to \code{interval_size_range} (see the documentation
 for that argument.)}
 
@@ -160,13 +162,18 @@ scale to "ramp" to another color. See \code{\link[=scale_fill_ramp]{scale_fill_r
 \strong{Line aesthetics}
 
 \itemize{
-\item{\code{size}: Width of the outline around the \strong{slab} (if visible). Also determines the width of
-the line used to draw the \strong{interval} and the size of the \strong{point}, but raw
+\item{\code{linewidth}: Width of the line used to draw the \strong{interval} (except with \code{\link[=geom_slab]{geom_slab()}}: then
+it is the width of the \strong{slab}). With composite geometries including an interval and slab,
+use \code{slab_linewidth} to set the line width of the \strong{slab} (see below). For \strong{interval}, raw
+\code{linewidth} values are transformed according to the \code{interval_size_domain} and \code{interval_size_range}
+parameters of the \code{geom} (see above).}
+\item{\code{size}: Determines the size of the \strong{point}. If \code{linewidth} is not provided, \code{size} will
+also determines the width of the line used to draw the \strong{interval} (this allows line width and
+point size to be modified together by setting only \code{size} and not \code{linewidth}). Raw
 \code{size} values are transformed according to the \code{interval_size_domain}, \code{interval_size_range},
-and \code{fatten_point} parameters of the \code{geom} (see above). Use the \code{slab_size},
-\code{interval_size}, or \code{point_size} aesthetics (below) to set sub-geometry line widths separately
-(note that when size is set directly using the override aesthetics, interval and point
-sizes are not affected by \code{interval_size_domain}, \code{interval_size_range}, and \code{fatten_point}).}
+and \code{fatten_point} parameters of the \code{geom} (see above). Use the \code{point_size} aesthetic
+(below) to set sub-geometry size directly without applying the effects of
+\code{interval_size_domain}, \code{interval_size_range}, and \code{fatten_point}.}
 \item{\code{stroke}: Width of the outline around the \strong{point} sub-geometry.}
 \item{\code{linetype}: Type of line (e.g., \code{"solid"}, \code{"dashed"}, etc) used to draw the \strong{interval}
 and the outline of the \strong{slab} (if it is visible). Use the \code{slab_linetype} or
@@ -178,8 +185,13 @@ and the outline of the \strong{slab} (if it is visible). Use the \code{slab_line
 \itemize{
 \item{\code{interval_colour}: (or \code{interval_color}) Override for \code{colour}/\code{color}: the color of the interval.}
 \item{\code{interval_alpha}: Override for \code{alpha}: the opacity of the interval.}
-\item{\code{interval_size}: Override for \code{size}: the line width of the interval.}
 \item{\code{interval_linetype}: Override for \code{linetype}: the line type of the interval.}
+}
+
+\strong{Deprecated aesthetics}
+
+\itemize{
+\item{\code{interval_size}: Use \code{interval_linewidth}.}
 }
 
 \strong{Other aesthetics} (these work as in standard \code{geom}s)

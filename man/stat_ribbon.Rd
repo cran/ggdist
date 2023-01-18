@@ -19,10 +19,10 @@ stat_ribbon(
 )
 }
 \arguments{
-\item{mapping}{Set of aesthetic mappings created by \code{\link[ggplot2:aes]{aes()}} or
-\code{\link[ggplot2:aes_]{aes_()}}. If specified and \code{inherit.aes = TRUE} (the
-default), it is combined with the default mapping at the top level of the
-plot. You must supply \code{mapping} if there is no plot mapping.}
+\item{mapping}{Set of aesthetic mappings created by \code{\link[ggplot2:aes]{aes()}}. If specified and
+\code{inherit.aes = TRUE} (the default), it is combined with the default mapping
+at the top level of the plot. You must supply \code{mapping} if there is no plot
+mapping.}
 
 \item{data}{The data to be displayed in this layer. There are three
 options:
@@ -47,7 +47,7 @@ Setting this equal to \code{"dodge"} (\code{\link[=position_dodge]{position_dodg
 you have overlapping geometries.}
 
 \item{...}{Other arguments passed to \code{\link[=layer]{layer()}}. These are often aesthetics, used to set an aesthetic
-to a fixed value, like \code{colour = "red"} or \code{size = 3} (see \strong{Aesthetics}, below). They may also be
+to a fixed value, like \code{colour = "red"} or \code{linewidth = 3} (see \strong{Aesthetics}, below). They may also be
 parameters to the paired geom/stat. When paired with the default geom, \code{\link[=geom_lineribbon]{geom_lineribbon()}},
 these include:
 \describe{
@@ -89,7 +89,7 @@ groups. For each group, uses the \code{y}, \code{ymin}, \code{ymax}, and \code{t
 draw points, intervals, and slabs.
 }
 For compatibility with the base ggplot naming scheme for \code{orientation}, \code{"x"} can be used as an alias
-for \code{"vertical"} and \code{"y"} as an alias for \code{"horizontal"} (tidybayes had an \code{orientation} parameter
+for \code{"vertical"} and \code{"y"} as an alias for \code{"horizontal"} (\pkg{ggdist} had an \code{orientation} parameter
 before base ggplot did, hence the discrepancy).}
 
 \item{na.rm}{If \code{FALSE}, the default, missing values are removed with a warning. If \code{TRUE}, missing
@@ -119,7 +119,7 @@ function.
 Roughly equivalent to:
 
 \if{html}{\out{<div class="sourceCode">}}\preformatted{stat_lineribbon(
-  aes(colour = stat(I(NA)))
+  show_point = FALSE
 )
 }\if{html}{\out{</div>}}
 }
@@ -155,8 +155,8 @@ of those functions.
 \section{Computed Variables}{
 
 The following variables are computed by this stat and made available for
-use in aesthetic specifications (\code{\link[=aes]{aes()}}) using the \code{\link[=stat]{stat()}} or \code{\link[=after_stat]{after_stat()}}
-functions:
+use in aesthetic specifications (\code{\link[=aes]{aes()}}) using the \code{\link[=after_stat]{after_stat()}}
+function or the \code{after_stat} argument of \code{\link[=stage]{stage()}}:
 \itemize{
 \item \code{x} or \code{y}: For slabs, the input values to the slab function.
 For intervals, the point summary from the interval function. Whether it is \code{x} or \code{y} depends on \code{orientation}

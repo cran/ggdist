@@ -126,11 +126,12 @@ test_that("side and justification can vary", {
 
   vdiffr::expect_doppelganger("varying side",
     df %>%
-      ggplot(aes(x = x, y = g, thickness = y,
-        side = ifelse(g == "a", "top", "bottom"),
+      ggplot(aes(x = x, y = g, color = g, thickness = y,
+        side = g,
         scale = ifelse(g == "a", 0.5, 0.25)
       )) +
-      geom_slab()
+      geom_slab() +
+      scale_side_mirrored()
   )
 
   vdiffr::expect_doppelganger("varying side and just",
@@ -226,9 +227,56 @@ test_that("NAs in thickness produce gaps", {
   skip_if_no_vdiffr()
 
   vdiffr::expect_doppelganger("slabinterval with NAs in thickness", {
-    data.frame(y = c(NA, 1:2, NA, 2:1, NA), x = 0:6) %>%
-      ggplot(aes(x, y = 0, thickness = y)) +
+    rbind(
+      data.frame(y = "gaps", t = c(NA, 1:2, NA, 2:1, NA), x = 0:6),
+      data.frame(y = "blank", t = NA, x = 0:6)
+    ) %>%
+      ggplot(aes(x, y, thickness = t)) +
       geom_slab(color = "black")
   })
 
+  # when side = "both", should not see outlines wrap around
+  vdiffr::expect_doppelganger("side = both with NAs in thickness", {
+    data.frame(y = "gaps", t = c(NA, 1:2, NA, 2:1, NA), x = 0:6) %>%
+      ggplot(aes(x, y, thickness = t)) +
+      geom_slab(color = "black", side = "both")
+  })
+})
+
+test_that("all-NA thickness produces no slab", {
+  grob = layer_grob(ggplot() + geom_slab(aes(x = 1, thickness = NA)))
+  expect_length(grob, 1)
+  expect_is(grob[[1]], "gTree")
+  expect_equal(grob[[1]]$children, gList())
+})
+
+test_that("NAs and Infs in x work", {
+  skip_if_no_vdiffr()
+
+  expect_warning(
+    vdiffr::expect_doppelganger("Inf and NA in x works",
+      ggplot() +
+        geom_slab(aes(y = "NA", x = c(NA,2:4,NA), thickness = c(0,1,2,0.5,0.25)), color = "black") +
+        geom_slab(aes(y = "Inf", x = c(-Inf,2:4,Inf), thickness = c(0,1,2,0.5,0.25)), color = "black")
+    ),
+    "Removed 2 rows containing missing values"
+  )
+})
+
+# NA width / xmax -----------------------------------------------------------
+
+test_that("NA width works", {
+  skip_if_no_vdiffr()
+
+  expect_warning(
+    vdiffr::expect_doppelganger("missing width",
+      data.frame(
+        y = 1:6, f = c(0,1,0,0,Inf,0),
+        g = rep(c("a","b"), each = 3),
+        w = rep(c(1, NA), each = 3)
+      ) %>% ggplot(aes(x = g, y = y, thickness = f, width = w)) +
+        geom_slab(color = "red")
+    ),
+    "Removed 3 rows"
+  )
 })

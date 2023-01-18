@@ -24,7 +24,7 @@ test_that("distribution eye plots work with the args aesthetic", {
     vdiffr::expect_doppelganger("vertical eye using args without na.rm",
       p + stat_dist_eye(aes(x = dist), n = 20)
     ),
-    "Removed 2 rows containing missing values"
+    "Removed 2 rows containing\\s+missing values"
   )
 
   vdiffr::expect_doppelganger("vertical eye using args",
@@ -174,7 +174,7 @@ test_that("stat fill aesthetic on halfeye works", {
 
   vdiffr::expect_doppelganger("gradient fill/color halfeye",
     data.frame(dist = "norm", mean = 0, sd = 1) %>%
-      ggplot(aes(y = 1, dist = dist, arg1 = mean, arg2 = sd, slab_color = stat(x > 0), fill = stat(f), slab_linetype = stat(x > -1), slab_size = stat(x > 1))) +
+      ggplot(aes(y = 1, dist = dist, arg1 = mean, arg2 = sd, slab_color = after_stat(x > 0), fill = after_stat(f), slab_linetype = after_stat(x > -1), slab_linewidth = after_stat(x > 1))) +
       stat_dist_halfeye(n = 10)
   )
 })
@@ -405,7 +405,7 @@ test_that("pdf and cdf aesthetics work", {
     "norm", list(0, 1),
     "t", list(3)
   ) %>%
-    ggplot(aes(dist = dist, args = args, fill = dist, thickness = stat(pdf), slab_alpha = stat(cdf))) +
+    ggplot(aes(dist = dist, args = args, fill = dist, thickness = after_stat(pdf), slab_alpha = after_stat(cdf))) +
     scale_slab_alpha_continuous(range = c(0,1))
 
   vdiffr::expect_doppelganger("pdf and cdf on a slabinterval",
@@ -552,6 +552,236 @@ test_that("stat_dist_ detects discrete distributions", {
 
 })
 
+test_that("rvar_factor works", {
+  skip_if_not_installed("posterior", "1.3.1.9000")
+
+  p = ggplot_build(
+    ggplot() +
+      stat_slabinterval(aes(xdist = posterior::rvar(c("a","a","a","b","b","c"))))
+  )
+
+  slab_ref = data.frame(
+    thickness = c(3,3,3,3, 2,2,2,2, 1,1,1,1)/6,
+    pdf = c(3,3,3,3, 2,2,2,2, 1,1,1,1)/6,
+    cdf = NA_real_,
+    f = c(3,3,3,3, 2,2,2,2, 1,1,1,1)/6,
+    n = 6,
+    datatype = "slab",
+    .width = NA_real_,
+    stringsAsFactors = FALSE
+  )
+  slab_ref$x = ggplot2:::mapped_discrete(c(.5, 1,1, 1.5,1.5, 2,2, 2.5,2.5, 3,3, 3.5))
+  expect_equal(p$data[[1]][p$data[[1]]$datatype == "slab", names(slab_ref)], slab_ref)
+
+  interval_ref = data.frame(
+    datatype = "interval",
+    .width = c(0.66, 0.95),
+    stringsAsFactors = FALSE
+  )
+  interval_ref$xmin = ggplot2:::mapped_discrete(c(NA_real_, NA_real_))
+  interval_ref$xmax = ggplot2:::mapped_discrete(c(NA_real_, NA_real_))
+  interval_ref$x = ggplot2:::mapped_discrete(c(NA_real_, NA_real_))
+  attr(interval_ref, "row.names") = c(13L, 14L)
+  expect_equal(p$data[[1]][p$data[[1]]$datatype == "interval", names(interval_ref)], interval_ref)
+
+  x_scale = p$plot$scales$get_scales("x")
+  expect_true(x_scale$is_discrete())
+  expect_equal(x_scale$get_limits(), c("a","b","c"))
+})
+
+test_that("rvar_ordered works and integer dist_sample works", {
+  skip_if_not_installed("posterior", "1.3.1.9000")
+
+  p = ggplot_build(
+    ggplot() +
+      stat_slabinterval(aes(xdist = posterior::rvar_ordered(c("a","a","a","b","b","c"))))
+  )
+
+  slab_ref = data.frame(
+    thickness = c(3,3,3,3, 2,2,2,2, 1,1,1,1)/6,
+    pdf = c(3,3,3,3, 2,2,2,2, 1,1,1,1)/6,
+    cdf = c(0,0, 3,3,3,3, 5,5,5,5, 6,6)/6,
+    f = c(3,3,3,3, 2,2,2,2, 1,1,1,1)/6,
+    n = 6,
+    datatype = "slab",
+    .width = c(NA, .66,.66,.66,.66,.66,.66, .95,.95, NA,NA,NA),
+    stringsAsFactors = FALSE
+  )
+  slab_ref$x = ggplot2:::mapped_discrete(c(.5, 1,1, 1.5,1.5, 2,2, 2.5,2.5, 3,3, 3.5))
+  expect_equal(p$data[[1]][p$data[[1]]$datatype == "slab", names(slab_ref)], slab_ref)
+
+  interval_ref = data.frame(
+    datatype = "interval",
+    .width = c(0.66, 0.95),
+    stringsAsFactors = FALSE
+  )
+  interval_ref$xmin = ggplot2:::mapped_discrete(c(1, 1))
+  interval_ref$xmax = ggplot2:::mapped_discrete(c(2.15, 2.875))
+  interval_ref$x = ggplot2:::mapped_discrete(c(1.5, 1.5))
+  attr(interval_ref, "row.names") = c(13L, 14L)
+  expect_equal(p$data[[1]][p$data[[1]]$datatype == "interval", names(interval_ref)], interval_ref)
+
+  x_scale = p$plot$scales$get_scales("x")
+  expect_true(x_scale$is_discrete())
+  expect_equal(x_scale$get_limits(), c("a","b","c"))
+
+
+  # integer dist_sample
+  p = ggplot_build(
+    ggplot() +
+      stat_slabinterval(aes(xdist = dist_sample(list(c(1L,1L,1L,2L,2L,3L)))))
+  )
+  slab_ref$x = as.numeric(slab_ref$x)
+  expect_equal(p$data[[1]][p$data[[1]]$datatype == "slab", names(slab_ref)], slab_ref)
+  interval_ref$x = as.numeric(interval_ref$x)
+  interval_ref$xmin = as.numeric(interval_ref$xmin)
+  interval_ref$xmax = as.numeric(interval_ref$xmax)
+  expect_equal(p$data[[1]][p$data[[1]]$datatype == "interval", names(interval_ref)], interval_ref)
+})
+
+test_that("rvar_ordered works with modified scale limits", {
+  skip_if_not_installed("posterior", "1.3.1.9000")
+
+  p = ggplot_build(
+    ggplot() +
+      stat_slab(aes(xdist = posterior::rvar_ordered(c("a","a","a","c")))) +
+      scale_x_discrete(limits = c("a","b","c"))
+  )
+
+  slab_ref = data.frame(
+    thickness = c(3,3,3,3, 0,0,0,0, 1,1,1,1)/4,
+    pdf = c(3,3,3,3, 0,0,0,0, 1,1,1,1)/4,
+    cdf = c(0,0, 3,3,3,3, 3,3,3,3, 4,4)/4,
+    f = c(3,3,3,3, 0,0,0,0, 1,1,1,1)/4,
+    n = 4,
+    datatype = "slab",
+    .width = c(NA, .66,.66,.66,.66, .95,.95,.95,.95, NA,NA,NA),
+    stringsAsFactors = FALSE
+  )
+  slab_ref$x = ggplot2:::mapped_discrete(c(.5, 1,1, 1.5,1.5, 2,2, 2.5,2.5, 3,3, 3.5))
+  expect_equal(p$data[[1]][, names(slab_ref)], slab_ref)
+})
+
+test_that("dist_bernoulli works", {
+  p = ggplot_build(
+    ggplot() +
+      stat_slabinterval(aes(xdist = dist_bernoulli(0.8)))
+  )
+
+  slab_ref = data.frame(
+    thickness = c(0.2, 0.2, 0.2, 0.2, 0.8, 0.8, 0.8, 0.8),
+    pdf = c(0.2, 0.2, 0.2, 0.2, 0.8, 0.8, 0.8, 0.8),
+    cdf = c(0, 0, 0.2, 0.2, 0.2, 0.2, 1, 1),
+    f = c(0.2, 0.2, 0.2, 0.2, 0.8, 0.8, 0.8, 0.8),
+    n = Inf,
+    datatype = "slab",
+    .width = c(NA, 0.66, 0.66, 0.66, 0.66, 0.66, 0.66, NA),
+    x = c(-0.5, 0, 0, 0.5, 0.5, 1, 1, 1.5),
+    stringsAsFactors = FALSE
+  )
+  expect_equal(p$data[[1]][p$data[[1]]$datatype == "slab", names(slab_ref)], slab_ref)
+
+  interval_ref = data.frame(
+    datatype = "interval",
+    .width = c(0.66, 0.95),
+    xmin = c(0, 0),
+    xmax = c(1, 1),
+    x = c(1, 1),
+    stringsAsFactors = FALSE
+  )
+  attr(interval_ref, "row.names") = c(9L, 10L)
+  expect_equal(p$data[[1]][p$data[[1]]$datatype == "interval", names(interval_ref)], interval_ref)
+
+  x_scale = p$plot$scales$get_scales("x")
+  expect_true(!x_scale$is_discrete())
+  expect_equal(x_scale$get_limits(), c(0, 1))
+})
+
+test_that("dist_categorical works", {
+  p = ggplot_build(
+    ggplot() +
+      stat_slabinterval(aes(xdist = dist_categorical(list(3:1/6), list(c("a","b","c")))))
+  )
+
+  slab_ref = data.frame(
+    thickness = c(3,3,3,3, 2,2,2,2, 1,1,1,1)/6,
+    pdf = c(3,3,3,3, 2,2,2,2, 1,1,1,1)/6,
+    cdf = NA_real_,
+    f = c(3,3,3,3, 2,2,2,2, 1,1,1,1)/6,
+    n = Inf,
+    datatype = "slab",
+    .width = NA_real_,
+    stringsAsFactors = FALSE
+  )
+  slab_ref$x = ggplot2:::mapped_discrete(c(.5, 1,1, 1.5,1.5, 2,2, 2.5,2.5, 3,3, 3.5))
+  expect_equal(p$data[[1]][p$data[[1]]$datatype == "slab", names(slab_ref)], slab_ref)
+
+  interval_ref = data.frame(
+    datatype = "interval",
+    .width = c(0.66, 0.95),
+    stringsAsFactors = FALSE
+  )
+  interval_ref$xmin = ggplot2:::mapped_discrete(c(NA_real_, NA_real_))
+  interval_ref$xmax = ggplot2:::mapped_discrete(c(NA_real_, NA_real_))
+  interval_ref$x = ggplot2:::mapped_discrete(c(NA_real_, NA_real_))
+  attr(interval_ref, "row.names") = c(13L, 14L)
+  expect_equal(p$data[[1]][p$data[[1]]$datatype == "interval", names(interval_ref)], interval_ref)
+
+  x_scale = p$plot$scales$get_scales("x")
+  expect_true(x_scale$is_discrete())
+  expect_equal(x_scale$get_limits(), c("a","b","c"))
+
+  # with integer categorical distribution
+  p = ggplot_build(
+    ggplot() +
+      stat_slabinterval(aes(xdist = dist_categorical(list(3:1/6))))
+  )
+  expect_equal(p$data[[1]][p$data[[1]]$datatype == "slab", names(slab_ref)], slab_ref)
+  expect_equal(p$data[[1]][p$data[[1]]$datatype == "interval", names(interval_ref)], interval_ref)
+})
+
+test_that("dist_categorical works with modified scale limits", {
+  p = ggplot_build(
+    ggplot() +
+      stat_slab(aes(xdist = dist_categorical(list(c(3,1)/4), list(c("a","c"))))) +
+      scale_x_discrete(limits = c("a","b","c"))
+  )
+
+  slab_ref = data.frame(
+    thickness = c(3,3,3,3, NA,NA,NA,NA, 1,1,1,1)/4,
+    pdf = c(3,3,3,3, NA,NA,NA,NA, 1,1,1,1)/4,
+    cdf = NA_real_,
+    f = c(3,3,3,3, NA,NA,NA,NA, 1,1,1,1)/4,
+    n = Inf,
+    datatype = "slab",
+    .width = NA_real_,
+    stringsAsFactors = FALSE
+  )
+  slab_ref$x = ggplot2:::mapped_discrete(c(.5, 1,1, 1.5,1.5, 2,2, 2.5,2.5, 3,3, 3.5))
+  expect_equal(p$data[[1]][, names(slab_ref)], slab_ref)
+
+})
+
+test_that("dist_categorical works with explicit integer levels", {
+  p = ggplot_build(
+    ggplot() +
+      stat_slab(aes(xdist = dist_categorical(list(c(3,1)/4), list(c(1L,3L)))))
+  )
+
+  slab_ref = data.frame(
+    thickness = c(3,3,3,3, 1,1,1,1)/4,
+    pdf = c(3,3,3,3, 1,1,1,1)/4,
+    cdf = NA_real_,
+    f = c(3,3,3,3, 1,1,1,1)/4,
+    n = Inf,
+    datatype = "slab",
+    .width = NA_real_,
+    stringsAsFactors = FALSE
+  )
+  slab_ref$x = ggplot2:::mapped_discrete(c(.5, 1,1, 1.5,1.5, 2,2, 2.5))
+  expect_equal(p$data[[1]][, names(slab_ref)], slab_ref)
+})
+
 
 # grouping order ----------------------------------------------------------
 
@@ -680,14 +910,53 @@ test_that("rvars work", {
   skip_if_not_installed("posterior")
 
 
+  set.seed(1234)
   p = tibble(
       mu = 1:2,
       x = posterior::rvar_rng(rnorm, 2, mu, 1:2)
     ) %>%
-    ggplot(aes(y = mu, xdist = x, fill = stat(cdf)))
+    ggplot(aes(y = mu, xdist = x, fill = after_stat(cdf)))
 
   vdiffr::expect_doppelganger("halfeye with rvar and cdf",
     p + stat_halfeye(n = 20, trim = FALSE, expand = TRUE, slab_color = "black")
+  )
+})
+
+
+# missing rvars and dists -------------------------------------------------
+
+test_that("missing distributions work", {
+  expect_warning(
+    expect_equal(
+      layer_data(ggplot() + stat_slabinterval(aes(xdist = dist_missing()))),
+      data.frame()
+    ),
+    "Removed 1 rows containing\\s+missing values"
+  )
+})
+
+test_that("missing rvars work", {
+  skip_if_not_installed("posterior")
+
+  expect_warning(
+    expect_equal(
+      layer_data(ggplot() + stat_slabinterval(aes(xdist = posterior::rvar(c(1,NA))))),
+      data.frame()
+    ),
+    "Removed 1 rows containing\\s+missing values"
+  )
+
+  skip_if_not_installed("posterior", "1.3.1.9000")
+  expect_warning(
+    expect_equal(
+      layer_data(
+        ggplot() +
+          stat_slabinterval(aes(xdist = posterior::rvar(c("a","b")))) +
+          scale_x_discrete(limits = "a")
+        ),
+      data.frame()
+    ),
+    "Removed 1 rows containing\\s+missing values"
   )
 })
 

@@ -17,8 +17,9 @@
 #' @param heightratio ratio of bin width to dot height
 #' @param stackratio ratio of dot height to vertical distance between dot
 #' centers
-#' @template param-dots-layout
-#' @template param-slab-side
+#' @eval rd_param_dots_layout()
+#' @eval rd_param_dots_overlaps()
+#' @eval rd_param_slab_side()
 #' @param orientation Whether the dots are laid out horizontally or vertically.
 #' Follows the naming scheme of [geom_slabinterval()]:
 #'
@@ -65,9 +66,10 @@
 bin_dots = function(x, y, binwidth,
   heightratio = 1,
   stackratio = 1,
-  layout = c("bin", "weave", "swarm"),
+  layout = c("bin", "weave", "hex", "swarm"),
   side = c("topright", "top", "right", "bottomleft", "bottom", "left", "topleft", "bottomright", "both"),
-  orientation = c("horizontal", "vertical", "y", "x")
+  orientation = c("horizontal", "vertical", "y", "x"),
+  overlaps = "nudge"
 ) {
   layout = match.arg(layout)
   side = match.arg(side)
@@ -87,11 +89,8 @@ bin_dots = function(x, y, binwidth,
   d$order = seq_len(nrow(d))
   d = d[order(d[[x]]), ]
 
-  # binning from the center (automatic_bin) is only useful in the "bin" layout
-  # and can give weird results with "weave" (and is pointless on "swarm")
-  bin_method = if (layout == "bin") automatic_bin else wilkinson_bin_to_right
-
   # bin the dots
+  bin_method = select_bin_method(d[[x]])
   h = dot_heap(d[[x]], binwidth = binwidth, heightratio = heightratio, stackratio = stackratio, bin_method = bin_method)
   d$bin = h$binning$bins
 
@@ -102,8 +101,9 @@ bin_dots = function(x, y, binwidth,
     both = 0
   )
   switch(layout,
-    bin = {
-      bin_midpoints = nudge_bins(h$binning$bin_midpoints, binwidth)
+    bin =, hex = {
+      bin_midpoints = h$binning$bin_midpoints
+      if (overlaps == "nudge") bin_midpoints = nudge_bins(bin_midpoints, binwidth, h$bin_counts)
       d[[x]] = bin_midpoints[h$binning$bins]
       # maintain original data order within each bin when finding y positions
       d = d[order(d$bin, d$order), ]
@@ -115,13 +115,12 @@ bin_dots = function(x, y, binwidth,
         seq_fun = if (side == "both") seq_interleaved_centered else seq_interleaved
         bin_df = bin_df[seq_fun(nrow(bin_df)),]
         bin_df$row = seq_len(nrow(bin_df))
+        if (side == "both") bin_df$row = bin_df$row - round((nrow(bin_df) - 1) / 2)
         bin_df
       })
 
-      # nudge values within each row to ensure there are no overlaps
-      # (rows are not well-defined in side = "both" for this to work,
-      # so we skip this step in that case)
-      if (side != "both") {
+      if (overlaps == "nudge") {
+        # nudge values within each row to ensure there are no overlaps
         d = ddply_(d, "row", function(row_df) {
           row_df[[x]] = nudge_bins(row_df[[x]], binwidth)
           row_df
@@ -147,20 +146,35 @@ bin_dots = function(x, y, binwidth,
     }
   )
 
-  # determine y positions (for bin/weave)
-  if (layout %in% c("bin", "weave")) {
+  # determine y positions (for bin/weave) and also x offsets (for hex)
+  if (layout %in% c("bin", "weave", "hex")) {
     d = ddply_(d, "bin", function(bin_df) {
       y_offset = seq(0, h$y_spacing * (nrow(bin_df) - 1), length.out = nrow(bin_df))
+      row_offset = 0
       switch_side(side, orientation,
         topright = {},
         bottomleft = {
           y_offset = - y_offset
         },
         both = {
-          y_offset = y_offset - h$y_spacing * (nrow(bin_df) - 1) / 2
+          row_offset = (nrow(bin_df) - 1) / 2
+          if (layout %in% c("weave", "hex")) {
+            # weave and hex require rows to be aligned exactly so that x offsets
+            # can be applied within rows
+            row_offset = round(row_offset)
+          }
+          y_offset = y_offset - h$y_spacing * row_offset
         }
       )
       bin_df[[y]] = bin_df[[y]] + y_start + y_offset
+
+      if (layout == "hex") {
+        # depending on whether this is an even or odd row, need to start the
+        # x offset to the left or to the right
+        x_offset_start = if (row_offset %% 2 == 0) 1 else -1
+        bin_df[[x]] = bin_df[[x]] + rep_len(c(-0.25, 0.25) * x_offset_start, nrow(bin_df)) * binwidth
+      }
+
       bin_df
     })
   }
@@ -235,7 +249,8 @@ find_dotplot_binwidth = function(x, maxheight, heightratio = 1, stackratio = 1) 
   } else{
     min(nclass.scott(x), nclass.FD(x), nclass.Sturges(x))
   }
-  dot_heap_ = function(...) dot_heap(x, ..., maxheight = maxheight, heightratio = heightratio, stackratio = stackratio)
+  bin_method = select_bin_method(x)
+  dot_heap_ = function(...) dot_heap(x, ..., maxheight = maxheight, heightratio = heightratio, stackratio = stackratio, bin_method = bin_method)
   min_h = dot_heap_(nbins = min_nbins)
 
   if (!min_h$is_valid) {
@@ -361,71 +376,150 @@ dot_heap = function(x, nbins = NULL, binwidth = NULL, maxheight = Inf, heightrat
 
 # modified wilkinson methods ----------------------------------------------
 
-# this implements a variant of the basic wilkinson binning method, a single
-# left-to-right sweep.
-# x must be sorted
-wilkinson_bin_to_right = function(x, width, direction = 1) {
+#' a variant of the basic wilkinson binning method, a single left-to-right sweep
+#' @param x sorted numeric vector
+#' @param width bin width
+#' @noRd
+wilkinson_bin_to_right = function(x, width) {
   if (length(x) == 0) {
     return(list(
       bins = integer(0),
-      bin_midpoints = NULL
+      bin_midpoints = numeric(0),
+      bin_left = numeric(0),
+      bin_right = numeric(0)
     ))
   }
 
   # determine bins and midpoints of bins
-  bins = c(1L, rep(NA_integer_, length(x) - 1))
-  bin_midpoints = numeric()
+  bins = rep(NA_integer_, length(x))
+  bins[[1]] = 1L
   current_bin = 1L
   first_x = x[[1]]
   n = 1
   for (i in seq_along(x)[-1]) {
-    x_first_x_diff = abs(x[[i]] - first_x)
-    # This is equivalent to x_first_x_diff >= width but it accounts for machine precision.
+    # This is equivalent to x[[i]] - first_x >= width but it accounts for machine precision.
     # If we instead used `>=` directly some things that should be symmetric will not be
-    if (x_first_x_diff > width || abs(x_first_x_diff - width) < .Machine$double.eps) {
-      bin_midpoints[[current_bin]] = (x[[i - 1]] + first_x) / 2
+    if (x[[i]] - first_x - width >= -.Machine$double.eps) {
       current_bin = current_bin + 1L
       first_x = x[[i]]
     }
     bins[[i]] = current_bin
   }
-  if (length(bin_midpoints) < current_bin) {
-    # calculate midpoint for last bin
-    bin_midpoints[[current_bin]] = (x[[length(x)]] + first_x) / 2
-  }
+
+  # determine bin positions
+  # can take advantage of the fact that bins is sorted runs of numbers to
+  # get the first and last entry from each bin
+  bin_left = x[!duplicated(bins)]
+  bin_right = x[!duplicated(bins, fromLast = TRUE)]
+  bin_midpoints = (bin_left + bin_right) / 2
 
   list(
     bins = bins,
-    bin_midpoints = bin_midpoints
+    bin_midpoints = bin_midpoints,
+    bin_left = bin_left,
+    bin_right = bin_right
   )
 }
 
-# the basic wilkinson method, but sweeping right-to-left
-# x must be sorted
-wilkinson_bin_to_left = function(x, width) {
+#' do a backwards sweep after a left-to-right wilkinson binning, trying to
+#' eliminate extra space at the end of the binning by eating up slack between
+#' bins
+#' @param x sorted numeric vector
+#' @param b a binning returned by wilkinson_bin_to_right
+#' @param width bin width
+#' @param first_slack max amount of slack on the first bin
+#' @noRd
+wilkinson_sweep_back = function(x, b, width, first_slack = Inf) {
+  n_bin = length(b$bin_left)
+  if (n_bin < 2) return(b)
+
+  # amount we want to move left is the extra space at the end of the last bin
+  move_left = width - b$bin_right[[n_bin]] + b$bin_left[[n_bin]] - .Machine$double.eps
+  if (move_left <= 0) return(b)
+
+  # slack is the distance between bins
+  slack = b$bin_left[-1] - (b$bin_left[-n_bin] + width)
+
+  # slack on first bin is at most half the move_left amount; this makes it so that
+  # in the worst case we are compromising between first and last bins being
+  # optimal
+  first_slack = min(first_slack, move_left/2)
+  slack = c(first_slack, slack)
+
+  # the sum of all slack is the max amount we can move bins left by
+  total_slack = sum(slack)
+  move_left = min(move_left, total_slack)
+
+  # move bins left, using up slack until we have achieved our desired
+  # total move_left amount
+  for (j in seq(n_bin, 1)) {
+    b$bin_left[[j]] = b$bin_left[[j]] - move_left
+    move_left = move_left - slack[[j]]
+    if (move_left < 0) break
+  }
+  min_changed_bin = max(j - 1, 1)
+  changed_bin_is = min_changed_bin:n_bin
+  changed_x_is = which(b$bin_left[[min_changed_bin]] <= x)
+
+  # re-bin xs in the changed region into new bins
+  x_changed = x[changed_x_is]
+  bins_changed = findInterval(x_changed, b$bin_left[changed_bin_is]) + min_changed_bin - 1
+  b$bins[changed_x_is] = bins_changed
+
+  # re-number bins to be consecutive in case some bins got removed completely
+  first_x_in_bin = !duplicated(b$bins)
+  b$bins = cumsum(first_x_in_bin)
+
+  # can take advantage of the fact that b$bins is sorted runs of numbers to
+  # get the first and last entry from each bin
+  b$bin_left = x[first_x_in_bin]
+  b$bin_right = x[!duplicated(b$bins, fromLast = TRUE)]
+  b$bin_midpoints = (b$bin_left + b$bin_right) / 2
+
+  b
+}
+
+#' a rightward or leftward wilkinson binning followed by a backwards sweep to
+#' reduce edge effects by taking up slack in the binning (spaces between bins)
+#' @param x numeric vector
+#' @param width bin width
+#' @param right bin left-to-right (TRUE) or right-to-left (FALSE)?
+#' @param first_slack maximum slack on the first bin (passed to wilkinson_sweep_back)
+#' @noRd
+wilkinson_bin = function(x, width, right = TRUE, first_slack = Inf) {
   if (length(x) == 0) {
     return(list(
       bins = integer(0),
-      bin_midpoints = NULL
+      bin_midpoints = numeric(0)
     ))
   }
 
-  binning = wilkinson_bin_to_right(rev(x), width, direction = -1)
-  list(
-    # renumber bins so 1,2,3,3 => 3,2,1,1 (then reverse so it matches original vector order)
-    bins = rev(max(binning$bins) + 1 - binning$bins),
-    bin_midpoints = rev(binning$bin_midpoints)
-  )
+  if (right) {
+    b = wilkinson_bin_to_right(x, width)
+    wilkinson_sweep_back(x, b, width, first_slack = first_slack)
+  } else {
+    rev_x = -rev(x)
+    b = wilkinson_bin_to_right(rev_x, width)
+    b = wilkinson_sweep_back(rev_x, b, width, first_slack = first_slack)
+    list(
+      # renumber bins so 1,2,3,3 => 3,2,1,1 (then reverse so it matches original vector order)
+      bins = rev(max(b$bins) + 1 - b$bins),
+      bin_midpoints = -rev(b$bin_midpoints)
+    )
+  }
 }
 
-# a modified wilkinson-style binning that expands outward from the center of the data
-# works best on symmetric data.
-# x must be sorted
+#' A modified wilkinson-style binning that expands outward from the center of
+#' the data. Works best on symmetric data.
+#'  x must be sorted
+#' @param x numeric vector
+#' @param width bin width
+#' @noRd
 wilkinson_bin_from_center = function(x, width) {
   if (length(x) == 0) {
     list(
       bins = integer(0),
-      bin_midpoints = NULL
+      bin_midpoints = numeric(0)
     )
   } else if (length(x) == 1 || abs(x[[length(x)]] - x[[1]]) < width) {
     # everything is in 1 bin
@@ -440,8 +534,9 @@ wilkinson_bin_from_center = function(x, width) {
       if (x[[length(x)/2]] != x[[length(x)/2 + 1]]) {
         # even number of items and items in middle not equal => even number of bins and
         # we bin out from center on either side of the middle
-        left = wilkinson_bin_to_left(x[1:(length(x)/2)], width)
-        right = wilkinson_bin_to_right(x[(length(x)/2 + 1):length(x)], width)
+        first_slack = (x[[length(x)/2 + 1]] - x[[length(x)/2]])/2
+        left = wilkinson_bin(x[1:(length(x)/2)], width, right = FALSE, first_slack = first_slack)
+        right = wilkinson_bin(x[(length(x)/2 + 1):length(x)], width, first_slack = first_slack)
         return(list(
           bins = c(left$bins, length(left$bin_midpoints) + right$bins),
           bin_midpoints = c(left$bin_midpoints, right$bin_midpoints)
@@ -472,8 +567,14 @@ wilkinson_bin_from_center = function(x, width) {
     center_midpoint = (x[[center_i - edge_offset_from_center]] + x[[center_i + edge_offset_from_center]])/2
 
     # construct bins for regions left / right of center
-    left = wilkinson_bin_to_left(x[1:(center_i - edge_offset_from_center - 1)], width)
-    right = wilkinson_bin_to_right(x[(center_i + edge_offset_from_center + 1):length(x)], width)
+    left = wilkinson_bin(
+      x[1:(center_i - edge_offset_from_center - 1)], width, right = FALSE,
+      first_slack = x[[center_i - edge_offset_from_center]] - x[[center_i - edge_offset_from_center - 1]]
+    )
+    right = wilkinson_bin(
+      x[(center_i + edge_offset_from_center + 1):length(x)], width,
+      first_slack = x[[center_i + edge_offset_from_center + 1]] - x[[center_i + edge_offset_from_center]]
+    )
 
     center_bin_i = length(left$bin_midpoints) + 1
     list(
@@ -486,52 +587,54 @@ wilkinson_bin_from_center = function(x, width) {
 
 # dynamic binning method selection ----------------------------------------
 
-# examines a vector x and determines an appropriate binning method based on its properties
 automatic_bin = function(x, width) {
+  select_bin_method(x)(x, width)[c("bins", "bin_midpoints")]
+}
+
+# examines a vector x and determines an appropriate binning method based on its properties
+select_bin_method = function(x) {
   diff_x = diff(x)
   if (isTRUE(all.equal(diff_x, rev(diff_x), check.attributes = FALSE))) {
     # x is symmetric, used centered binning
-    wilkinson_bin_from_center(x, width)
+    wilkinson_bin_from_center
   } else {
-    wilkinson_bin_to_right(x, width)
+    wilkinson_bin
   }
 }
 
 
 # bin nudging for overlaps ------------------------------------------------
 
-# given a binning produced by one of the binning methods, nudge
-# bin midpoints to ensure they are at least `width` apart
-nudge_bins = function(bin_midpoints, width) {
-  if (length(bin_midpoints) >= 2) {
-    if (length(bin_midpoints) %% 2 == 0) {
-      # even number of bins => ensure the two center bins are proper width apart
-      left_center_bin = length(bin_midpoints) / 2
-      right_center_bin = left_center_bin + 1
+#' given a binning produced by one of the binning methods, nudge
+#' bin midpoints to ensure they are at least `width` apart. Nudging is done
+#' by constrained optimization, minimizing the sum of squares of distances of
+#' new bin midpoints to old (weighted by number of items in each bin), subject
+#' to adjacent bins being at least `width` apart.
+#' @param bin_midpoints vector: midpoints of each bin
+#' @param width scalar: width of bins
+#' @param count vector of length(bin_midpoints): number of items in each bin
+#' @returns vector of length(bin_midpoints) giving new bin midpoints
+#' @noRd
+nudge_bins = function(bin_midpoints, width, count = rep(1, length(bin_midpoints))) {
+  n = length(bin_midpoints)
+  if (n < 2) return(bin_midpoints)
 
-      # ensure the two center bins are proper width apart
-      center_bin_nudge = max((width - abs(bin_midpoints[[left_center_bin]] - bin_midpoints[[right_center_bin]]))/2, 0)
-      bin_midpoints[[left_center_bin]] = bin_midpoints[[left_center_bin]] - center_bin_nudge
-      bin_midpoints[[right_center_bin]] = bin_midpoints[[right_center_bin]] + center_bin_nudge
-    } else {
-      # odd number of bins => don't need to adjust the center
-      left_center_bin = floor(length(bin_midpoints) / 2)
-      right_center_bin = left_center_bin + 2
-    }
+  # make coefs minimize squared distance to bin centers, weighted
+  # by the number of elements in each bin
+  d = count^2 * bin_midpoints
+  # equivalent to D = diag(count^2) when factorized = FALSE
+  R_inv = diag(1/count)
 
-    # nudge the left bins (those below the center) apart as necessary
-    # can't use lag here since we're changing the values as we go
-    for (i in left_center_bin:1) {
-      bin_midpoints[[i]] = bin_midpoints[[i]] -
-        max(width - abs(bin_midpoints[[i]] - bin_midpoints[[i + 1]]), 0)
-    }
+  # constrain difference between adjacent bin centers to be greater than bin width
+  # equivalent to A = matrix(rep_len(c(-1, 1, rep(0, n - 1)), n * (n - 1)), nrow = n)
+  # when using solve.QP()
+  Amat = matrix(rep(c(-1, 1), n - 1), nrow = 2)
+  Aind = matrix(
+    c(rep(2, n - 1), seq_len(n - 1), seq(2, n)),
+    nrow = 3,
+    byrow = TRUE
+  )
+  b = rep(width, n - 1)
 
-    # nudge the right bins (those above the center) apart as necessary
-    for (i in right_center_bin:length(bin_midpoints)) {
-      bin_midpoints[[i]] = bin_midpoints[[i]] +
-        max(width - abs(bin_midpoints[[i]] - bin_midpoints[[i - 1]]), 0)
-    }
-  }
-
-  bin_midpoints
+  quadprog::solve.QP.compact(R_inv, d, Amat, Aind, b, factorized = TRUE)$solution
 }

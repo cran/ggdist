@@ -9,6 +9,8 @@
 globalVariables(c(".lower", ".upper", ".width"))
 
 
+# geom_lineribbon ---------------------------------------------------------
+
 #' Line + multiple-ribbon plots (ggplot geom)
 #'
 #' A combination of [geom_line()] and [geom_ribbon()] with default aesthetics
@@ -23,11 +25,11 @@ globalVariables(c(".lower", ".upper", ".width"))
 #' Specifically, [geom_lineribbon()] acts as if its default aesthetics are
 #' `aes(fill = forcats::fct_rev(ordered(.width)))`.
 #'
-#' @eval rd_slabinterval_params("lineribbon")
+#' @eval rd_layer_params("lineribbon")
 #' @eval rd_lineribbon_aesthetics("lineribbon")
 #' @inheritParams ggplot2::geom_line
 #' @param ...  Other arguments passed to [layer()]. These are often aesthetics, used to set an aesthetic
-#' to a fixed value, like `colour = "red"` or `size = 3` (see **Aesthetics**, below). They may also be
+#' to a fixed value, like `colour = "red"` or `linewidth = 3` (see **Aesthetics**, below). They may also be
 #' parameters to the paired geom/stat.
 #' @return A [ggplot2::Geom] representing a combined line + multiple-ribbon geometry which can
 #' be added to a [ggplot()] object.
@@ -60,9 +62,14 @@ draw_key_lineribbon = function(self, data, params, size) {
   if (is.null(data[["fill"]]) &&
     (!is.null(data[["fill_ramp"]]) || !all(is.na(data[["alpha"]])))
   ) {
-    data$fill = "gray65"
+    data$fill = self$default_key_aes$fill
   }
   data$fill = apply_colour_ramp(data$fill, data$fill_ramp)
+
+  if (!is.null(data[["colour"]]) || !is.null(data[["linewidth"]])) {
+    data$colour = data[["colour"]] %||% self$default_key_aes$colour
+    data$linewidth = data[["linewidth"]] %||% self$default_key_aes$linewidth
+  }
 
   fill_grob = if (!is.null(data$fill)) {
     draw_key_rect(data, params, size)
@@ -79,9 +86,34 @@ draw_key_lineribbon = function(self, data, params, size) {
 #' @import ggplot2
 #' @export
 GeomLineribbon = ggproto("GeomLineribbon", AbstractGeom,
+
+  ## aesthetics --------------------------------------------------------------
+
+  aes_docs = modifyList(AbstractGeom$aes_docs, list(
+    "Ribbon-specific aesthetics" = list(
+      xmin = 'Left edge of the ribbon sub-geometry (if `orientation = "horizontal"`).',
+      xmax = 'Right edge of the ribbon sub-geometry (if `orientation = "horizontal"`).',
+      ymin = 'Lower edge of the ribbon sub-geometry (if `orientation = "vertical"`).',
+      ymax = 'Upper edge of the ribbon sub-geometry (if `orientation = "vertical"`).'
+    ),
+
+    "Color aesthetics" = list(
+      colour = '(or `color`) The color of the **line** sub-geometry.',
+      fill = 'The fill color of the **ribbon** sub-geometry.',
+      alpha = 'The opacity of the **line** and **ribbon** sub-geometries.',
+      fill_ramp = 'A secondary scale that modifies the `fill`
+       scale to "ramp" to another color. See [scale_fill_ramp()] for examples.'
+    ),
+
+    "Line aesthetics" = list(
+      linewidth = 'Width of **line**. In \\pkg{ggplot2} < 3.4, was called `size`.',
+      linetype = 'Type of **line** (e.g., `"solid"`, `"dashed"`, etc)'
+    )
+  )),
+
   default_aes = aes(
     colour = NULL,
-    size = 1.25,
+    linewidth = NULL,
     linetype = 1,
     fill = NULL,
     fill_ramp = NULL,
@@ -90,19 +122,39 @@ GeomLineribbon = ggproto("GeomLineribbon", AbstractGeom,
 
   default_key_aes = aes(
     colour = "black",
-    fill = "gray65"
+    fill = "gray65",
+    linewidth = 1.25
   ),
 
   default_computed_aes = aes(
     fill = fct_rev_(ordered(.width))
   ),
 
-  # workaround (#84)
-  draw_key = function(self, ...) draw_key_lineribbon(self, ...),
+  # support for `size` in place of `linewidth` aes in ggplot2 < 3.4
+  rename_size = TRUE,
+  non_missing_aes = union("size", AbstractGeom$non_missing_aes),
 
   required_aes = c("x|y"),
 
   optional_aes = c("ymin", "ymax", "xmin", "xmax", "fill_ramp"),
+
+
+  ## params ------------------------------------------------------------------
+
+  param_docs = defaults(list(
+    step = glue_doc('
+      Should the line/ribbon be drawn as a step function? One of:
+      \\itemize{
+        \\item `FALSE` (default): do not draw as a step function.
+        \\item `"mid"` (or `TRUE`): draw steps midway between adjacent x values.
+        \\item `"hv"`: draw horizontal-then-vertical steps.
+        \\item `"vh"`: draw as vertical-then-horizontal steps.
+      }
+      `TRUE` is an alias for `"mid"` because for a step function with ribbons, `"mid"` is probably what you want
+      (for the other two step approaches the ribbons at either the very first or very last x value will not be
+      visible).
+      ')
+  ), AbstractGeom$param_docs),
 
   default_params = list(
     step = FALSE,
@@ -113,6 +165,12 @@ GeomLineribbon = ggproto("GeomLineribbon", AbstractGeom,
   orientation_options = defaults(list(
     range_is_orthogonal = TRUE, ambiguous = TRUE, group_has_equal = TRUE
   ), AbstractGeom$orientation_options),
+
+
+  ## other methods -----------------------------------------------------------
+
+  # workaround (#84)
+  draw_key = function(self, ...) draw_key_lineribbon(self, ...),
 
   draw_panel = function(self, data, panel_scales, coord,
     step = self$default_params$step,
@@ -144,13 +202,13 @@ GeomLineribbon = ggproto("GeomLineribbon", AbstractGeom,
       intersect(c("colour", "fill", "fill_raw", "linetype", "group"))
 
     # draw as a step function if requested
-    if (step == TRUE) step = "mid"
-    if (step != FALSE) data = ddply_(data, grouping_columns, stepify, x = y, direction = step)
+    if (isTRUE(step)) step = "mid"
+    if (!isFALSE(step)) data = ddply_(data, grouping_columns, stepify, x = y, direction = step)
 
     # draw all the ribbons
     ribbon_grobs = data %>%
       dlply_(grouping_columns, function(d) {
-        group_grobs = list(GeomRibbon$draw_panel(transform(d, size = NA), panel_scales, coord, flipped_aes = flipped_aes))
+        group_grobs = list(GeomRibbon$draw_panel(transform(d, linewidth = NA), panel_scales, coord, flipped_aes = flipped_aes))
         list(
           width = mean(abs(d[[xmax]] - d[[xmin]])),
           grobs = group_grobs

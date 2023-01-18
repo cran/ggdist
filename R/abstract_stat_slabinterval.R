@@ -14,8 +14,8 @@
 AbstractStatSlabinterval = ggproto("AbstractStatSlabinterval", AbstractStat,
   default_aes = aes(
     datatype = "slab",
-    thickness = stat(f),
-    size = stat(-.width),
+    thickness = after_stat(f),
+    size = after_stat(-.width),
     x = NULL,
     y = NULL
   ),
@@ -79,9 +79,10 @@ AbstractStatSlabinterval = ggproto("AbstractStatSlabinterval", AbstractStat,
   # @param data The data frame of aesthetic values
   # @param input Input values for the function (may be ignored in some cases
   # where compute_slab() needs to determine its own input values)
+  # @param scales the scales associated with the plot
   # @param trans the scale transformation object applied to the coordinate space
   # @param ... other stat parameters created by children of stat_slabinterval
-  compute_slab = function(self, data, trans, input, ...) {
+  compute_slab = function(self, data, scales, trans, input, ...) {
     data.frame()
   },
 
@@ -122,6 +123,17 @@ AbstractStatSlabinterval = ggproto("AbstractStatSlabinterval", AbstractStat,
 
     # remove missing values
     data = ggplot2::remove_missing(data, na.rm, c(x, y), name = "stat_slabinterval")
+    # remove any missing dists: we can't use remove_missing since it does not
+    # detect rvar or distribution missingness correctly, so we do the removal
+    # manually and then generate a call to remove_missing on a dummy data frame
+    # that will create the appropriate warning message, if needed
+    missing = is.na(data$dist)
+    if (any(missing)) {
+      data = data[!missing, ]
+      remove_missing(data.frame(dist = ifelse(missing, NA_real_, 0)), na.rm, "dist", name = "stat_slabinterval")
+    }
+    if (nrow(data) == 0) return(data.frame())
+
 
     # figure out coordinate transformation
     trans = scales[[x]]$trans %||% scales::identity_trans()
@@ -142,10 +154,7 @@ AbstractStatSlabinterval = ggproto("AbstractStatSlabinterval", AbstractStat,
     # POINT/INTERVAL PRE-CALCULATIONS
     if (!is.null(point_interval)) {
       point_interval = if (is.character(point_interval)) {
-        # ensure we always search the ggdist namespace for point_interval
-        # functions in case ggdist is not in the caller's search path
-        get0(point_interval, mode = "function") %||%
-          get(point_interval, mode = "function", envir = getNamespace("ggdist"))
+        match_function(point_interval)
       } else {
         as_function(point_interval)
       }
@@ -168,7 +177,7 @@ AbstractStatSlabinterval = ggproto("AbstractStatSlabinterval", AbstractStat,
       # example without warnings and remove this guard.
       s_data = if (getOption("ggdist.experimental.slab_data_in_intervals", FALSE) || show_slab) {
         self$compute_slab(d,
-          trans = trans, input = input,
+          scales = scales, trans = trans, input = input,
           orientation = orientation, limits = limits, n = n,
           na.rm = na.rm,
           ...
@@ -248,6 +257,8 @@ AbstractStatSlabinterval = ggproto("AbstractStatSlabinterval", AbstractStat,
         i_data$cdf_max = cdf_fun(i_data[[xmax]])
       }
 
+      # remove point data if it is not being shown
+      if (!show_point) i_data[[x]] = NA_real_
 
       bind_rows(
         if (show_slab) s_data,
@@ -297,10 +308,10 @@ compute_panel_limits = function(
   # (the limits are *at most* these)
   max_limits = limits
   if (is.null(max_limits)) {
-    if (is.null(scales[[x]]$limits)) {
+    if (is.null(scales[[x]]$limits) || scales[[x]]$is_discrete()) {
       max_limits = c(NA_real_, NA_real_)
-    } else{
-      max_limits = trans$inverse(scales[[x]]$limits)
+    } else {
+      max_limits = trans$inverse(scales[[x]]$get_limits())
     }
   }
 

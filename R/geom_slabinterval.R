@@ -100,6 +100,13 @@ draw_slabs = function(self, s_data, panel_params, coord,
 ) {
   define_orientation_variables(orientation)
 
+  # remove missing values - thickness NAs are fine here since they just create
+  # breaks in the slab (handled below), but missing height means we can't
+  # even determine slab dimensions, so need a warning
+  s_data = ggplot2::remove_missing(s_data, na.rm, c(height, "justification", "scale"), name = "geom_slabinterval", finite = TRUE)
+  # side is a character vector, thus need finite = FALSE for it; x/y can be Inf here
+  s_data = ggplot2::remove_missing(s_data, na.rm, c(x, y, "scale"), name = "geom_slabinterval")
+
   s_data = self$override_slab_aesthetics(rescale_slab_thickness(
     s_data, orientation, normalize, height, y, ymin, ymax
   ))
@@ -113,6 +120,9 @@ draw_slabs = function(self, s_data, panel_params, coord,
   s_data$na_thickness_group = cumsum(is.na(s_data$thickness))
   # now that we've used them for grouping, we can drop rows with NA values of thickness
   s_data = s_data[!is.na(s_data$thickness),]
+
+  # if dropping NAs caused this slab to be empty, return early
+  if (nrow(s_data) == 0) return(list())
 
   # build groups for the slabs
   # must group within both group and y for the polygon and path drawing functions to work
@@ -142,8 +152,15 @@ draw_slabs = function(self, s_data, panel_params, coord,
     if (!is.null(d$colour) && !all(is.na(d$colour))) {
       # we have an outline to draw around the outside of the slab:
       # the definition of "outside" depends on the value of `side`:
-      outline_data = group_slab_data_by(d, c("colour", "alpha", "size", "linetype"), orientation, d$side[[1]])
-      gList(slab_grob, draw_path(outline_data, panel_params, coord))
+      side = d$side[[1]]
+      if (side == "both") {
+        outline_data_top = group_slab_data_by(d, c("colour", "alpha", "linewidth", "linetype"), orientation, "top")
+        outline_data_bottom = group_slab_data_by(d, c("colour", "alpha", "linewidth", "linetype"), orientation, "bottom")
+        gList(slab_grob, draw_path(outline_data_top, panel_params, coord), draw_path(outline_data_bottom, panel_params, coord))
+      } else {
+        outline_data = group_slab_data_by(d, c("colour", "alpha", "linewidth", "linetype"), orientation, side)
+        gList(slab_grob, draw_path(outline_data, panel_params, coord))
+      }
     } else {
       slab_grob
     }
@@ -208,7 +225,7 @@ draw_path = function(data, panel_params, coord) {
       default.units = "native",
       gp = grid::gpar(
         col = alpha(munched_path$colour, munched_path$alpha),
-        lwd = munched_path$size * .pt,
+        lwd = munched_path$linewidth * .pt,
         lty = munched_path$linetype,
         lineend = "butt",
         linejoin = "round",
@@ -226,7 +243,8 @@ override_slab_aesthetics = function(self, s_data) {
   s_data$fill = s_data[["slab_fill"]] %||% s_data[["fill"]]
   s_data$fill = apply_colour_ramp(s_data[["fill"]], s_data[["fill_ramp"]])
   s_data$alpha = s_data[["slab_alpha"]] %||% s_data[["alpha"]]
-  s_data$size = s_data[["slab_size"]]
+  #TODO: insert slab_size deprecation warning?
+  s_data$linewidth = s_data[["slab_linewidth"]] %||% s_data[["slab_size"]]
   s_data$linetype = s_data[["slab_linetype"]] %||% s_data[["linetype"]]
   s_data
 }
@@ -236,7 +254,8 @@ override_point_aesthetics = function(self, p_data, size_domain, size_range, fatt
   p_data$colour = apply_colour_ramp(p_data[["colour"]], p_data[["colour_ramp"]])
   p_data$fill = p_data[["point_fill"]] %||% p_data[["fill"]]
   p_data$alpha = p_data[["point_alpha"]] %||% p_data[["alpha"]]
-  p_data$size = p_data[["point_size"]] %||% (fatten_point * get_line_size(p_data, size_domain, size_range))
+  # TODO: insert fatten_point deprecation warning
+  p_data$size = p_data[["point_size"]] %||% (fatten_point * transform_size(p_data[["interval_size"]] %||% p_data[["size"]], size_domain, size_range))
   p_data
 }
 
@@ -244,13 +263,13 @@ override_interval_aesthetics = function(self, i_data, size_domain, size_range) {
   i_data$colour = i_data[["interval_colour"]] %||% i_data[["colour"]]
   i_data$colour = apply_colour_ramp(i_data[["colour"]], i_data[["colour_ramp"]])
   i_data$alpha = i_data[["interval_alpha"]] %||% i_data[["alpha"]]
-  i_data$size = get_line_size(i_data, size_domain, size_range)
+  # TODO: insert interval_size deprecation warning
+  i_data$linewidth = transform_size(i_data[["linewidth"]] %||% i_data[["interval_size"]] %||% i_data[["size"]], size_domain, size_range)
   i_data$linetype = i_data[["interval_linetype"]] %||% i_data[["linetype"]]
   i_data
 }
 
-get_line_size = function(i_data, size_domain, size_range) {
-  size = i_data[["interval_size"]] %||% i_data[["size"]]
+transform_size = function(size, size_domain, size_range) {
   pmax(
     (size - size_domain[[1]]) / (size_domain[[2]] - size_domain[[1]]) *
       (size_range[[2]] - size_range[[1]]) + size_range[[1]],
@@ -263,7 +282,7 @@ get_line_size = function(i_data, size_domain, size_range) {
 #' Slab + point + interval meta-geom
 #'
 #' This meta-geom supports drawing combinations of functions (as slabs, aka ridge plots or joy plots), points, and
-#' intervals. It acts as a meta-geom for many other tidybayes geoms that are wrappers around this geom, including
+#' intervals. It acts as a meta-geom for many other \pkg{ggdist} geoms that are wrappers around this geom, including
 #' eye plots, half-eye plots, CCDF barplots, and point+multiple interval plots, and supports both horizontal and
 #' vertical orientations, dodging (via the `position` argument), and relative justification of slabs with their
 #' corresponding intervals.
@@ -305,11 +324,11 @@ get_line_size = function(i_data, size_domain, size_range) {
 #' directly. Typically, the `geom_*` versions are meant for use with already-summarized data (such as intervals) and the
 #' `stat_*` versions are summarize the data themselves (usually draws from a distribution) to produce the geom.
 #'
-#' @eval rd_slabinterval_params()
+#' @eval rd_layer_params("slabinterval")
 #' @eval rd_slabinterval_aesthetics()
 #' @inheritParams ggplot2::layer
 #' @param ...  Other arguments passed to [layer()]. These are often aesthetics, used to set an aesthetic
-#' to a fixed value, like `colour = "red"` or `size = 3` (see **Aesthetics**, below). They may also be
+#' to a fixed value, like `colour = "red"` or `linewidth = 3` (see **Aesthetics**, below). They may also be
 #' parameters to the paired geom/stat.
 #' @param position Position adjustment, either as a string, or the result of a call to a position adjustment function.
 #' Setting this equal to `"dodge"` ([position_dodge()]) or `"dodgejust"` ([position_dodgejust()]) can be useful if
@@ -339,6 +358,110 @@ NULL
 #' @usage NULL
 #' @export
 GeomSlabinterval = ggproto("GeomSlabinterval", AbstractGeom,
+
+  ## aesthetics --------------------------------------------------------------
+
+  aes_docs = list(
+    "Slab-specific aesthetics" = list(
+      thickness =
+        'The thickness of the slab at each `x` value (if `orientation = "horizontal"`) or
+      `y` value (if `orientation = "vertical"`) of the slab.',
+      side =
+        'Which side to place the slab on. `"topright"`, `"top"`, and `"right"` are synonyms
+      which cause the slab to be drawn on the top or the right depending on if `orientation` is `"horizontal"`
+      or `"vertical"`. `"bottomleft"`, `"bottom"`, and `"left"` are synonyms which cause the slab
+      to be drawn on the bottom or the left depending on if `orientation` is `"horizontal"` or
+      `"vertical"`. `"topleft"` causes the slab to be drawn on the top or the left, and `"bottomright"`
+      causes the slab to be drawn on the bottom or the right. `"both"` draws the slab mirrored on both
+      sides (as in a violin plot).',
+      scale =
+        'What proportion of the region allocated to this geom to use to draw the slab. If `scale = 1`,
+      slabs that use the maximum range will just touch each other. Default is `0.9` to leave some space.',
+      justification =
+        'Justification of the interval relative to the slab, where `0` indicates bottom/left
+      justification and `1` indicates top/right justification (depending on `orientation`). If `justification`
+      is `NULL` (the default), then it is set automatically based on the value of `side`: when `side` is
+      `"top"`/`"right"` `justification` is set to `0`, when `side` is `"bottom"`/`"left"`
+      `justification` is set to `1`, and when `side` is `"both"` `justification` is set to 0.5.',
+      datatype =
+        'When using composite geoms directly without a `stat` (e.g. [geom_slabinterval()]), `datatype` is used to
+      indicate which part of the geom a row in the data targets: rows with `datatype = "slab"` target the
+      slab portion of the geometry and rows with `datatype = "interval"` target the interval portion of
+      the geometry. This is set automatically when using ggdist `stat`s.'
+    ),
+
+    "Interval-specific aesthetics" = list(
+      xmin = 'Left end of the interval sub-geometry (if `orientation = "horizontal"`).',
+      xmax = 'Right end of the interval sub-geometry (if `orientation = "horizontal"`).',
+      ymin = 'Lower end of the interval sub-geometry (if `orientation = "vertical"`).',
+      ymax = 'Upper end of the interval sub-geometry (if `orientation = "vertical"`).'
+    ),
+
+    "Point-specific aesthetics" = list(
+      shape = 'Shape type used to draw the **point** sub-geometry.'
+    ),
+
+    "Color aesthetics" = list(
+      colour = '(or `color`) The color of the **interval** and **point** sub-geometries.
+     Use the `slab_color`, `interval_color`, or `point_color` aesthetics (below) to
+     set sub-geometry colors separately.',
+      fill = 'The fill color of the **slab** and **point** sub-geometries. Use the `slab_fill`
+     or `point_fill` aesthetics (below) to set sub-geometry colors separately.',
+      alpha = 'The opacity of the **slab**, **interval**, and **point** sub-geometries. Use the `slab_alpha`,
+     `interval_alpha`, or `point_alpha` aesthetics (below) to set sub-geometry colors separately.',
+      colour_ramp = '(or `color_ramp`) A secondary scale that modifies the `color`
+     scale to "ramp" to another color. See [scale_colour_ramp()] for examples.',
+      fill_ramp = 'A secondary scale that modifies the `fill`
+     scale to "ramp" to another color. See [scale_fill_ramp()] for examples.'
+    ),
+
+    "Line aesthetics" = list(
+      linewidth = 'Width of the line used to draw the **interval** (except with [geom_slab()]: then
+     it is the width of the **slab**). With composite geometries including an interval and slab,
+     use `slab_linewidth` to set the line width of the **slab** (see below). For **interval**, raw
+     `linewidth` values are transformed according to the `interval_size_domain` and `interval_size_range`
+     parameters of the `geom` (see above).',
+      size = 'Determines the size of the **point**. If `linewidth` is not provided, `size` will
+     also determines the width of the line used to draw the **interval** (this allows line width and
+     point size to be modified together by setting only `size` and not `linewidth`). Raw
+     `size` values are transformed according to the `interval_size_domain`, `interval_size_range`,
+     and `fatten_point` parameters of the `geom` (see above). Use the `point_size` aesthetic
+     (below) to set sub-geometry size directly without applying the effects of
+     `interval_size_domain`, `interval_size_range`, and `fatten_point`.',
+      stroke = 'Width of the outline around the **point** sub-geometry.',
+      linetype = 'Type of line (e.g., `"solid"`, `"dashed"`, etc) used to draw the **interval**
+     and the outline of the **slab** (if it is visible). Use the `slab_linetype` or
+     `interval_linetype` aesthetics (below) to set sub-geometry line types separately.'
+    ),
+
+    "Slab-specific color/line override aesthetics" = list(
+      slab_fill = 'Override for `fill`: the fill color of the slab.',
+      slab_colour = '(or `slab_color`) Override for `colour`/`color`: the outline color of the slab.',
+      slab_alpha = 'Override for `alpha`: the opacity of the slab.',
+      slab_linewidth = 'Override for `linwidth`: the width of the outline of the slab.',
+      slab_linetype = 'Override for `linetype`: the line type of the outline of the slab.',
+      slab_shape = 'Override for `shape`: the shape of the dots used to draw the dotplot slab.'
+    ),
+
+    "Interval-specific color/line override aesthetics" = list(
+      interval_colour = '(or `interval_color`) Override for `colour`/`color`: the color of the interval.',
+      interval_alpha = 'Override for `alpha`: the opacity of the interval.',
+      interval_linetype = 'Override for `linetype`: the line type of the interval.'
+    ),
+
+    "Point-specific color/line override aesthetics" = list(
+      point_fill = 'Override for `fill`: the fill color of the point.',
+      point_colour = '(or `point_color`) Override for `colour`/`color`: the outline color of the point.',
+      point_alpha = 'Override for `alpha`: the opacity of the point.',
+      point_size = 'Override for `size`: the size of the point.'
+    ),
+
+    "Deprecated aesthetics" = list(
+      slab_size = 'Use `slab_linewidth`.',
+      interval_size = 'Use `interval_linewidth`.'
+    )
+  ),
+
   default_aes = aes(
     # default datatype is slab (other valid value is "interval" for points/intervals)
     datatype = "slab",
@@ -359,20 +482,22 @@ GeomSlabinterval = ggproto("GeomSlabinterval", AbstractGeom,
     # point aesthetics
     shape = NULL,
     stroke = NULL,
+    size = NULL,
     point_colour = NULL,      # falls back to colour
     point_fill = NULL,        # falls back to fill
     point_alpha = NULL,       # falls back to alpha
     point_size = NULL,        # falls back to size
 
     # interval aesthetics
-    size = NULL,
+    linewidth = NULL,         # falls back to interval_size (dep) then size
     interval_colour = NULL,   # falls back to colour
     interval_alpha = NULL,    # falls back to alpha
-    interval_size = NULL,     # falls back to size
+    interval_size = NULL,     # deprecated (use linewidth)
     interval_linetype = NULL, # falls back to linetype
 
     # slab aesthetics
-    slab_size = NULL,         # no fallback
+    slab_size = NULL,         # deprecated
+    slab_linewidth = NULL,    # falls back to slab_size (dep)
     slab_colour = NULL,       # no fallback
     slab_fill = NULL,         # falls back to fill
     slab_alpha = NULL,        # falls back to alpha
@@ -411,6 +536,77 @@ GeomSlabinterval = ggproto("GeomSlabinterval", AbstractGeom,
   override_point_aesthetics = function(self, ...) override_point_aesthetics(self, ...),
   override_interval_aesthetics = function(self, ...) override_interval_aesthetics(self, ...),
 
+
+
+  ## params ------------------------------------------------------------------
+
+  param_docs = defaults(list(
+    # SLAB PARAMS
+    normalize = glue_doc('
+      How to normalize heights of functions input to the `thickness` aesthetic. One of:
+      \\itemize{
+        \\item `"all"`: normalize so that the maximum height across all data is `1`.
+        \\item `"panels"`: normalize within panels so that the maximum height in each panel is `1`.
+        \\item `"xy"`: normalize within the x/y axis opposite the `orientation` of this geom so
+          that the maximum height at each value of the opposite axis is `1`.
+        \\item `"groups"`: normalize within values of the opposite axis and within each
+          group so that the maximum height in each group is `1`.
+        \\item `"none"`: values are taken as is with no normalization (this should probably
+          only be used with functions whose values are in \\[0,1\\], such as CDFs).
+      }
+      '),
+    fill_type = glue_doc('
+      What type of fill to use when the fill color or alpha varies within a slab. One of:
+      \\itemize{
+        \\item `"segments"`: breaks up the slab geometry into segments for each unique combination of fill color and
+          alpha value. This approach is supported by all graphics devices and works well for sharp cutoff values,
+          but can give ugly results if a large number of unique fill colors are being used (as in gradients,
+          like in [stat_gradientinterval()]).
+        \\item `"gradient"`: a `grid::linearGradient()` is used to create a smooth gradient fill. This works well for
+          large numbers of unique fill colors, but requires R >= 4.1 and is not yet supported on all graphics devices.
+          As of this writing, the `png()` graphics device with `type = "cairo"`, the `svg()` device, the `pdf()`
+          device, and the `ragg::agg_png()` devices are known to support this option. On R < 4.1, this option
+          will fall back to `fill_type = "segment"` with a message.
+        \\item `"auto"`: attempts to use `fill_type = "gradient"` if support for it can be auto-detected. On R >= 4.2,
+          support for gradients can be auto-detected on some graphics devices; if support is not detected, this
+          option will fall back to `fill_type = "segments"` (in case of a false negative, `fill_type = "gradient"`
+          can be set explicitly). On R < 4.2, support for gradients cannot be auto-detected, so this will always
+          fall back to `fill_type = "segments"`, in which case you can set `fill_type = "gradient"` explicitly
+          if you are using a graphics device that support gradients.
+      }
+      '),
+
+    # INTERVAL PARAMS
+    interval_size_domain = glue_doc('
+      A length-2 numeric vector giving the minimum and maximum of the values of the `size` and `linewidth` aesthetics that will be
+      translated into actual sizes for intervals drawn according to `interval_size_range` (see the documentation
+      for that argument.)
+      '),
+    interval_size_range = glue_doc('
+      A length-2 numeric vector. This geom scales the raw size aesthetic values when drawing interval and point
+      sizes, as they tend to be too thick when using the default settings of [scale_size_continuous()], which give
+      sizes with a range of `c(1, 6)`. The `interval_size_domain` value indicates the input domain of raw size
+      values (typically this should be equal to the value of the `range` argument of the [scale_size_continuous()]
+      function), and `interval_size_range` indicates the desired output range of the size values (the min and max of
+      the actual sizes used to draw intervals). Most of the time it is not recommended to change the value of this
+      argument, as it may result in strange scaling of legends; this argument is a holdover from earlier versions
+      that did not have size aesthetics targeting the point and interval separately. If you want to adjust the
+      size of the interval or points separately, you can also use the `linewidth` or `point_size`
+      aesthetics; see [scales].
+      '),
+    fatten_point = glue_doc('
+      A multiplicative factor used to adjust the size of the point relative to the size of the
+      thickest interval line. If you wish to specify point sizes directly, you can also use the `point_size`
+      aesthetic and [scale_point_size_continuous()] or [scale_point_size_discrete()]; sizes
+      specified with that aesthetic will not be adjusted using `fatten_point`.
+      '),
+
+    # SUB_GEOMETRY FLAGS
+    show_slab = 'Should the slab portion of the geom be drawn?',
+    show_point = 'Should the point portion of the geom be drawn?',
+    show_interval = 'Should the interval portion of the geom be drawn?'
+  ), AbstractGeom$param_docs),
+
   default_params = list(
     orientation = NA,
     normalize = "all",
@@ -431,6 +627,9 @@ GeomSlabinterval = ggproto("GeomSlabinterval", AbstractGeom,
   orientation_options = defaults(list(
     main_is_orthogonal = TRUE, range_is_orthogonal = TRUE, group_has_equal = TRUE, main_is_optional = TRUE
   ), AbstractGeom$orientation_options),
+
+
+  ## other methods -----------------------------------------------------------
 
   setup_data = function(self, data, params) {
     data = ggproto_parent(AbstractGeom, self)$setup_data(data, params)
@@ -775,7 +974,7 @@ draw_polygon = function(data, panel_params, coord, fill = NULL) {
       gp = gpar(
         col = first_rows$colour,
         fill = fill %||% alpha(first_rows[["fill"]], first_rows[["alpha"]]),
-        lwd = first_rows$size * .pt,
+        lwd = first_rows$linewidth * .pt,
         lty = first_rows$linetype
       )
     )

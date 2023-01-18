@@ -38,6 +38,19 @@ defaults = function(x, defaults) {
   c(x, defaults[setdiff(names(defaults), names(x))])
 }
 
+#' A variation of match.fun() that allows prefixes to be supplied to strings
+#' to determine the function to be used, and which ensures we always fall back
+#' to searching the ggdist namespace for the function
+#' in case ggdist is not in the caller's search path.
+#' @noRd
+match_function = function(f, prefix = "", env = globalenv()) {
+  if (is.function(f)) return(f)
+
+  f = paste0(prefix, f)
+  get0(f, mode = "function", envir = env) %||%
+    get(f, mode = "function", envir = getNamespace("ggdist"))
+}
+
 
 # deprecations and warnings -----------------------------------------------
 
@@ -83,6 +96,20 @@ map_dfr_ = function(data, fun, ...) {
   bind_rows(lapply(data, fun, ...))
 }
 
+#' faster version of a map over rows of a data frame, like:
+#' map_dfr(seq_len(nrow(data)), function(i) {
+#'   row = data[i, , drop = FALSE]
+#'   ...
+#' })
+#' @noRd
+row_map_dfr_ = function(data, fun, ...) {
+  map_dfr_(seq_len(nrow(data)), function(row_i) {
+    # faster version of row_df = data[row_i, , drop = FALSE]
+    row_df = tibble::new_tibble(lapply(data, vctrs::vec_slice, row_i), nrow = 1)
+    fun(row_df, ...)
+  })
+}
+
 pmap_ = function(data, fun) {
   # this is roughly equivalent to purrr::pmap
   lapply(vctrs::vec_chop(data), function(row) do.call(fun, lapply(row, `[[`, 1)))
@@ -123,8 +150,8 @@ dlply_ = function(data, groups, fun, ...) {
     group_is = unname(split(seq_len(nrow(data)), group_vars, drop = TRUE, lex.order = TRUE))
 
     lapply(group_is, function(group_i) {
-      # faster version of row_df = data[group_i, ]
-      row_df = tibble::new_tibble(lapply(data, `[`, group_i), nrow = length(group_i))
+      # faster version of row_df = data[group_i, , drop = FALSE]
+      row_df = tibble::new_tibble(lapply(data, vctrs::vec_slice, group_i), nrow = length(group_i))
       fun(row_df, ...)
     })
   } else {
@@ -213,13 +240,31 @@ seq_interleaved = function(n) {
   i
 }
 
+#' seq_interleaved that starts at n instead of 1
+#' @noRd
+seq_interleaved_rev = function(n) {
+  n + 1 - seq_interleaved(n)
+}
+
 #' a variant of seq_interleaved that proceeds outwards from the middle,
-#' for use with side = "both" in dots geoms
+#' for use with layout = "weave" when side = "both" in dots geoms
 #' @noRd
 seq_interleaved_centered = function(n) {
-  is_odd = n %% 2
-  head = rev(seq_interleaved(floor(n/2))) * 2 - 1 + is_odd
-  center = if (is_odd) 1
-  tail = seq_interleaved(floor(n/2)) * 2 + is_odd
-  c(head, center, tail)
+  half_n = floor(n/2)
+  if (n %% 2 == 1) {
+    # odd n should have 1 in the middle
+    head = rev(seq_interleaved_rev(half_n)) * 2
+    tail = seq_interleaved_rev(half_n) * 2 + 1
+    c(head, 1, tail)
+  } else if (half_n %% 2 == 0) {
+    # even n with even halves should have 1 just above half way
+    head = rev(seq_interleaved_rev(half_n)) * 2
+    tail = seq_interleaved(half_n) * 2 - 1
+    c(head, tail)
+  } else {
+    # even n with odd halves should have 1 just below half way
+    head = rev(seq_interleaved(half_n)) * 2 - 1
+    tail = seq_interleaved_rev(half_n) * 2
+    c(head, tail)
+  }
 }

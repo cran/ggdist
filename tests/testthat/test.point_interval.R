@@ -345,6 +345,10 @@ test_that("NAs are handled correctly in point_interval", {
 
 })
 
+test_that("automatic partial evaluation works", {
+  expect_equal(point_interval(.point = mean)(1:10), point_interval(1:10, .point = mean))
+})
+
 
 # upper/lower limits (ul/ll) ----------------------------------------------
 
@@ -608,7 +612,7 @@ test_that("flattened indices retain index order", {
       ),
       y = c("a","b")
     )  %>%
-    ggplot(aes(xdist = x, y = y, group = stat(.index))) +
+    ggplot(aes(xdist = x, y = y, group = after_stat(.index))) +
     stat_pointinterval(position = "dodge")
   )
 

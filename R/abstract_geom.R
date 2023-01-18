@@ -5,6 +5,8 @@
 
 
 
+# AbstractGeom ------------------------------------------------------------
+
 #' Geom base class designed to reduce boilerplate
 #'
 #' A base class for orientation-aware geoms that handles boilerplate generation
@@ -34,17 +36,64 @@
 #' @keywords internal
 #' @noRd
 AbstractGeom = ggproto("AbstractGeom", Geom,
+
+  ## aesthetics --------------------------------------------------------------
+
   default_computed_aes = aes(),
 
-  default_params = list(
-    orientation = NA,
-    na.rm = FALSE
-  ),
+  # named list of named lists: section title => aesthetic => doc string
+  aes_docs = list(),
+
+  get_aes_docs = function(self, ...) {
+    self$aes_docs
+  },
+
+  # aesthetics to hide from documentation
+  hidden_aes = character(),
+
+
+  ## layer arguments ---------------------------------------------------------
 
   # arguments passed to the geom_XXX() constructor and the underlying layer() call
   layer_args = list(
     show.legend = NA,
     inherit.aes = TRUE
+  ),
+
+
+  ## parameters --------------------------------------------------------------
+
+  param_docs = list(
+    orientation = glue_doc('
+      Whether this geom is drawn horizontally or vertically. One of:
+      \\itemize{
+        \\item `NA` (default): automatically detect the orientation based on how the aesthetics
+          are assigned. Automatic detection works most of the time.
+        \\item `"horizontal"` (or `"y"`): draw horizontally, using the `y` aesthetic to identify different
+          groups. For each group, uses the `x`, `xmin`, `xmax`, and `thickness` aesthetics to
+          draw points, intervals, and slabs.
+        \\item `"vertical"` (or `"x"`): draw vertically, using the `x` aesthetic to identify different
+          groups. For each group, uses the `y`, `ymin`, `ymax`, and `thickness` aesthetics to
+          draw points, intervals, and slabs.
+      }
+      For compatibility with the base ggplot naming scheme for `orientation`, `"x"` can be used as an alias
+      for `"vertical"` and `"y"` as an alias for `"horizontal"` (\\pkg{ggdist} had an `orientation` parameter
+      before base ggplot did, hence the discrepancy).
+      '),
+
+    na.rm = glue_doc('
+      If `FALSE`, the default, missing values are removed with a warning. If `TRUE`, missing
+      values are silently removed.
+      ')
+  ),
+
+  get_param_docs = function(self, ...) {
+    self$param_docs
+  },
+
+  default_params = list(
+    orientation = NA,
+    na.rm = FALSE
   ),
 
   # parameters to hide from user input in the geom_XXX() constructor
@@ -89,8 +138,30 @@ AbstractGeom = ggproto("AbstractGeom", Geom,
     # we ignore the `extra` argument and just always include the "extra"
     # parameters (based on default_params instead of extra_params as in ggplot2::Geom)
     union(params, names(self$default_params))
+  },
+
+
+  ## other methods -----------------------------------------------------------
+
+  use_defaults = function(self, data, params = list(), modifiers = aes()) {
+    # we must provide our own check for Geom$rename_size because our fallbacks
+    # from default_aes to default_key_aes require us to be able to have a non-missing
+    # (but NULL) linewidth aesthetic in default_aes, which ggplot2::Geom$use_defaults
+    # with rename_size = TRUE treats as a *missing* aesthetic and generates a warning for
+    if (self$rename_size && is.null(data$linewidth) && is.null(params$linewidth)) {
+      data$linewidth = data$size
+      params$linewidth = params$size
+    }
+    rename_size = self$rename_size
+    self$rename_size = FALSE
+    out = ggproto_parent(Geom, self)$use_defaults(data, params, modifiers)
+    self$rename_size = rename_size
+    out
   }
 )
+
+
+# make_geom ---------------------------------------------------------------
 
 #' @importFrom rlang syms new_function pairlist2 expr
 make_geom = function(geom,

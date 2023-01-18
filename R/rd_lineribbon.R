@@ -10,8 +10,7 @@
 rd_lineribbon_shortcut_stat = function(
   stat_name, chart_type,
   geom_name = stat_name,
-  from_name = "slabinterval",
-  line = TRUE
+  from_name = "lineribbon"
 ) {
   stat = get(paste0("Stat", title_case(stat_name)))
   geom = get(paste0("Geom", title_case(geom_name)))
@@ -31,7 +30,7 @@ rd_lineribbon_shortcut_stat = function(
     rd_shortcut_stat(stat_name, geom_name, from_name = from_name),
     '@inheritParams stat_pointinterval',
     '@inheritParams geom_lineribbon',
-    rd_slabinterval_params(geom_name, stat, as_dots = TRUE),
+    rd_layer_params(geom_name, stat, as_dots = TRUE),
     glue_doc('
       @param geom Use to override the default connection between
       [stat_<<stat_name>>()] and [geom_<<geom_name>>()]'),
@@ -44,7 +43,7 @@ rd_lineribbon_shortcut_stat = function(
       @return A [ggplot2::Stat] representing a <<chart_type>> geometry which can
       be added to a [ggplot()] object.'),
     rd_slabinterval_computed_variables(stat),
-    rd_lineribbon_aesthetics(geom_name, stat, line = line),
+    rd_lineribbon_aesthetics(geom_name, stat),
     glue_doc('
       @seealso
       See [geom_<<geom_name>>()] for the geom underlying this stat.
@@ -80,10 +79,16 @@ rd_lineribbon_shortcut_stat = function(
   )
 }
 
+
+# aesthetics --------------------------------------------------------------
+
 #' Provides documentation of aesthetics for lineribbons
 #' @noRd
-rd_lineribbon_aesthetics = function(geom_name = "lineribbon", stat = NULL, vignette = "lineribbon", line = TRUE) {
-  geom = get(paste0("Geom", title_case(geom_name)))
+rd_lineribbon_aesthetics = function(
+  geom_name = "lineribbon",
+  stat = NULL,
+  vignette = "lineribbon"
+) {
 
   out = glue_doc('
     @section Aesthetics:
@@ -92,39 +97,7 @@ rd_lineribbon_aesthetics = function(geom_name = "lineribbon", stat = NULL, vigne
 
     ')
 
-  # Build sections for the geom-specific aesthetics ...
-  geom_aes_sections = list()
-
-  # ribbon-specific aesthetics
-  geom_aes_sections[["Ribbon-specific aesthetics"]] = list(
-    xmin = 'Left edge of the ribbon sub-geometry (if `orientation = "horizontal"`).',
-    xmax = 'Right edge of the ribbon sub-geometry (if `orientation = "horizontal"`).',
-    ymin = 'Lower edge of the ribbon sub-geometry (if `orientation = "vertical"`).',
-    ymax = 'Upper edge of the ribbon sub-geometry (if `orientation = "vertical"`).'
-  )
-
-  # color aesthetics
-  geom_aes_sections[["Color aesthetics"]] = list(
-    colour = '(or `color`) The color of the **line** sub-geometry.',
-    fill = 'The fill color of the **ribbon** sub-geometry.',
-    alpha = 'The opacity of the **line** and **ribbon** sub-geometries.',
-    fill_ramp = 'A secondary scale that modifies the `fill`
-     scale to "ramp" to another color. See [scale_fill_ramp()] for examples.'
-  )
-
-  # line aesthetics
-  if (line) geom_aes_sections[["Line aesthetics"]] = list(
-    size = 'Width of **line**.',
-    linetype = 'Type of **line** (e.g., `"solid"`, `"dashed"`, etc)'
-  )
-
-  out = c(out, rd_aesthetics_sections(
-    geom_name, stat,
-    geom_aes_sections = geom_aes_sections,
-    stat_aes = rd_stat_slabinterval_aes,
-    undocumented_aes = c("group"),
-    vignette = vignette
-  ))
+  out = c(out, rd_aesthetics_sections(geom_name, stat, vignette = vignette))
 
   glue_collapse(out, "\n")
 }

@@ -10,11 +10,13 @@
 #' @importFrom stats ppoints
 #' @noRd
 compute_slab_dots = function(
-  self, data, trans, input, orientation,
+  self, data, scales, trans, input, orientation,
   quantiles,
   na.rm,
   ...
 ) {
+  define_orientation_variables(orientation)
+
   dist = data$dist
   if (distr_is_missing(dist)) {
     return(data.frame(.input = NA_real_, f = NA_real_, n = NA_integer_))
@@ -22,19 +24,28 @@ compute_slab_dots = function(
 
   quantiles = quantiles %||% NA
   quantiles_provided = !isTRUE(is.na(quantiles))
-  dist_quantiles = if (quantiles_provided) quantiles else 100
-  probs = ppoints(dist_quantiles, a = 1/2)
+
+  map_character = if (distr_is_factor_like(dist) && !is.null(scales[[x]]) && scales[[x]]$is_discrete()) {
+    # character or factor-like values need to be mapped back through the scale
+    scales[[x]]$map
+  } else {
+    identity
+  }
 
   if (distr_is_sample(dist)) {
-    input = distr_get_sample(dist)
+    input = map_character(distr_get_sample(dist))
     if (quantiles_provided) {
       # ppoints() with a = 1/2 corresponds to quantile() with type = 5
+      # (on continuous samples --- on discrete, we use type = 1)
       # and ensures that if quantiles == length(data[[x]]) then input == data[[x]]
-      input = quantile(input, ppoints(quantiles, a = 1/2), type = 5, na.rm = na.rm)
+      quantile_type = if (distr_is_discrete(dist)) 1 else 5
+      input = quantile(input, ppoints(quantiles, a = 1/2), type = quantile_type, na.rm = na.rm)
     }
   } else {
-    quantile_fun = distr_quantile(dist)
-    input = quantile_fun(probs)
+    dist_quantiles = if (quantiles_provided) quantiles else 100
+    dist_probs = ppoints(dist_quantiles, a = 1/2)
+    quantile_fun = distr_quantile(dist, categorical_okay = TRUE)
+    input = map_character(quantile_fun(dist_probs))
   }
 
   data.frame(
@@ -55,13 +66,20 @@ StatDotsinterval = ggproto("StatDotsinterval", StatSlabinterval,
   hidden_params = union(c(
     "limits", "n",
     "p_limits", "slab_type", "outline_bars",
-    "adjust", "trim", "expand", "breaks"
+    "density", "adjust", "trim", "expand", "breaks"
   ), StatSlabinterval$hidden_params),
 
   # workaround (#84)
   compute_slab = function(self, ...) compute_slab_dots(self, ...)
 )
-#' @rdname geom_dotsinterval
+
+#' @eval rd_dotsinterval_shortcut_stat("dotsinterval", "dots + point + interval")
+#' @inheritParams stat_slabinterval
+#' @param quantiles Setting this to a value other than `NA`
+#' will produce a quantile dotplot: that is, a dotplot of quantiles from the sample or distribution
+#' (for analytical distributions, the default of `NA` is taken to mean `100` quantiles). The value of
+#' `quantiles` determines the number
+#' of quantiles to plot. See Kay et al. (2016) and Fernandes et al. (2018) for more information on quantile dotplots.
 #' @export
 stat_dotsinterval = make_stat(StatDotsinterval, geom = "dotsinterval")
 
@@ -84,6 +102,7 @@ StatDots = ggproto("StatDots", StatDotsinterval,
   ), StatDotsinterval$hidden_params)
 )
 StatDots$default_aes$size = NULL
-#' @rdname geom_dotsinterval
+
+#' @eval rd_dotsinterval_shortcut_stat("dots", "dot")
 #' @export
 stat_dots = make_stat(StatDots, geom = "dots")

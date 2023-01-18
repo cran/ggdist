@@ -7,8 +7,8 @@
 StatLineribbon = ggproto("StatLineribbon", StatPointinterval,
   default_aes = defaults(aes(
     datatype = "interval",
-    group = stat(level),
-    fill = stat(level)
+    group = after_stat(level),
+    fill = after_stat(level)
   ), StatPointinterval$default_aes),
 
   default_params = defaults(list(
@@ -30,7 +30,7 @@ StatLineribbon = ggproto("StatLineribbon", StatPointinterval,
 # instead of being removed
 StatLineribbon$default_aes$size = NULL
 
-#' @eval rd_lineribbon_shortcut_stat("lineribbon", "line + multiple-ribbon")
+#' @eval rd_lineribbon_shortcut_stat("lineribbon", "line + multiple-ribbon", from_name = "slabinterval")
 #' @export
 stat_lineribbon = make_stat(StatLineribbon, geom = "lineribbon")
 
@@ -39,11 +39,15 @@ stat_lineribbon = make_stat(StatLineribbon, geom = "lineribbon")
 # shortcut stats ----------------------------------------------------------
 
 StatRibbon = ggproto("StatRibbon", StatLineribbon,
-  default_aes = defaults(aes(
-    color = stat(I(NA))
-  ), StatLineribbon$default_aes)
+  hidden_aes = union(c(
+    "linewidth", "linetype"
+  ), StatLineribbon$hidden_aes),
+
+  default_params = defaults(list(
+    show_point = FALSE
+  ), StatLineribbon$default_params)
 )
 
-#' @eval rd_lineribbon_shortcut_stat("ribbon", "multiple-ribbon", geom_name = "lineribbon", from_name = "lineribbon", line = FALSE)
+#' @eval rd_lineribbon_shortcut_stat("ribbon", "multiple-ribbon", geom_name = "lineribbon")
 #' @export
 stat_ribbon = make_stat(StatRibbon, geom = "lineribbon")

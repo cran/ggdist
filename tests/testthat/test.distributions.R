@@ -76,6 +76,8 @@ test_that("constant distributions are detected correctly", {
   expect_equal(distr_is_constant(dist_sample(list(1))), TRUE)
   expect_equal(distr_is_constant(dist_sample(list(c(2,2,2)))), TRUE)
   expect_equal(distr_is_constant(dist_sample(list(c(1,2,3)))), FALSE)
+  expect_false(distr_is_constant(dist_mixture(dist_degenerate(1L), dist_degenerate(2L), weights = c(0.3, 0.7))))
+  expect_true(distr_is_constant(dist_mixture(dist_degenerate(1L), dist_degenerate(1L), weights = c(0.3, 0.7))))
 
   skip_if_not_installed("posterior")
   expect_equal(distr_is_constant(posterior::rvar(1)), TRUE)

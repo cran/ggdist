@@ -37,7 +37,8 @@ label. One of "top", "bottom" (default for horizontal guide), "left", or
 object of \code{\link[ggplot2:element_text]{element_text()}} is expected. By default, the theme is
 specified by \code{legend.text} in \code{\link[ggplot2:theme]{theme()}}.}
     \item{\code{label.hjust}}{A numeric specifying horizontal justification of the
-label text.}
+label text. The default for standard text is 0 (left-aligned) and 1
+(right-aligned) for expressions.}
     \item{\code{label.vjust}}{A numeric specifying vertical justification of the label
 text.}
     \item{\code{barwidth}}{A numeric or a \code{\link[grid:unit]{grid::unit()}} object specifying
@@ -55,13 +56,14 @@ raster image.}
     \item{\code{frame.colour}}{A string specifying the colour of the frame
 drawn around the bar. If \code{NULL} (the default), no frame is drawn.}
     \item{\code{frame.linewidth}}{A numeric specifying the width of the frame
-drawn around the bar.}
+drawn around the bar in millimetres.}
     \item{\code{frame.linetype}}{A numeric specifying the linetype of the frame
 drawn around the bar.}
     \item{\code{ticks}}{A logical specifying if tick marks on the colourbar should be
 visible.}
     \item{\code{ticks.colour}}{A string specifying the colour of the tick marks.}
-    \item{\code{ticks.linewidth}}{A numeric specifying the width of the tick marks.}
+    \item{\code{ticks.linewidth}}{A numeric specifying the width of the tick marks in
+millimetres.}
     \item{\code{draw.ulim}}{A logical specifying if the upper limit tick marks should
 be visible.}
     \item{\code{draw.llim}}{A logical specifying if the lower limit tick marks should
@@ -111,20 +113,20 @@ library(distributional)
 # discrete style scale:
 tibble(d = dist_uniform(0, 1)) \%>\%
   ggplot(aes(y = 0, xdist = d)) +
-  stat_slab(aes(fill_ramp = stat(x)), fill = "blue") +
+  stat_slab(aes(fill_ramp = after_stat(x)), fill = "blue") +
   scale_fill_ramp_continuous(from = "red")
 
 # We can guide_rampbar() to instead create a continuous guide, but
 # it does not know what ccolor to ramp to (defaults to "gray65"):
 tibble(d = dist_uniform(0, 1)) \%>\%
   ggplot(aes(y = 0, xdist = d)) +
-  stat_slab(aes(fill_ramp = stat(x)), fill = "blue") +
+  stat_slab(aes(fill_ramp = after_stat(x)), fill = "blue") +
   scale_fill_ramp_continuous(from = "red", guide = guide_rampbar())
 
 # We can tell the guide what color to ramp to using the `to` argument:
 tibble(d = dist_uniform(0, 1)) \%>\%
   ggplot(aes(y = 0, xdist = d)) +
-  stat_slab(aes(fill_ramp = stat(x)), fill = "blue") +
+  stat_slab(aes(fill_ramp = after_stat(x)), fill = "blue") +
   scale_fill_ramp_continuous(from = "red", guide = guide_rampbar(to = "blue"))
 
 }
