@@ -157,6 +157,15 @@ df_2groups %>%
   stat_lineribbon(aes(fill_ramp = after_stat(level))) +
   labs(title = "stat_lineribbon(aes(fill = g, fill_ramp = after_stat(level)))")
 
+## ----stat_lineribbon_2groups_group_order, fig.width = tiny_width, fig.height = tiny_height----------------------------
+df_2groups %>%
+  ggplot(aes(x = x, y = y, fill = g)) +
+  stat_lineribbon(aes(
+    fill_ramp = after_stat(level),
+    order = after_stat(interaction(level, group))
+  )) +
+  labs(title = "stat_lineribbon(aes(order = after_stat(interaction(level, group))))")
+
 ## ----analytical_df----------------------------------------------------------------------------------------------------
 analytical_df = tibble(
   x = -4:5,

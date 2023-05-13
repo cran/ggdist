@@ -306,12 +306,6 @@ plot_grid(ncol = 3, align = "hv",
   p + stat_eye(side = "right")  + labs(subtitle = "side = 'right'")
 )
 
-## ----halfeyeh, fig.width = small_height, fig.height = small_height----------------------------------------------------
-df %>%
-  ggplot(aes(x = group, y = value)) +
-  stat_halfeye() +
-  ggtitle("stat_halfeye()")
-
 ## ----eyeh_side, fig.width = med_width, fig.height = small_height------------------------------------------------------
 p = df %>%
   ggplot(aes(x = value, y = group)) +
@@ -340,12 +334,6 @@ dist_df = tribble(
     "c",          "i",     9,   1,
     "c",          "j",     7,   1
 )
-
-## ----dist_eye_dodge---------------------------------------------------------------------------------------------------
-dist_df %>%
-  ggplot(aes(x = group, ydist = "norm", arg1 = mean, arg2 = sd, fill = subgroup)) +
-  stat_eye(position = "dodge") +
-  ggtitle("stat_eye(position = 'dodge')", 'aes(ydist = "norm", arg1 = mean, arg2 = sd)')
 
 ## ----dist_eye_dodge_distributional------------------------------------------------------------------------------------
 dist_df %>%
@@ -377,20 +365,20 @@ data.frame(alpha = seq(5, 100, length.out = 10)) %>%
   )
 
 ## ----norm_vs_t, fig.width = small_height, fig.height = small_height---------------------------------------------------
-tribble(
-  ~ dist,      ~ args,
-  "norm",      list(0, 1),
-  "student_t", list(3, 0, 1)
+tibble(
+  dist = c(dist_normal(0,1), dist_student_t(3, 0, 1))
 ) %>%
-  ggplot(aes(y = dist, xdist = dist, args = args)) +
+  ggplot(aes(y = format(dist), xdist = dist)) +
   stat_halfeye() +
-  ggtitle("stat_halfeye()", "aes(xdist = dist, args = args)")
+  ggtitle("stat_halfeye()", "aes(xdist = dist)")
 
 ## ----priors_fake, eval=FALSE------------------------------------------------------------------------------------------
 #  # NB these priors are made up!
 #  priors = c(
-#    prior(normal(0,1), class = b),
-#    prior(lognormal(0,1), class = sigma)
+#    prior(normal(1, 0.5), class = b),
+#    prior(gamma(2, 2), class = phi),
+#    # lb = 0 sets a lower bound of 0, i.e. a half-Normal distribution
+#    prior(normal(0, 1), class = sigma, lb = 0)
 #  )
 #  priors
 
@@ -398,13 +386,14 @@ tribble(
 # we want to avoid a brms dependency, so we fake it above and
 # just show the output of brms::prior() here
 priors = data.frame(
-  prior = c("normal(0, 1)", "lognormal(0, 1)"),
-  class = c("b", "sigma"), coef = c("", ""),
-  group = c("", ""),
-  resp = c("", ""),
-  dpar = c("", ""),
-  nlpar = c("", ""),
-  bound = c("", "")
+  prior = c("normal(1, 0.5)", "gamma(2, 2)", "normal(0, 1)"),
+  class = c("b", "phi", "sigma"), coef = c("", "", ""),
+  group = c("", "", ""),
+  resp = c("", "", ""),
+  dpar = c("", "", ""),
+  nlpar = c("", "", ""),
+  lb = c(NA, NA, "0"),
+  ub = c(NA, NA, NA)
 )
 priors
 
@@ -415,12 +404,13 @@ priors %>%
 ## ----prior_dist_halfeyeh----------------------------------------------------------------------------------------------
 priors %>%
   parse_dist(prior) %>%
-  ggplot(aes(y = class, xdist = .dist, args = .args)) +
+  ggplot(aes(y = paste(class, "~", format(.dist_obj)), xdist = .dist_obj)) +
   stat_halfeye() +
   labs(
     title = "stat_halfeye()",
     subtitle = "with brms::prior() and ggdist::parse_dist() to visualize priors",
-    x = NULL
+    x = NULL,
+    y = NULL
   )
 
 ## ----prior_post, fig.width = med_width, fig.height = small_height * 2/3-----------------------------------------------
@@ -447,9 +437,9 @@ shared_scale_plot = prior_post %>%
 
 separate_scale_plot + shared_scale_plot
 
-## ----dist_halfeyeh_log_scale, fig.width = small_height, fig.height = small_height/1.5---------------------------------
-data.frame(dist = "lnorm", logmean = log(10), logsd = 2*log(10)) %>%
-  ggplot(aes(xdist = dist, arg1 = logmean, arg2 = logsd)) +
+## ----dist_halfeyeh_log_scale, fig.width = small_height, fig.height = small_height/1.75--------------------------------
+data.frame(dist = dist_lognormal(log(10), 2*log(10))) %>%
+  ggplot(aes(xdist = dist)) +
   stat_halfeye() +
   scale_x_log10(breaks = 10^seq(-5,7, by = 2))
 
@@ -509,15 +499,6 @@ df %>%
   stat_ccdfinterval(position = "dodge") +
   ggtitle("stat_ccdfinterval(position = 'dodge')") 
 
-## ----ccdf_dodge-------------------------------------------------------------------------------------------------------
-df %>%
-  ggplot(aes(x = group, y = value, fill = subgroup)) +
-  stat_ccdfinterval(position = "dodge") +
-  expand_limits(y = 0) +
-  # plus coord_cartesian so there is no space between bars and axis
-  coord_cartesian(expand = FALSE) +
-  ggtitle("stat_ccdfinterval(position = 'dodge')")
-
 ## ----ccdf_justification-----------------------------------------------------------------------------------------------
 df %>%
   ggplot(aes(x = group, y = value, fill = subgroup)) +
@@ -526,7 +507,7 @@ df %>%
   coord_cartesian(expand = FALSE) +
   ggtitle("stat_ccdfinterval(position = 'dodge', justification = 1)")
 
-## ----ccdf_side, fig.width = med_width, fig.height = med_height--------------------------------------------------------
+## ----ccdf_side, fig.width = med_width, fig.height = med_height/1.5----------------------------------------------------
 p = df %>%
   ggplot(aes(x = value, y = group)) +
   expand_limits(x = 0) +
@@ -534,7 +515,8 @@ p = df %>%
 
 plot_grid(ncol = 3, align = "hv", 
   # side = "left" would give the same result
-  p + stat_ccdfinterval(side = "bottom") + ggtitle("stat_ccdfinterval()") + labs(subtitle = "side = 'bottom'"),
+  p + stat_ccdfinterval(side = "bottom") + labs(subtitle = "side = 'bottom'") +
+    ggtitle("stat_ccdfinterval()"),
   p + stat_ccdfinterval(side = "both") + labs(subtitle = "side = 'both'"),
   # side = "right" would give the same result
   p + stat_ccdfinterval(side = "top") + labs(subtitle = "side = 'top'")
@@ -599,14 +581,12 @@ df %>%
   ggtitle("stat_ccdfinterval(thickness = 1)", "aes(slab_alpha = after_stat(f))")
 
 ## ----norm_vs_t_highlight, fig.width = med_width, fig.height = small_height--------------------------------------------
-priors = tribble(
-  ~ dist,      ~ args,
-  "norm",      list(0, 1),
-  "student_t", list(3, 0, 1)
+priors = tibble(
+  dist = c(dist_normal(0, 1), dist_student_t(3, 0, 1))
 ) 
 
 priors %>%
-  ggplot(aes(y = dist, xdist = dist, args = args)) +
+  ggplot(aes(y = format(dist), xdist = dist)) +
   stat_halfeye(aes(fill = after_stat(abs(x) < 1.5))) +
   ggtitle("stat_halfeye()", "aes(fill = after_stat(abs(x) < 1.5)))") +
   # we'll use a nicer palette than the default for highlighting:
@@ -614,7 +594,7 @@ priors %>%
 
 ## ----norm_vs_t_gradient_eye, fig.width = med_width, fig.height = small_height-----------------------------------------
 priors %>%
-  ggplot(aes(y = dist, xdist = dist, args = args)) +
+  ggplot(aes(y = format(dist), xdist = dist)) +
   stat_eye(aes(slab_alpha = after_stat(f), fill = after_stat(x > 1)), fill_type = "gradient") +
   ggtitle(
     "stat_eye(fill_type = 'gradient')", 
@@ -625,7 +605,7 @@ priors %>%
 
 ## ----correll_gradient, fig.width = small_width, fig.height = small_height/2-------------------------------------------
 priors %>%
-  ggplot(aes(y = dist, xdist = dist, args = args)) +
+  ggplot(aes(y = format(dist), xdist = dist)) +
   stat_gradientinterval(aes(slab_alpha = after_stat(-pmax(abs(1 - 2*cdf), .95))),
     fill_type = "gradient"
   ) +
@@ -637,7 +617,7 @@ priors %>%
 
 ## ----helske_gradient_eye, fig.width = med_width, fig.height = small_height--------------------------------------------
 priors %>%
-  ggplot(aes(y = dist, xdist = dist, args = args)) +
+  ggplot(aes(y = format(dist), xdist = dist)) +
   stat_eye(aes(slab_alpha = after_stat(-pmax(abs(1 - 2*cdf), .95))), fill_type = "gradient") +
   scale_slab_alpha_continuous(guide = "none") +
   ggtitle(
@@ -693,19 +673,39 @@ df %>%
 
 ## ----halfeye_qi_vs_hdi, fig.width = med_width, fig.height = small_height----------------------------------------------
 qi_plot = data.frame(dist = dist_beta(10, 2)) %>%
-  ggplot(aes(xdist = dist, fill = after_stat(level))) + 
-  stat_halfeye(point_interval = median_qi, .width = c(.5, .8, .95)) + 
+  ggplot(aes(xdist = dist)) + 
+  stat_halfeye(aes(fill = after_stat(level)), point_interval = median_qi, .width = c(.5, .8, .95)) + 
   scale_fill_brewer(na.value = "gray95") +
   labs(subtitle = "stat_halfeye(aes(fill = after_stat(level)), point_interval = median_qi)")
 
 hdi_plot = data.frame(dist = dist_beta(10, 2)) %>%
-  ggplot(aes(xdist = dist, fill = after_stat(level))) + 
-  stat_halfeye(point_interval = mode_hdci, .width = c(.5, .8, .95)) + 
+  ggplot(aes(xdist = dist)) + 
+  stat_halfeye(aes(fill = after_stat(level)), point_interval = mode_hdci, .width = c(.5, .8, .95)) + 
   scale_fill_brewer(na.value = "gray95") +
   labs(subtitle = "stat_halfeye(aes(fill = after_stat(level)), point_interval = mode_hdci)")
 
 qi_plot /
   hdi_plot
+
+## ----halfeye_qi_vs_hdi_spikes, fig.width = med_width, fig.height = small_height---------------------------------------
+qi_plot_spikes = data.frame(dist = dist_beta(10, 2)) %>%
+  ggplot(aes(xdist = dist)) + 
+  stat_slab(aes(fill = after_stat(level)), point_interval = median_qi, .width = c(.5, .95)) + 
+  stat_spike(at = c(median, qi)) + 
+  scale_fill_brewer(na.value = "gray95") +
+  scale_thickness_shared() +
+  labs(subtitle = "stat_slab() + stat_spike(at = c(median, qi))")
+
+hdi_plot_spikes = data.frame(dist = dist_beta(10, 2)) %>%
+  ggplot(aes(xdist = dist)) + 
+  stat_slab(aes(fill = after_stat(level)), point_interval = mode_hdci, .width = c(.5, .95)) + 
+  stat_spike(at = c(Mode, hdci)) +
+  scale_fill_brewer(na.value = "gray95") +
+  scale_thickness_shared() +
+  labs(subtitle = "stat_slab() + stat_spike(at = c(Mode, hdci))")
+
+qi_plot_spikes /
+  hdi_plot_spikes
 
 ## ----halfeye_filled_intervals_subgroup, fig.width = med_width, fig.height = small_height------------------------------
 df %>%
@@ -737,9 +737,9 @@ dist_df %>%
     subtitle = "aes(color = subgroup, color_ramp = after_stat(level))"
   )
 
-## ----raindrop, fig.width = med_width, fig.height = small_height-------------------------------------------------------
+## ----raindrop, fig.width = med_width, fig.height = small_height/1.5---------------------------------------------------
 priors %>%
-  ggplot(aes(y = dist, xdist = dist, args = args)) +
+  ggplot(aes(y = format(dist), xdist = dist)) +
   # must also use normalize = "groups" because min(log(pdf)) will be different for each dist
   stat_slab(
     aes(thickness = after_stat(ifelse(.width <= 0.99, log(pdf), NA))), 
@@ -776,7 +776,7 @@ ridges_df %>%
   )) +
   stat_slab(
     height = 2, color = "gray15", 
-    expand = TRUE, trim = FALSE, 
+    expand = TRUE, trim = FALSE, density = "unbounded",
     fill_type = "gradient", 
     show.legend = FALSE
   ) +
@@ -817,7 +817,7 @@ df %>%
     'stat_pointinterval(geom = "label")'
   ))
 
-## ----slab_and_pointinterval, fig.width = med_width, fig.height = small_height-----------------------------------------
+## ----slab_and_pointinterval, fig.width = med_width, fig.height = small_height/1.5-------------------------------------
 df %>%
   ggplot(aes(fill = group, color = group, x = value)) +
   stat_slab(alpha = .3) +

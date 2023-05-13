@@ -51,6 +51,19 @@ match_function = function(f, prefix = "", env = globalenv()) {
     get(f, mode = "function", envir = getNamespace("ggdist"))
 }
 
+#' Check for NAs and remove them as needed
+#' @noRd
+check_na = function(x, na.rm) {
+  if (anyNA(x)) {
+    if (isTRUE(na.rm)) {
+      x = x[!is.na(x)]
+    } else {
+      stop0("`x` must not contain missing (NA) values")
+    }
+  }
+  x
+}
+
 
 # deprecations and warnings -----------------------------------------------
 
@@ -113,13 +126,6 @@ row_map_dfr_ = function(data, fun, ...) {
 pmap_ = function(data, fun) {
   # this is roughly equivalent to purrr::pmap
   lapply(vctrs::vec_chop(data), function(row) do.call(fun, lapply(row, `[[`, 1)))
-}
-
-pmap_dfr_ = function(data, fun) {
-  # this is roughly equivalent to
-  # pmap_dfr(df, function(...) { ... })
-  # but works properly with vctrs (pmap_dfr seems broken on rvars?)
-  bind_rows(pmap_(data, fun))
 }
 
 ddply_ = function(data, groups, fun, ...) {

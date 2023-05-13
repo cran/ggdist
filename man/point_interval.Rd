@@ -94,15 +94,23 @@ ll(x, .width = 0.95, na.rm = FALSE)
 
 ul(x, .width = 0.95, na.rm = FALSE)
 
-hdi(x, .width = 0.95, .prob, na.rm = FALSE, ...)
+hdi(
+  x,
+  .width = 0.95,
+  na.rm = FALSE,
+  ...,
+  density = density_bounded(trim = TRUE),
+  n = 4096,
+  .prob
+)
 
-Mode(x, na.rm = FALSE)
+Mode(x, na.rm = FALSE, ...)
 
-\method{Mode}{default}(x, na.rm = FALSE)
+\method{Mode}{default}(x, na.rm = FALSE, ..., density = density_bounded(trim = TRUE), n = 2001)
 
-\method{Mode}{rvar}(x, na.rm = FALSE)
+\method{Mode}{rvar}(x, na.rm = FALSE, ...)
 
-\method{Mode}{distribution}(x, na.rm = FALSE)
+\method{Mode}{distribution}(x, na.rm = FALSE, ...)
 
 hdci(x, .width = 0.95, na.rm = FALSE)
 
@@ -177,6 +185,16 @@ names used in \pkg{ggdist} and \pkg{tidybayes}.}
 \item{.prob}{Deprecated. Use \code{.width} instead.}
 
 \item{x}{vector to summarize (for interval functions: \code{qi} and \code{hdi})}
+
+\item{density}{For \code{\link[=hdi]{hdi()}} and \code{\link[=Mode]{Mode()}}, the kernel density estimator to use, either as
+a function (e.g. \code{\link{density_bounded}}, \code{\link{density_unbounded}}) or as a string giving the
+suffix to a function that starts with \code{density_} (e.g. \code{"bounded"} or \code{"unbounded"}). The
+default, \code{"bounded"}, uses the bounded density estimator of \code{\link[=density_bounded]{density_bounded()}}, which
+itself estimates the bounds of the distribution, and tends to work well on both bounded
+and unbounded data.}
+
+\item{n}{For \code{\link[=hdi]{hdi()}} and \code{\link[=Mode]{Mode()}}, the number of points to use to estimate highest-density
+intervals or modes.}
 }
 \value{
 A data frame containing point summaries and intervals, with at least one column corresponding
@@ -226,15 +244,12 @@ equi-tailed interval) as a 1x2 matrix.
 density interval). \strong{Note:} If the distribution is multimodal, \code{hdi} may return multiple
 intervals for each probability level (these will be spread over rows). You may wish to use
 \code{hdci} (below) instead if you want a single highest-density interval, with the caveat that when
-the distribution is multimodal \code{hdci} is not a highest-density interval. Internally \code{hdi} uses
-\code{\link[HDInterval:hdi]{HDInterval::hdi()}} with \code{allowSplit = TRUE} (when multimodal) and with
-\code{allowSplit = FALSE} (when not multimodal).
+the distribution is multimodal \code{hdci} is not a highest-density interval.
 
-\code{hdci} yields the highest-density \emph{continuous} interval. \strong{Note:} If the distribution
-is multimodal, this may not actually be the highest-density interval (there may be a higher-density
-discontinuous interval). Internally \code{hdci} uses
-\code{\link[HDInterval:hdi]{HDInterval::hdi()}} with \code{allowSplit = FALSE}; see that function for more
-information on multimodality and continuous versus discontinuous intervals.
+\code{hdci} yields the highest-density \emph{continuous} interval, also known as the shortest
+probability interval. \strong{Note:} If the distribution is multimodal, this may not actually
+be the highest-density interval (there may be a higher-density
+discontinuous interval, which can be found using \code{hdi}).
 
 \code{ll} and \code{ul} yield lower limits and upper limits, respectively (where the opposite
 limit is set to either \code{Inf} or \code{-Inf}).

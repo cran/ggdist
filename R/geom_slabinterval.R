@@ -54,7 +54,20 @@ normalize_thickness.data.frame = function(x) {
 #' so we scale things based on the min height to ensure everything
 #' is the same height
 #' @noRd
-rescale_slab_thickness = function(s_data, orientation, normalize, height, y, ymin, ymax) {
+rescale_slab_thickness = function(
+  s_data, orientation, normalize, na.rm,
+  name = "geom_slabinterval"
+) {
+  define_orientation_variables(orientation)
+
+  # remove missing values - thickness NAs are fine here since they just create
+  # breaks in the slab (handled elsewhere in geom_slabinterval), but missing height
+  # means we can't even determine slab dimensions, so need a warning
+  s_data = ggplot2::remove_missing(s_data, na.rm, c(height, "justification", "scale"), name = name, finite = TRUE)
+  # side is a character vector, thus need finite = FALSE for it; x/y can be Inf here
+  s_data = ggplot2::remove_missing(s_data, na.rm, c(x, y, "side"), name = name)
+  if (nrow(s_data) == 0) return(s_data)
+
   min_height = min(s_data[[height]])
 
   # must do this within groups so that `side` can vary by slab
@@ -100,15 +113,8 @@ draw_slabs = function(self, s_data, panel_params, coord,
 ) {
   define_orientation_variables(orientation)
 
-  # remove missing values - thickness NAs are fine here since they just create
-  # breaks in the slab (handled below), but missing height means we can't
-  # even determine slab dimensions, so need a warning
-  s_data = ggplot2::remove_missing(s_data, na.rm, c(height, "justification", "scale"), name = "geom_slabinterval", finite = TRUE)
-  # side is a character vector, thus need finite = FALSE for it; x/y can be Inf here
-  s_data = ggplot2::remove_missing(s_data, na.rm, c(x, y, "scale"), name = "geom_slabinterval")
-
   s_data = self$override_slab_aesthetics(rescale_slab_thickness(
-    s_data, orientation, normalize, height, y, ymin, ymax
+    s_data, orientation, normalize, na.rm, name = "geom_slabinterval"
   ))
 
   # avoid giving fill type warnings multiple times
@@ -228,7 +234,7 @@ draw_path = function(data, panel_params, coord) {
         lwd = munched_path$linewidth * .pt,
         lty = munched_path$linetype,
         lineend = "butt",
-        linejoin = "round",
+        linejoin = "bevel",
         linemitre = 10
       )
     )
@@ -566,7 +572,7 @@ GeomSlabinterval = ggproto("GeomSlabinterval", AbstractGeom,
           large numbers of unique fill colors, but requires R >= 4.1 and is not yet supported on all graphics devices.
           As of this writing, the `png()` graphics device with `type = "cairo"`, the `svg()` device, the `pdf()`
           device, and the `ragg::agg_png()` devices are known to support this option. On R < 4.1, this option
-          will fall back to `fill_type = "segment"` with a message.
+          will fall back to `fill_type = "segments"` with a message.
         \\item `"auto"`: attempts to use `fill_type = "gradient"` if support for it can be auto-detected. On R >= 4.2,
           support for gradients can be auto-detected on some graphics devices; if support is not detected, this
           option will fall back to `fill_type = "segments"` (in case of a false negative, `fill_type = "gradient"`
@@ -981,35 +987,44 @@ draw_polygon = function(data, panel_params, coord, fill = NULL) {
   )
 }
 
+#'@importFrom cli cli_warn cli_abort
 switch_fill_type = function(fill_type, segments, gradient) {
   if (getRversion() < "4.1.0" && fill_type == "gradient") {             # nocov start
-    warning0(glue('
-      fill_type = "gradient" is not supported in R < 4.1.0.
-       - Falling back to fill_type = "segments".
-       - See help("geom_slabinterval") for more information.
-      '))
+    cli_warn(c(
+      '{.code fill_type = "gradient"} is not supported in R < 4.1.0.',
+      'i' = 'Falling back to {.code fill_type = "segments"}.',
+      'i' = 'See the documentation for {.arg fill_type} in
+             {.fun ggdist::geom_slabinterval} for more information.'
+    ))
     fill_type = "segments"
   } else if (getRversion() < "4.2.0" && fill_type == "auto") {
-    warning0(glue('
-      fill_type cannot be auto-detected in R < 4.2.0.
-       - Falling back to fill_type = "segments".
-       - For best results, if you are using a graphics device that
-         supports gradients, set fill_type = "gradient".
-       - See help("geom_slabinterval") for more information.
-      '))
+    cli_warn(c(
+      '{.arg fill_type} cannot be auto-detected in R < 4.2.0.',
+      'i' = 'Falling back to {.code fill_type = "segments"}.',
+      'i' = 'For best results, if you are using a graphics device that
+             supports gradients, set {.code fill_type = "gradient"}.',
+      'i' = 'See the documentation for {.arg fill_type} in
+             {.fun ggdist::geom_slabinterval} for more information.'
+    ))
     fill_type = "segments"
   } else if (fill_type == "auto") {
     if ("LinearGradient" %in% grDevices::dev.capabilities()$patterns) {
       fill_type = "gradient"
     } else {
-      warning0(glue('
-        fill_type = "gradient" is not supported by the current graphics device.
-         - Falling back to fill_type = "segments".
-         - If you believe your current graphics device *does* support
-           fill_type = "gradient" but auto-detection failed, set that option
-           explicitly and consider reporting a bug.
-         - See help("geom_slabinterval") for more information.
-        '))
+      cli_warn(c(
+        '{.code fill_type = "gradient"} is not supported by the current graphics device,
+         which is {.code {deparse0(names(dev.cur()))}}.',
+        'i' = 'Falling back to {.code fill_type = "segments"}.',
+        'i' = 'If you believe your current graphics device {.emph does} support
+           {.code fill_type = "gradient"} but auto-detection failed, try setting
+           {.code fill_type = "gradient"} explicitly. If this causes the gradient to display
+           correctly, then this warning is likely a false positive caused by
+           the graphics device failing to properly report its support for the
+           {.code "LinearGradient"} pattern via {.fun grDevices::dev.capabilities}.
+           Consider reporting a bug to the author of the graphics device.',
+        'i' = 'See the documentation for {.arg fill_type} in
+             {.fun ggdist::geom_slabinterval} for more information.'
+      ))
       fill_type = "segments"
     }
   }                                                                     # nocov end
@@ -1017,6 +1032,9 @@ switch_fill_type = function(fill_type, segments, gradient) {
   switch(fill_type,
     segments = segments,
     gradient = gradient,
-    stop0("Unknown fill_type: ", deparse0(fill_type), '\nShould be "segments" or "gradient"')
+    cli_abort(c(
+      'Unknown {.arg fill_type}: {.code {deparse0(fill_type)}}',
+      'i' = '{.arg fill_type} should be {.code "segments"} or {.code "gradient"}.'
+    ))
   )
 }

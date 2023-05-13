@@ -512,7 +512,7 @@ dist_df %>%
     'aes(slab_color = after_stat(x)) +\nscale_color_distiller(aesthetics = "slab_color", guide = "colorbar2")'
   )
 
-## ----dist_dots_shape_color, fig.width = med_width, fig.height = large_height------------------------------------------
+## ----dist_dots_shape_color, fig.width = med_width, fig.height = med_height--------------------------------------------
 ab_df = tibble(
   ab = c("a", "b"),
   mean = c(5, 7),
@@ -534,7 +534,7 @@ ab_df %>%
   # we'll use these shapes since they have fill and outlines
   scale_shape_manual(values = c(21,22))
 
-## ----dist_dots_weave, fig.width = med_width, fig.height = large_height------------------------------------------------
+## ----dist_dots_weave, fig.width = med_width, fig.height = med_height--------------------------------------------------
 ab_df %>%
   ggplot(aes(y = ab, xdist = dist_normal(mean, sd), fill = after_stat(x < 6))) +
   stat_dots(position = "dodge", color = NA, layout = "weave") +
@@ -563,7 +563,7 @@ data.frame(
     'aes(fill = abc)'
   )
 
-## ----gentoo_raw-------------------------------------------------------------------------------------------------------
+## ----gentoo_raw, fig.width = med_width, fig.height = med_height-------------------------------------------------------
 gentoo = penguins %>%
   filter(species == "Gentoo", !is.na(sex))
 
@@ -580,7 +580,7 @@ gentoo %>%
 m = glm(sex == "male" ~ body_mass_g, data = gentoo, family = binomial)
 m
 
-## ----logit_dotplot----------------------------------------------------------------------------------------------------
+## ----logit_dotplot, fig.width = med_width, fig.height = med_height/1.5------------------------------------------------
 # construct a prediction grid for the fit line
 prediction_grid = with(gentoo, 
   data.frame(body_mass_g = seq(min(body_mass_g), max(body_mass_g), length.out = 100))

@@ -3,10 +3,11 @@
 # Author: mjskay
 ###############################################################################
 
-library(dplyr)
-library(purrr)
-library(tidyr)
-
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(purrr)
+  library(tidyr)
+})
 
 
 # use a subset of RankCorr so tests are faster
@@ -83,19 +84,23 @@ test_that("multimodal intervals work with stat_interval", {
 
 
   set.seed(1234)
-  df = data.frame(x = c(rnorm(300), rnorm(300, 5)) + c(0,.5), g = c("a","b"))
+  df = data.frame(x = c(rexp(300), rnorm(300, 5)) + c(0,.5), g = c("a","b"))
 
   vdiffr::expect_doppelganger("multimodal intervals (h, stat, dodged)",
     df %>%
       ggplot(aes(x = x, y = "a", group = g)) +
+      # stat_slab(position = "dodge") +  # for verification
+      # stat_slab(aes(x = NULL, xdist = d), data = data.frame(d = dist_mixture(dist_exponential(1), dist_normal(5), weights = c(0.5, 0.5)) + c(0, 0.5), g = c("a","b")), position = "dodge", fill = NA, color = "green", alpha = 0.5) +  # for verification
+      stat_interval(point_interval = mean_hdi, position = "dodge", .width = c(.55, .95)) +
+      stat_pointinterval(point_interval = mode_hdi, position = "dodge", .width = .55) +
+      scale_color_brewer() +
+      scale_thickness_shared()
+  )
+
+  vdiffr::expect_doppelganger("multimodal intervals (stat, dodged)",
+    df %>%
+      ggplot(aes(y = x, x = "a", group = g)) +
       stat_interval(point_interval = mean_hdi, position = "dodge") +
       scale_color_brewer()
   )
-
-  stat_interval_plot_multimodal_dodged = df %>%
-    ggplot(aes(y = x, x = "a", group = g)) +
-    stat_interval(point_interval = mean_hdi, position = "dodge") +
-    scale_color_brewer()
-
-  vdiffr::expect_doppelganger("multimodal intervals (stat, dodged)", stat_interval_plot_multimodal_dodged)
 })

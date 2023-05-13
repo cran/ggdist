@@ -41,7 +41,7 @@ ABC =
     response = rnorm(n * 5, c(0,1,2,1,-1), 0.5)
   )
 
-## ----data_plot--------------------------------------------------------------------------------------------------------
+## ----data_plot, fig.width = med_width, fig.height = med_height/1.5----------------------------------------------------
 ABC %>%
   ggplot(aes(x = response, y = condition)) +
   geom_point(alpha = 0.5) +

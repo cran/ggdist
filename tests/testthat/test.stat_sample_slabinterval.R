@@ -3,8 +3,10 @@
 # Author: mjskay
 ###############################################################################
 
-library(dplyr)
-library(tidyr)
+suppressWarnings(suppressPackageStartupMessages({
+  library(dplyr)
+  library(tidyr)
+}))
 
 
 
@@ -46,12 +48,6 @@ test_that("fill_type = 'gradient' works", {
     ggplot() +
     scale_slab_alpha_continuous(range = c(0,1))
 
-  write_svg_with_gradient = function(plot, file, title = "") {
-    svglite::svglite(file, width = 10, height = 8, bg = "white", pointsize = 12, standalone = TRUE, always_valid = FALSE)
-    on.exit(grDevices::dev.off())
-    vdiffr:::print_plot(plot, title)
-  }
-
   vdiffr::expect_doppelganger("fill_type = gradient with two groups",
     p + stat_gradientinterval(aes(x = dist, y = x), n = 15, fill_type = "gradient"),
     writer = write_svg_with_gradient
@@ -63,7 +59,7 @@ test_that("fill_type = 'gradient' works", {
 
 })
 
-test_that("histinterval and slab work", {
+test_that("histinterval outline works", {
   skip_if_no_vdiffr()
 
 
@@ -85,6 +81,21 @@ test_that("histinterval and slab work", {
   vdiffr::expect_doppelganger("histinterval with outlines bw bars",
     p + stat_histinterval(aes(x = dist, y = x), slab_color = "black", outline_bars = TRUE)
   )
+})
+
+test_that("slab outline works", {
+  skip_if_no_vdiffr()
+  skip_if_sensitive_to_density()
+
+
+  set.seed(1234)
+  p = tribble(
+    ~dist,  ~x,
+    "norm", rnorm(100),
+    "t",    rt(100, 3)
+  ) %>%
+    unnest(x) %>%
+    ggplot()
 
   vdiffr::expect_doppelganger("slab with outline",
     p + stat_slab(aes(x = dist, y = x), n = 20, slab_color = "black")
@@ -96,31 +107,50 @@ test_that("scale transformation works", {
   skip_if_no_vdiffr()
 
 
-
-  p_log = data.frame(x = qlnorm(ppoints(200), log(10), 2 * log(10))) %>%
-    ggplot(aes(y = "a", x = x)) +
-    scale_x_log10(breaks = 10^seq(-5,7, by = 2))
-
-  vdiffr::expect_doppelganger("halfeyeh log scale transform",
-    p_log + stat_halfeye(point_interval = mode_hdci, n = 20)
-  )
+  p_log = data.frame(x = 10^c(-1, -0.55, -0.35, -0.15, -0.05, -0.01, 0.01, 0.05, 0.15, 0.35, 0.55, 1)) %>%
+    ggplot(aes(y = 0, x = x)) +
+    scale_x_log10(breaks = 10^seq(-2,2), limits = 10^c(-2,2))
 
   vdiffr::expect_doppelganger("ccdfintervalh log scale transform",
-    p_log + stat_ccdfinterval(point_interval = mean_hdi, n = 20)
+    p_log + stat_ccdfinterval(point_interval = mean_hdi, n = 100, .width = .5, scale = 1, slab_color = "black") +
+      geom_point()
   )
 
   vdiffr::expect_doppelganger("cdfintervalh log scale transform",
-    p_log + stat_cdfinterval(point_interval = mean_hdi, n = 20)
+    p_log + stat_cdfinterval(point_interval = mean_hdi, n = 100, .width = .5, scale = 1, slab_color = "black") +
+      geom_point()
   )
 
   vdiffr::expect_doppelganger("histintervalh log scale transform",
-    p_log + stat_histinterval(point_interval = median_qi, n = 20)
+    p_log + stat_histinterval(point_interval = median_qi, .width = .5)
+  )
+
+})
+
+test_that("scale transformation works on halfeye", {
+  skip_if_no_vdiffr()
+  skip_if_sensitive_to_density()
+
+
+  p_log = data.frame(x = 10^c(-1, -0.55, -0.35, -0.15, -0.05, -0.01, 0.01, 0.05, 0.15, 0.35, 0.55, 1)) %>%
+    ggplot(aes(y = 0, x = x)) +
+    scale_x_log10(breaks = 10^seq(-1,1))
+
+  vdiffr::expect_doppelganger("halfeyeh log scale tri",
+    p_log + stat_halfeye(point_interval = mode_hdci, n = 20, density = density_unbounded(kernel = "tri"), .width = .5) +
+      geom_point(data = data.frame(x = 10^c(-1, 1)))
+  )
+
+  vdiffr::expect_doppelganger("halfeyeh log scale tri no trim",
+    p_log + stat_halfeye(point_interval = mode_hdci, n = 20, density = density_unbounded(kernel = "tri"), trim = FALSE, .width = .5) +
+      geom_point(data = data.frame(x = 10^c(-1, 1)))
   )
 
 })
 
 test_that("pdf and cdf aesthetics work", {
   skip_if_no_vdiffr()
+  skip_if_sensitive_to_density()
 
 
   p = data.frame(
@@ -138,10 +168,10 @@ test_that("constant distributions work", {
   skip_if_no_vdiffr()
 
 
+  # constant dist when n != 1
   p = data.frame(
-    x = c("constant = 1", "normal(2,1)"),
-    # sd of 0 will generate constant dist
-    y = qnorm(ppoints(100), mean = c(1, 2), sd = c(0, 1))
+    x = c("constant = 1", "constant = 2", "constant = 3"),
+    y = rep(c(0,1,2), times = 10)
   ) %>%
     ggplot(aes(x = x, y = y))
 
@@ -154,14 +184,13 @@ test_that("constant distributions work", {
   )
 
   vdiffr::expect_doppelganger("constant dist on ccdf",
-    p + stat_ccdfinterval()
+    p + stat_ccdfinterval(trim = FALSE)
   )
 
   # constant dist when n = 1
   p = data.frame(
-    x = c("constant = 1", rep("normal(2,1)", 50)),
-    # sd of 0 will generate constant dist
-    y = qnorm(c(0.5, ppoints(50)), mean = c(1, rep(2, 50)), sd = c(0, rep(1, 50)))
+    x = c("constant = 1", "constant = 2", "constant = 3"),
+    y = c(0,1,2)
   ) %>%
     ggplot(aes(x = x, y = y))
 
@@ -184,7 +213,7 @@ test_that("side and justification can vary", {
         justification = case_when(cyl == 4 ~ 0, cyl == 6 ~ 0.5, cyl == 8 ~ 1),
         scale = case_when(cyl == 4 ~ 0.5, cyl == 6 ~ 1, cyl == 8 ~ 0.5)
       )) +
-      stat_sample_slabinterval(orientation = "horizontal", normalize = "groups", n = 15)
+      stat_histinterval(orientation = "horizontal", normalize = "groups", n = 15)
   )
 })
 
@@ -194,13 +223,25 @@ test_that("n is calculated correctly", {
   set.seed(1234)
   df = data.frame(
     g = c("a","a","a","b","c"),
-    x = rnorm(120, c(1,1,1,2,3))
+    x = rnorm(15, c(1,1,1,2,3))
   )
 
-  vdiffr::expect_doppelganger("pdf*n for different-sized groups",
+  ld = layer_data(
     df %>%
       ggplot(aes(x = x, y = g, thickness = after_stat(pdf*n), fill = after_stat(n))) +
-      stat_sample_slabinterval(n = 15)
+      stat_sample_slabinterval(n = 2)
+  )
+
+  expect_equal(
+    ld[ld$datatype == "slab", c("y","group","n")],
+    data.frame(y = c(1,1,2,2,3,3), group = c(1,1,2,2,3,3), n = c(9,9,3,3,3,3)),
+    ignore_attr = c("row.names", "class")
+  )
+
+  expect_equal(
+    ld[ld$datatype == "interval", c("y","group","n")],
+    data.frame(y = c(1,1,2,2,3,3), group = c(1,1,2,2,3,3), n = NA_real_),
+    ignore_attr = c("row.names", "class")
   )
 })
 
@@ -210,18 +251,18 @@ test_that("n is calculated correctly", {
 test_that("NAs are handled correctly", {
   skip_if_no_vdiffr()
 
-  p = data.frame(x = c(1:10, NA)) %>%
+  p = data.frame(x = c(1:5000, NA)) %>%
     ggplot(aes(x = x, y = "a"))
 
   expect_warning(
     vdiffr::expect_doppelganger("NAs with na.rm = FALSE",
-      p + stat_halfeye(na.rm = FALSE, n = 15)
+      p + stat_cdfinterval(na.rm = FALSE, n = 5)
     ),
     "Removed 1 rows"
   )
 
   vdiffr::expect_doppelganger("NAs with na.rm = TRUE",
-    p + stat_halfeye(na.rm = TRUE, n = 15)
+    p + stat_cdfinterval(na.rm = TRUE, n = 5)
   )
 })
 
@@ -230,6 +271,7 @@ test_that("NAs are handled correctly", {
 
 test_that("trim and expand work", {
   skip_if_no_vdiffr()
+  skip_if_sensitive_to_density()
 
   set.seed(1234)
   df = data.frame(
@@ -259,15 +301,24 @@ test_that("expand can take length two vector", {
   expect_equal(min(ld$x), 0)
   expect_equal(max(ld$x), 4)
 
-  ld = layer_data(p + stat_ccdfinterval(expand = c(TRUE, FALSE)))
+  ld = layer_data(p + stat_ccdfinterval(
+    expand = c(TRUE, FALSE),
+    density = density_bounded(bounder = "range")
+  ))
   expect_equal(min(ld$x), 0)
   expect_equal(max(ld$x), 3)
 
-  ld = layer_data(p + stat_ccdfinterval(expand = c(FALSE, TRUE)))
+  ld = layer_data(p + stat_ccdfinterval(
+    expand = c(FALSE, TRUE),
+    density = density_bounded(bounder = "range")
+  ))
   expect_equal(min(ld$x), 1)
   expect_equal(max(ld$x), 4)
 
-  ld = layer_data(p + stat_ccdfinterval(expand = c(FALSE, FALSE)))
+  ld = layer_data(p + stat_ccdfinterval(
+    expand = c(FALSE, FALSE),
+    density = density_bounded(bounder = "range")
+  ))
   expect_equal(min(ld$x), 1)
   expect_equal(max(ld$x), 3)
 })
@@ -282,16 +333,16 @@ test_that("characters work", {
   )
 
   slab_ref = data.frame(
-    thickness = c(3,3,3,3, 2,2,2,2, 1,1,1,1)/6,
-    pdf = c(3,3,3,3, 2,2,2,2, 1,1,1,1)/6,
-    cdf = c(0,0, 3,3,3,3, 5,5,5,5, 6,6)/6,
-    f = c(3,3,3,3, 2,2,2,2, 1,1,1,1)/6,
+    thickness = c(3,3,3,3,3,3, 2,2,2,2,2,2, 1,1,1,1,1,1)/6,
+    pdf = c(3,3,3,3,3,3, 2,2,2,2,2,2, 1,1,1,1,1,1)/6,
+    cdf = c(0,0,0, 3,3,3,3,3,3, 5,5,5,5,5,5, 6,6,6)/6,
+    f = c(3,3,3,3,3,3, 2,2,2,2,2,2, 1,1,1,1,1,1)/6,
     n = 6,
     datatype = "slab",
-    .width = c(NA, .66,.66,.66,.66,.66,.66, .95,.95, NA,NA,NA),
+    .width = c(NA,NA, .66,.66,.66,.66,.66,.66,.66,.66, .95,.95,.95,.95, NA,NA,NA,NA),
     stringsAsFactors = FALSE
   )
-  slab_ref$x = ggplot2:::mapped_discrete(c(.5, 1,1, 1.5,1.5, 2,2, 2.5,2.5, 3,3, 3.5))
+  slab_ref$x = ggplot2:::mapped_discrete(c(.5,.5, 1,1, 1.5,1.5,1.5,1.5, 2,2, 2.5,2.5,2.5,2.5, 3,3, 3.5,3.5))
   expect_equal(p$data[[1]][p$data[[1]]$datatype == "slab", names(slab_ref)], slab_ref)
 
   interval_ref = data.frame(
@@ -302,6 +353,56 @@ test_that("characters work", {
   interval_ref$xmin = ggplot2:::mapped_discrete(c(1, 1))
   interval_ref$xmax = ggplot2:::mapped_discrete(c(2.15, 2.875))
   interval_ref$x = ggplot2:::mapped_discrete(c(1.5, 1.5))
-  attr(interval_ref, "row.names") = c(13L, 14L)
+  attr(interval_ref, "row.names") = c(19L, 20L)
   expect_equal(p$data[[1]][p$data[[1]]$datatype == "interval", names(interval_ref)], interval_ref)
+})
+
+test_that("logical conditions at bin edges on histograms work", {
+  p = ggplot() +
+    stat_slab(
+      aes(x = c(1,1,2,2,2,3,3,3,3), fill = after_stat(x > 1.5)),
+      density = "histogram",
+      breaks = breaks_fixed(width = 1),
+      align = "center"
+    ) +
+    scale_fill_manual(values = c("red", "blue"))
+
+  ref = data.frame(
+    x = c(0.5, 0.5, 1, 1, 1.5, 1.5, 1.5, 1.5, 2, 2, 2.5, 2.5, 2.5, 2.5,  3, 3, 3.5, 3.5),
+    fill = c(rep("red", 7), rep("blue", 11)),
+    stringsAsFactors = FALSE
+  )
+  expect_equal(layer_data(p)[,c("x", "fill")], ref)
+
+  # with outline
+  p = ggplot() +
+    stat_slab(
+      aes(x = c(1,1,2,2,2,3,3,3,3), fill = after_stat(x > 1.5)),
+      density = density_histogram(),
+      breaks = breaks_fixed(width = 1),
+      align = "center",
+      outline_bars = TRUE,
+      color = "black"
+    ) +
+    scale_fill_manual(values = c("red", "blue"))
+
+  ref = data.frame(
+    x = c(0.5, 0.5, 0.5, 1, 1, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 2, 2, 2.5,  2.5, 2.5, 2.5, 2.5, 2.5, 3, 3, 3.5, 3.5, 3.5),
+    fill = c(rep("red", 10), rep("blue", 14)),
+    stringsAsFactors = FALSE
+  )
+  expect_equal(layer_data(p)[,c("x", "fill")], ref)
+})
+
+
+# deprecated params -------------------------------------------------------
+
+test_that("slab_type throws appropriate warnings and errors", {
+  expect_warning(
+    expect_warning(
+      layer_data(ggplot() + stat_slab(aes(1:5), slab_type = "xx")),
+      "slab_type.*is deprecated"
+    ),
+    'Unknown `slab_type`: "xx"'
+  )
 })

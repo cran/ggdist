@@ -10,7 +10,15 @@
 \alias{r_dist_name}
 \title{Parse distribution specifications into columns of a data frame}
 \usage{
-parse_dist(object, ..., dist = ".dist", args = ".args", to_r_names = TRUE)
+parse_dist(
+  object,
+  ...,
+  dist = ".dist",
+  args = ".args",
+  dist_obj = ".dist_obj",
+  package = NULL,
+  to_r_names = TRUE
+)
 
 \method{parse_dist}{default}(object, ...)
 
@@ -20,12 +28,32 @@ parse_dist(object, ..., dist = ".dist", args = ".args", to_r_names = TRUE)
   ...,
   dist = ".dist",
   args = ".args",
+  dist_obj = ".dist_obj",
+  package = NULL,
+  lb = "lb",
+  ub = "ub",
   to_r_names = TRUE
 )
 
-\method{parse_dist}{character}(object, ..., dist = ".dist", args = ".args", to_r_names = TRUE)
+\method{parse_dist}{character}(
+  object,
+  ...,
+  dist = ".dist",
+  args = ".args",
+  dist_obj = ".dist_obj",
+  package = NULL,
+  to_r_names = TRUE
+)
 
-\method{parse_dist}{factor}(object, ..., dist = ".dist", args = ".args", to_r_names = TRUE)
+\method{parse_dist}{factor}(
+  object,
+  ...,
+  dist = ".dist",
+  args = ".args",
+  dist_obj = ".dist_obj",
+  package = NULL,
+  to_r_names = TRUE
+)
 
 \method{parse_dist}{brmsprior}(
   object,
@@ -33,6 +61,8 @@ parse_dist(object, ..., dist = ".dist", args = ".args", to_r_names = TRUE)
   ...,
   dist = ".dist",
   args = ".args",
+  dist_obj = ".dist_obj",
+  package = NULL,
   to_r_names = TRUE
 )
 
@@ -48,6 +78,16 @@ containing distribution specifications.}
 
 \item{args}{The name of the output column to contain the arguments to the distribution}
 
+\item{dist_obj}{The name of the output column to contain a \pkg{distributional} object representing the distribution}
+
+\item{package}{The package or environment to search for distribution functions in.
+Passed to \code{\link[distributional:dist_wrap]{distributional::dist_wrap()}}. One of:
+\itemize{
+\item \code{NULL}: use the calling environment
+\item a string: use the environment for the package with the given name
+\item an \link{environment}: use the given environment
+}}
+
 \item{to_r_names}{If \code{TRUE} (the default), certain common aliases for distribution names are
 automatically translated into names that R can recognize (i.e., names which have functions starting
 with \code{r}, \code{p}, \code{q}, and \code{d} representing random number generators, distribution
@@ -56,6 +96,16 @@ functions, etc. for that distribution), using the \code{r_dist_name} function. F
 
 \item{dist_col}{A bare (unquoted) column or column expression that resolves to a character vector
 of distribution specifications.}
+
+\item{lb}{The name of an input column (for \code{data.frame} and \code{brms::prior} objects) that contains
+the lower bound of the distribution, which if present will produce a truncated distribution using
+\code{\link[=dist_truncated]{dist_truncated()}}. Ignored if \code{lb} is \code{NULL} or if \code{object[[lb]]} is \code{NA} for the corresponding
+input row.}
+
+\item{ub}{The name of an input column (for \code{data.frame} and \code{brms::prior} objects) that contains
+the upper bound of the distribution, which if present will produce a truncated distribution using
+\code{\link[=dist_truncated]{dist_truncated()}}. Ignored if \code{ub} is \code{NULL} or if \code{object[[ub]]} is \code{NA} for the corresponding
+input row.}
 
 \item{dist_name}{For \code{r_dist_name}, a character vector of distribution names to be translated into
 distribution names R recognizes. Unrecognized names are left as-is.}
@@ -102,7 +152,7 @@ data.frame(prior = c("normal(0,1)", "student_t(3,0,1)")) \%>\%
   parse_dist(prior)
 
 # parse_dist is particularly useful with the output of brms::prior(),
-# which follow the same format as above
+# which follows the same format as above
 
 }
 \seealso{

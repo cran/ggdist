@@ -3,10 +3,10 @@
 # Author: mjskay
 ###############################################################################
 
-library(dplyr)
-library(tidyr)
-
-
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(tidyr)
+})
 
 
 test_that("curve_interval works with lineribbon", {
@@ -41,7 +41,9 @@ test_that("curve_interval works with lineribbon", {
   ab_curve_df = bind_rows(
     mutate(curve_df, group = "a"),
     mutate(curve_df, group = "b", .draw = b_draw[.draw])
-  )
+  ) %>%
+    arrange(.draw)
+
   vdiffr::expect_doppelganger("conditional curve_interval with mhd",
     ab_curve_df %>%
       group_by(group) %>%
@@ -114,8 +116,22 @@ test_that("basic cases on single curve work", {
     .interval = "mhd"
   )
 
+  # data frame of draws
   expect_equal(curve_interval(df, .along = x, .width = c(.95, 0, 1)), ref)
   expect_equal(curve_interval(group_by(df, x), .width = c(.95, 0, 1)), ref)
+
+  skip_if_not_installed("posterior")
+  # data frame of rvars
+  y_rvar = rep(posterior::rvar(ppoints(1000)), 3) + 1:3
+  df = data.frame(x = 1:3, y = y_rvar)
+  expect_equal(curve_interval(df, .along = x, .width = c(.95, 0, 1)), ref)
+  expect_equal(curve_interval(group_by(df, x), .width = c(.95, 0, 1)), ref)
+
+  # rvar
+  expect_equal(curve_interval(y_rvar, .width = c(.95, 0, 1)), select(ref, -x, .value = y))
+
+  # matrix
+  expect_equal(curve_interval(posterior::draws_of(y_rvar), .width = c(.95, 0, 1)), select(ref, -x, .value = y))
 })
 
 test_that("basic cases on multiple variables", {
@@ -154,4 +170,17 @@ test_that("error is thrown when no columns found to summarize", {
 test_that("error is thrown with groups of different sizes", {
   df = data.frame(value = ppoints(9), group = c("a", "a", "b"))
   expect_error(curve_interval(df, .along = group), "Must have the same number of values in each group")
+})
+
+test_that("curve_interval(<rvar>) and curve_interval(<matrix>) do not support along", {
+  expect_error(
+    curve_interval(matrix(1:4, nrow = 2), .along = "x"),
+    'does\\s+not\\s+support\\s+the\\s+[^a-zA-Z]*\\.along[^a-zA-Z]*\\s+argument'
+  )
+
+  skip_if_not_installed("posterior")
+  expect_error(
+    curve_interval(posterior::rvar(), .along = "x"),
+    'does\\s+not\\s+support\\s+the\\s+[^a-zA-Z]*\\.along[^a-zA-Z]*\\s+argument'
+  )
 })

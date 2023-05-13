@@ -51,15 +51,12 @@ globalVariables(c("y", "ymin", "ymax"))
 #' density interval). **Note:** If the distribution is multimodal, `hdi` may return multiple
 #' intervals for each probability level (these will be spread over rows). You may wish to use
 #' `hdci` (below) instead if you want a single highest-density interval, with the caveat that when
-#' the distribution is multimodal `hdci` is not a highest-density interval. Internally `hdi` uses
-#' [HDInterval::hdi()] with `allowSplit = TRUE` (when multimodal) and with
-#' `allowSplit = FALSE` (when not multimodal).
+#' the distribution is multimodal `hdci` is not a highest-density interval.
 #'
-#' `hdci` yields the highest-density *continuous* interval. **Note:** If the distribution
-#' is multimodal, this may not actually be the highest-density interval (there may be a higher-density
-#' discontinuous interval). Internally `hdci` uses
-#' [HDInterval::hdi()] with `allowSplit = FALSE`; see that function for more
-#' information on multimodality and continuous versus discontinuous intervals.
+#' `hdci` yields the highest-density *continuous* interval, also known as the shortest
+#' probability interval. **Note:** If the distribution is multimodal, this may not actually
+#' be the highest-density interval (there may be a higher-density
+#' discontinuous interval, which can be found using `hdi`).
 #'
 #' `ll` and `ul` yield lower limits and upper limits, respectively (where the opposite
 #' limit is set to either `Inf` or `-Inf`).
@@ -95,6 +92,14 @@ globalVariables(c("y", "ymin", "ymax"))
 #' If `FALSE` (the default), any vectors to be summarized that contain `NA` will result in
 #' point and interval summaries equal to `NA`.
 #' @param x vector to summarize (for interval functions: `qi` and `hdi`)
+#' @param density For [hdi()] and [Mode()], the kernel density estimator to use, either as
+#' a function (e.g. [`density_bounded`], [`density_unbounded`]) or as a string giving the
+#' suffix to a function that starts with `density_` (e.g. `"bounded"` or `"unbounded"`). The
+#' default, `"bounded"`, uses the bounded density estimator of [density_bounded()], which
+#' itself estimates the bounds of the distribution, and tends to work well on both bounded
+#' and unbounded data.
+#' @param n For [hdi()] and [Mode()], the number of points to use to estimate highest-density
+#' intervals or modes.
 #' @return A data frame containing point summaries and intervals, with at least one column corresponding
 #' to the point summary, one to the lower end of the interval, one to the upper end of the interval, the
 #' width of the interval (`.width`), the type of point summary (`.point`), and the type of interval (`.interval`).
@@ -402,31 +407,61 @@ ul = function(x, .width = .95, na.rm = FALSE) {
 
 #' @export
 #' @rdname point_interval
-hdi = function(x, .width = .95, .prob, na.rm = FALSE, ...) {
+hdi = function(x, .width = .95, na.rm = FALSE, ..., density = density_bounded(trim = TRUE), n = 4096, .prob) {
   .width = .Deprecated_argument_alias(.width, .prob)
-  hdi_(x, .width = .width, na.rm = na.rm)
+  hdi_(x, .width = .width, na.rm = na.rm, ..., density = density, n = n)
 }
 hdi_ = function(x, ...) {
   UseMethod("hdi_")
 }
 #' @importFrom stats density
 #' @export
-hdi_.numeric = function(x, .width = .95, na.rm = FALSE, ...) {
+hdi_.numeric = function(x, .width = .95, na.rm = FALSE, ..., density = density_bounded(trim = TRUE), n = 4096) {
   if (!na.rm && anyNA(x)) {
     return(matrix(c(NA_real_, NA_real_), ncol = 2))
   }
   if (isTRUE(.width == 1)) {
     return(matrix(range(x), ncol = 2))
   }
+  x = check_na(x, na.rm)
 
-  intervals = HDInterval::hdi(density(x, cut = 0, na.rm = na.rm), credMass = .width, allowSplit = TRUE)
+  intervals = .hdi_numeric(x, .width = .width, ..., density = density, n = n)
   if (nrow(intervals) == 1) {
-    # the above method tends to be a little conservative on unimodal distributions, so if the
-    # result is unimodal, switch to the method below (which will be slightly narrower)
-    intervals = HDInterval::hdi(x, credMass = .width)
+    # if the result is unimodal, switch to hdci (which will be more accurate)
+    intervals = hdci_.numeric(x, .width = .width)
   }
-  matrix(intervals, ncol = 2)
+  intervals
 }
+
+# based on hdr.dist_default from {distributional}
+# https://github.com/mitchelloharawild/distributional/blob/50e29554456d99e9b7671ba6110bebe5961683d2/R/default.R#L137
+#' @importFrom stats approx
+.hdi_numeric = function(x, .width = 0.95, ..., density = density_bounded(trim = TRUE), n = 4096) {
+  density = match_function(density, "density_")
+
+  dist_x = quantile(x, ppoints(n, a = 0.5))
+  # Remove duplicate values of dist_x from less continuous distributions
+  dist_x = unique(dist_x)
+  d = density(x, n = n)
+  dist_y = approx(d$x, d$y, dist_x)$y
+  alpha = quantile(dist_y, probs = 1 - .width)
+
+  it = seq_len(length(dist_y) - 1)
+  y_minus_alpha = dist_y - alpha
+  dd = y_minus_alpha[it + 1] * y_minus_alpha[it]
+  index = it[dd <= 0]
+  # unique() removes possible duplicates if sequential dd has same value.
+  y0 = y_minus_alpha[index]
+  y1 = y_minus_alpha[index + 1]
+  x0 = dist_x[index]
+  x1 = dist_x[index + 1]
+  hdr = unique(x1 - (x1 - x0) / (y1 - y0) * y1)
+  # Add boundary values which may exceed the crossing point.
+  hdr = c(dist_x[1][dist_y[1] > alpha], hdr, dist_x[length(dist_x)][dist_y[length(dist_y)] > alpha])
+
+  matrix(hdr, ncol = 2, byrow = TRUE)
+}
+
 #' @export
 hdi_.rvar = function(x, ...) {
   if (length(x) > 1) {
@@ -436,7 +471,7 @@ hdi_.rvar = function(x, ...) {
 }
 #' @importFrom distributional hdr support
 #' @export
-hdi_.distribution = function(x, .width = .95, ...) {
+hdi_.distribution = function(x, .width = .95, na.rm = FALSE, ..., density = density_bounded(trim = TRUE), n = 4096) {
   if (length(x) > 1) {
     stop0("HDI for non-scalar distribution objects is not implemented")
   }
@@ -449,8 +484,11 @@ hdi_.distribution = function(x, .width = .95, ...) {
   if (isTRUE(.width == 1)) {
     return(matrix(quantile(x, c(0, 1))[[1]], ncol = 2))
   }
+  if (distr_is_sample(x)) {
+    return(hdi_.numeric(distr_get_sample(x), .width = .width, na.rm = na.rm, ..., density = density, n = n))
+  }
 
-  hilos = hdr(x, .width * 100, ...)
+  hilos = hdr(x, .width * 100, n = n, ...)
   matrix(c(unlist(vctrs::field(hilos, "lower")), unlist(vctrs::field(hilos, "upper"))), ncol = 2)
 }
 
@@ -458,18 +496,19 @@ hdi_.distribution = function(x, .width = .95, ...) {
 #' @rdname point_interval
 #' @importFrom rlang is_integerish
 #' @importFrom stats density
-Mode = function(x, na.rm = FALSE) {
+Mode = function(x, na.rm = FALSE, ...) {
   UseMethod("Mode")
 }
 #' @export
 #' @rdname point_interval
-Mode.default = function(x, na.rm = FALSE) {
+Mode.default = function(x, na.rm = FALSE, ..., density = density_bounded(trim = TRUE), n = 2001) {
   if (na.rm) {
     x = x[!is.na(x)]
   }
   else if (anyNA(x)) {
     return(NA_real_)
   }
+  density = match_function(density, "density_")
 
   if (is_integerish(x)) {
     # for the discrete case, based on https://stackoverflow.com/a/8189441
@@ -477,13 +516,13 @@ Mode.default = function(x, na.rm = FALSE) {
     ux[which.max(tabulate(match(x, ux)))]
   } else {
     # for the continuous case
-    d = density(x, cut = 0)
+    d = density(x, n = n)
     d$x[which.max(d$y)]
   }
 }
 #' @export
 #' @rdname point_interval
-Mode.rvar = function(x, na.rm = FALSE) {
+Mode.rvar = function(x, na.rm = FALSE, ...) {
   draws <- posterior::draws_of(x)
   dim <- dim(draws)
   apply(draws, seq_along(dim)[-1], Mode, na.rm = na.rm)
@@ -491,12 +530,21 @@ Mode.rvar = function(x, na.rm = FALSE) {
 #' @importFrom stats optim
 #' @export
 #' @rdname point_interval
-Mode.distribution = function(x, na.rm = FALSE) {
+Mode.distribution = function(x, na.rm = FALSE, ...) {
   find_mode = function(x) {
     if (anyNA(x)) {
       NA_real_
     } else if (distr_is_sample(x)) {
       Mode(distr_get_sample(x), na.rm = na.rm)
+    } else if (distr_is_discrete(x)) {
+      bounds = quantile(x, c(0, 1))[[1]]
+      non_finite_bounds = !is.finite(bounds)
+      if (any(non_finite_bounds)) {
+        bounds[non_finite_bounds] = quantile(x, c(0.001, 0.999)[non_finite_bounds])[[1]]
+      }
+      at = seq(bounds[[1]], bounds[[2]])
+      d = density(x, at = at)[[1]]
+      at[which.max(d)]
     } else {
       optim(
         median(x, na.rm = na.rm),
@@ -531,9 +579,24 @@ hdci_.numeric = function(x, .width = .95, na.rm = FALSE, ...) {
     return(matrix(range(x), ncol = 2))
   }
 
-  intervals = HDInterval::hdi(x, credMass = .width)
-  matrix(intervals, ncol = 2)
+  # d = density_bounded(x, na.rm = na.rm, adjust = 0.1)
+  # .hdci_function(ggdist::weighted_quantile_fun(d$x, weights = d$y, type = 5), .width = .width)
+  .hdci_function(ggdist::weighted_quantile_fun(x, na.rm = na.rm, type = 5), .width = .width)
 }
+
+#' find the hdci using a quantile function
+#' @noRd
+.hdci_function = function(quantile_fun, .width = .95) {
+  p_lower = optimize(
+    function(p) quantile_fun(p + .width) - quantile_fun(p),
+    lower = 0,
+    upper = 1 - .width,
+    tol = sqrt(.Machine$double.eps)
+  )$minimum
+  endpoints = quantile_fun(c(p_lower, p_lower + .width))
+  matrix(endpoints, ncol = 2)
+}
+
 #' @export
 hdci_.rvar = function(x, ...) {
   if (length(x) > 1) {
@@ -557,9 +620,7 @@ hdci_.distribution = function(x, .width = .95, na.rm = FALSE, ...) {
     return(matrix(quantile(x, c(0, 1))[[1]], ncol = 2))
   }
 
-  #TODO: after #114, pass na.rm to quantile here
-  intervals = HDInterval::hdi(function(p) quantile(x, p), credMass = .width)
-  matrix(intervals, ncol = 2)
+  .hdci_function(function(p) quantile(x, p)[[1]], .width = .width)
 }
 
 #' @export

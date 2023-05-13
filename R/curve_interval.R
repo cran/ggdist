@@ -3,6 +3,8 @@
 # Author: mjskay
 ###############################################################################
 
+globalVariables(".value")
+
 #' Curvewise point and interval summaries for tidy data frames of draws from distributions
 #'
 #' Translates draws from distributions in a grouped data frame into a set of point and
@@ -18,13 +20,18 @@
 #' See Mirzargar *et al.* (2014) or Juul *et al.* (2020) for an accessible introduction
 #' to data depth and curve boxplots / functional boxplots.
 #'
-#' @param .data Data frame (or grouped data frame as returned by [group_by()])
-#' that contains draws to summarize.
+#' @param .data One of:
+#'   - A data frame (or grouped data frame as returned by [group_by()])
+#'     that contains draws to summarize.
+#'   - A [posterior::rvar] vector.
+#'   - A matrix; in which case the first dimension should be draws and the second
+#'     dimension values of the curve.
 #' @param ... Bare column names or expressions that, when evaluated in the context of
 #' `.data`, represent draws to summarize. If this is empty, then by default all
 #' columns that are not group columns and which are not in `.exclude` (by default
 #' `".chain"`, `".iteration"`, `".draw"`, and `".row"`) will be summarized.
-#' This can be list columns.
+#' This can be numeric columns, list columns containing numeric vectors, or
+#' [posterior::rvar()]s.
 #' @param .along Which columns are the input values to the function describing the curve (e.g., the "x"
 #' values). Supports tidyselect syntax, as in [dplyr::select()]. Intervals are calculated jointly with
 #' respect to these variables, conditional on all other grouping variables in the data frame. The default
@@ -32,7 +39,9 @@
 #' for `.along`, which will generate the most conservative intervals. However, if you want to calculate
 #' intervals for some function `y = f(x)` conditional on some other variable(s) (say, conditional on a
 #' factor `g`), you would group by `g`, then use `.along = x` to calculate intervals jointly over `x`
-#' conditional on `g`.
+#' conditional on `g`. To avoid selecting any variables as input values to the function describing the
+#' curve, use `character()`; this will produce conditional intervals only (the result in this case should
+#' be very similar to `median_qi()`). Currently only supported when `.data` is a data frame.
 #' @param .width vector of probabilities to use that determine the widths of the resulting intervals.
 #' If multiple probabilities are provided, multiple rows per group are generated, each with
 #' a different probability interval (and value of the corresponding `.width` column).
@@ -46,11 +55,8 @@
 #'     [fda::fbplot()] with `method = "Both"`.
 #' @param .simple_names When `TRUE` and only a single column / vector is to be summarized, use the
 #' name `.lower` for the lower end of the interval and `.upper` for the
-#' upper end. If `.data` is a vector and this is `TRUE`, this will also set the column name
-#' of the point summary to `.value`. When `FALSE` and `.data` is a data frame,
+#' upper end. When `FALSE` and `.data` is a data frame,
 #' names the lower and upper intervals for each column `x` `x.lower` and `x.upper`.
-#' When `FALSE` and `.data` is a vector, uses the naming scheme `y`, `ymin`
-#' and `ymax` (for use with ggplot).
 #' @param .exclude A character vector of names of columns to be excluded from summarization
 #' if no column names are specified to be summarized. Default ignores several meta-data column
 #' names used in \pkg{ggdist} and \pkg{tidybayes}.
@@ -131,9 +137,52 @@
 #' @importFrom rlang quos quos_auto_name eval_tidy quo_get_expr syms enquo
 #' @importFrom tidyselect eval_select
 #' @export
-curve_interval = function(.data, ..., .along = NULL, .width = .5,
-  .interval = c("mhd", "mbd", "bd", "bd-mbd"), .simple_names = TRUE,
-  na.rm = FALSE, .exclude = c(".chain", ".iteration", ".draw", ".row")
+curve_interval = function(
+  .data, ..., .along = NULL, .width = .5, na.rm = FALSE,
+  .interval = c("mhd", "mbd", "bd", "bd-mbd")
+) {
+  UseMethod("curve_interval")
+}
+
+#' @rdname curve_interval
+#' @export
+curve_interval.matrix = function(
+  .data, ..., .along = NULL, .width = .5, na.rm = FALSE,
+  .interval = c("mhd", "mbd", "bd", "bd-mbd")
+) {
+  if (!requireNamespace("posterior", quietly = TRUE)) {
+    stop0('curve_interval() requires the `posterior` package to be installed.') #nocov
+  }
+  check_along_is_null(.along)
+
+  curve_interval(
+    data.frame(.value = posterior::rvar(.data)), .value,
+    .width = .width, na.rm = na.rm,
+    .interval = .interval
+  )
+}
+
+#' @rdname curve_interval
+#' @export
+curve_interval.rvar = function(
+  .data, ..., .along = NULL, .width = .5, na.rm = FALSE,
+  .interval = c("mhd", "mbd", "bd", "bd-mbd")
+) {
+  check_along_is_null(.along)
+
+  curve_interval(
+    data.frame(.value = .data), .value,
+    .width = .width, na.rm = na.rm,
+    .interval = .interval
+  )
+}
+
+#' @rdname curve_interval
+#' @export
+curve_interval.data.frame = function(
+  .data, ..., .along = NULL, .width = .5, na.rm = FALSE,
+  .interval = c("mhd", "mbd", "bd", "bd-mbd"),
+  .simple_names = TRUE, .exclude = c(".chain", ".iteration", ".draw", ".row")
 ) {
   if (!requireNamespace("posterior", quietly = TRUE)) {
     stop0('curve_interval() requires the `posterior` package to be installed.') #nocov
@@ -224,6 +273,22 @@ curve_interval = function(.data, ..., .along = NULL, .width = .5,
   result
 }
 
+
+# helpers -----------------------------------------------------------------
+
+check_along_is_null = function(.along) {
+  if (!is.null(.along)) cli_abort(c(
+    '{.fun ggdist::curve_interval} applied to a matrix or rvar does not support the {.arg .along} argument',
+    'i' = 'Intervals for {.code curve_interval(<rvar>)} and {.code curve_interval(<matrix>)}
+      are calculated jointly for all dimensions of the input.',
+    '>' = 'If you want all dimensions to be joint, simply do not pass anything to {.arg .along}.',
+    '>' = 'If you want only some dimensions to be joint (i.e., some to be conditional), consider
+      using a data frame, and group by the conditional columns and pass the joint columns to
+      {.arg .along}',
+    'i' = 'For more information, see the {.arg .along} argument of {.fun ggdist::curve_interval}.'
+  ))
+}
+
 halfspace_depth = function(x) {
   rank_x = rank(x, na.last = "keep")
   n = length(x)
@@ -248,10 +313,19 @@ halfspace_depth = function(x) {
   map_dfr_(dfs, function(d) {
 
     # draws x y matrix
-    draws = do.call(cbind, d[[col_name]])
-    y_rvar = posterior::rvar(draws)
+    if (posterior::is_rvar(d[[col_name]])) {
+      y_rvar = d[[col_name]]
+      draws = posterior::draws_of(y_rvar)
+    } else {
+      draws = do.call(cbind, d[[col_name]])
+      y_rvar = posterior::rvar(draws)
+    }
 
-    if (.interval_internal == "mhd") { #mean halfspace depth
+    if (.interval_internal == "mhd" || length(y_rvar) == 1) { #mean halfspace depth
+      # length(y_rvar) == 1 is in this condition because fda methods fail on curves
+      # with only 1 x value, but that's fine because we can just fall back to the
+      # mhd method, which will be equivalent when n = 1
+
       # draws x depth matrix
       pointwise_depths = apply(draws, 2, halfspace_depth)
       # mean depth of each draw
@@ -269,15 +343,15 @@ halfspace_depth = function(x) {
 
     # median draw = the one with the maximum depth
     median_draw = which.max(draw_depth)
-    median_y = map_dbl_(d[[col_name]], `[[`, median_draw)
+    median_y = draws[median_draw, ]
 
     # function for determining the intervals given a selected draw depth
     calc_intervals_at_depth_cutoff = function(depth_cutoff) {
       selected_draws = draw_depth >= depth_cutoff
 
-      selected_y = lapply(d[[col_name]], `[`, selected_draws)
-      d[[lower]] = map_dbl_(selected_y, min)
-      d[[upper]] = map_dbl_(selected_y, max)
+      selected_y = draws[selected_draws, , drop = FALSE]
+      d[[lower]] = apply(selected_y, 2, min)
+      d[[upper]] = apply(selected_y, 2, max)
       d[[".actual_width"]] = posterior::Pr(posterior::rvar_all(d[[lower]] <= y_rvar & y_rvar <= d[[upper]]))
 
       d

@@ -249,8 +249,9 @@ test_that("point_interval works on vectors", {
 
 test_that("various point summaries and intervals give correct numbers", {
   expect_equal(
-    median_hdci(c(0:6, 1:5, 2:4, 2), .width = .6),
-    data.frame(y = 3, ymin = 2, ymax = 4, .width = 0.6, .point = "median", .interval = "hdci", stringsAsFactors = FALSE)
+    median_hdci(c(0:6, 1:3 + 0.25, 1:3 + 0.5, 4.5, 5, 2), .width = .625),
+    data.frame(y = 2.75, ymin = 1, ymax = 4, .width = 0.625, .point = "median", .interval = "hdci", stringsAsFactors = FALSE),
+    tolerance = 1e-7
   )
 
   expect_equal(
@@ -259,18 +260,21 @@ test_that("various point summaries and intervals give correct numbers", {
   )
 
   expect_equal(
-    mode_hdi(c(0:6, 1:5, 2:4, 2), .width = .6, .simple_names = TRUE),
-    data.frame(.value = 2, .lower = 2, .upper = 4, .width = 0.6, .point = "mode", .interval = "hdi", stringsAsFactors = FALSE)
+    mode_hdi(c(0:6, 0:5 + 0.5, 2:4), .width = .5, .simple_names = TRUE),
+    data.frame(.value = 3, .lower = 1.75, .upper = 4.25, .width = 0.5, .point = "mode", .interval = "hdi", stringsAsFactors = FALSE),
+    tolerance = 1e-7
   )
 
   expect_equal(
-    mode_hdci(c(0:6, 1:5, 2:4, 2), .width = .6, .simple_names = TRUE),
-    data.frame(.value = 2, .lower = 2, .upper = 4, .width = 0.6, .point = "mode", .interval = "hdci", stringsAsFactors = FALSE)
+    mode_hdci(c(0:6, 0:5 + 0.5, 2:4), .width = .5, .simple_names = TRUE),
+    data.frame(.value = 3, .lower = 1.75, .upper = 4.25, .width = 0.5, .point = "mode", .interval = "hdci", stringsAsFactors = FALSE),
+    tolerance = 1e-7
   )
 
   expect_equal(
-    mean_hdci(c(0:6, 1:5, 2:4, 2), .width = .6),
-    data.frame(y = 2.9375, ymin = 2, ymax = 4, .width = 0.6, .point = "mean", .interval = "hdci", stringsAsFactors = FALSE)
+    mean_hdci(c(0:6, 0:5 + 0.5, 2:4), .width = .5),
+    data.frame(y = 3, ymin = 1.75, ymax = 4.25, .width = 0.5, .point = "mean", .interval = "hdci", stringsAsFactors = FALSE),
+    tolerance = 1e-7
   )
 
 })
@@ -285,7 +289,7 @@ test_that("attempting to use hdi with multiple multimodal columns simultaneously
 test_that("NAs are handled correctly in point_interval", {
   expect_equal(
     median_hdci(c(0:6, 1:5, 2:4, 2, NA), .width = .6, na.rm = TRUE),
-    data.frame(y = 3, ymin = 2, ymax = 4, .width = 0.6, .point = "median", .interval = "hdci", stringsAsFactors = FALSE)
+    data.frame(y = 3, ymin = 2, ymax = 5, .width = 0.6, .point = "median", .interval = "hdci", stringsAsFactors = FALSE)
   )
 
   expect_equal(
@@ -295,17 +299,17 @@ test_that("NAs are handled correctly in point_interval", {
 
   expect_equal(
     mode_hdi(c(0:6, 1:5, 2:4, 2, NA), .width = .6, .simple_names = TRUE, na.rm = TRUE),
-    data.frame(.value = 2, .lower = 2, .upper = 4, .width = 0.6, .point = "mode", .interval = "hdi", stringsAsFactors = FALSE)
+    data.frame(.value = 2, .lower = 2, .upper = 5, .width = 0.6, .point = "mode", .interval = "hdi", stringsAsFactors = FALSE)
   )
 
   expect_equal(
     mode_hdci(c(0:6, 1:5, 2:4, 2, NA), .width = .6, .simple_names = TRUE, na.rm = TRUE),
-    data.frame(.value = 2, .lower = 2, .upper = 4, .width = 0.6, .point = "mode", .interval = "hdci", stringsAsFactors = FALSE)
+    data.frame(.value = 2, .lower = 2, .upper = 5, .width = 0.6, .point = "mode", .interval = "hdci", stringsAsFactors = FALSE)
   )
 
   expect_equal(
     mean_hdci(c(0:6, 1:5, 2:4, 2, NA), .width = .6, na.rm = TRUE),
-    data.frame(y = 2.9375, ymin = 2, ymax = 4, .width = 0.6, .point = "mean", .interval = "hdci", stringsAsFactors = FALSE)
+    data.frame(y = 2.9375, ymin = 2, ymax = 5, .width = 0.6, .point = "mean", .interval = "hdci", stringsAsFactors = FALSE)
   )
 
   expect_equal(
@@ -381,11 +385,11 @@ test_that("pointintervals work on rvars", {
   )
   expect_equal(
     mean_hdi(tibble(x), .width = 0.6),
-    tibble(x = c(2.9375,4.9375), .lower = c(2,4), .upper = c(4,6), .width = 0.6, .point = "mean", .interval = "hdi")
+    tibble(x = c(2.9375,4.9375), .lower = c(2,4), .upper = c(5,7), .width = 0.6, .point = "mean", .interval = "hdi")
   )
   expect_equal(
     mode_hdci(tibble(x), .width = 0.6),
-    tibble(x = c(2,4), .lower = c(2,4), .upper = c(4,6), .width = 0.6, .point = "mode", .interval = "hdci")
+    tibble(x = c(2,4), .lower = c(2,4), .upper = c(5,7), .width = 0.6, .point = "mode", .interval = "hdci")
   )
 })
 
@@ -540,6 +544,19 @@ test_that("Mode on dist_sample uses the numeric method", {
   expect_equal(Mode(x), Mode(x_values))
 })
 
+test_that("hdi on dist_sample uses the numeric method", {
+  x_values = dgamma(ppoints(100), 2, 2)
+  x = dist_sample(list(x_values))
+
+  expect_equal(hdi(x), hdi(x_values))
+})
+
+test_that("Mode on discrete distributions works", {
+  x = c(dist_poisson(3.5), dist_binomial(10, 0.4))
+
+  expect_equal(Mode(x), c(3, 4))
+})
+
 test_that("non-scalar distributions throw appropriate warnings", {
   x = dist_normal(0:1)
   expect_error(hdi(x), "HDI for non-scalar distribution objects is not implemented")
@@ -547,7 +564,7 @@ test_that("non-scalar distributions throw appropriate warnings", {
 })
 
 test_that("multivariate distributions throw appropriate warnings", {
-  skip_if_not_installed("mvtnorm") # needed by distributional::support for dist_mvnorm
+  skip_if_not_installed("mvtnorm")  # needed for dist_multivariate_normal()
 
   x = dist_multivariate_normal(list(0:1), list(diag(2)))
   expect_error(hdi(x), "HDI for multivariate distribution objects is not implemented")
@@ -569,6 +586,7 @@ test_that("point_interval works on NA dists", {
 })
 
 test_that("multivariate distributions work", {
+  skip_if_not_installed("mvtnorm")  # needed for dist_multivariate_normal()
 
   x = c(dist_multivariate_normal(list(1:3), list(diag(3))), dist_normal(0,0.5))
 
@@ -596,6 +614,7 @@ test_that("multivariate distributions work", {
 
 test_that("flattened indices retain index order", {
   skip_if_no_vdiffr()
+  skip_if_not_installed("mvtnorm")  # needed for dist_multivariate_normal()
 
   vdiffr::expect_doppelganger("flattened indices with geom_pointinterval",
     tibble(x = dist_multivariate_normal(list(c(1:10)), list(diag(10)))) %>%

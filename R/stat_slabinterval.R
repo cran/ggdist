@@ -26,9 +26,14 @@ compute_limits_slabinterval = function(
     return(data.frame(.lower = NA, .upper = NA))
   }
 
+  if (distr_is_constant(dist)) {
+    median = distr_quantile(dist)(0.5)
+    return(data.frame(.lower = median, .upper = median))
+  }
+
   if (distr_is_sample(dist)) {
     sample = distr_get_sample(dist)
-    return(compute_limits_sample(sample, trans, trim, adjust))
+    return(compute_limits_sample(sample, trans, trim, adjust, ...))
   }
 
   quantile_fun = distr_quantile(dist)
@@ -62,23 +67,16 @@ compute_limits_slabinterval = function(
 #' @param trans scale transformation
 #' @param trim/adjust see stat_slabinterval
 #' @noRd
-compute_limits_sample = function(x, trans, trim, adjust) {
-  if (trim) {
-    data.frame(
-      .lower = min(x),
-      .upper = max(x)
-    )
-  } else {
-    # when trim is FALSE, limits of data will be expanded by 3 * the bandwidth
-    # bandwidth must be calculated on the transformed scale
-    x = trans$transform(x)
-    bw = stats::bw.nrd0(x)
-    expansion = bw * adjust * 3
-    data.frame(
-      .lower = trans$inverse(min(x) - expansion),
-      .upper = trans$inverse(max(x) + expansion)
-    )
-  }
+compute_limits_sample = function(x, trans, trim, adjust, ..., density = "bounded") {
+  density = match_function(density, "density_")
+
+  # determine limits of data based on the density estimator
+  x = trans$transform(x)
+  x_range = range(density(x, n = 2, range_only = TRUE, trim = trim, adjust = adjust)$x)
+  data.frame(
+    .lower = trans$inverse(x_range[[1]]),
+    .upper = trans$inverse(x_range[[2]])
+  )
 }
 
 
@@ -89,7 +87,7 @@ compute_limits_sample = function(x, trans, trim, adjust) {
 compute_slab_slabinterval = function(
   self, data, scales, trans, input, orientation,
   slab_type, limits, n,
-  adjust, trim, expand, breaks, outline_bars,
+  adjust, trim, expand, breaks, align, outline_bars,
   ...
 ) {
   dist = data$dist
@@ -119,7 +117,8 @@ compute_slab_slabinterval = function(
     return(compute_slab_sample(
       trans$transform(distr_get_sample(dist)), scales, trans, input,
       slab_type = slab_type, limits = limits, n = n,
-      adjust = adjust, trim = trim, expand = expand, breaks = breaks, outline_bars = outline_bars,
+      adjust = adjust, trim = trim, expand = expand,
+      breaks = breaks, align = align, outline_bars = outline_bars,
       ...
     ))
   } else if (trans$name == "identity") {
@@ -136,20 +135,24 @@ compute_slab_slabinterval = function(
       # at the midpoint of each bin
       lag_cdf_input = c(input_[[1]] - 1, input_[-length(input_)])
       lag_cdf = cdf_fun(lag_cdf_input)
+      # need an epsilon value we can use to create ghost values "just above" and
+      # "just below" the bin edges, so that logical conditions on fills like `x > 1`
+      # work as expected if 1 is a bin edge.
+      eps = 2*.Machine$double.eps
 
       if (!outline_bars) {
         # as.vector(rbind(x, y, z, ...)) interleaves vectors x, y, z, ..., giving
         # us the bin endpoints and midpoints --- then just need to repeat the same
         # value of density for both endpoints of the same bin and to make sure the
         # cdf is a step function that steps at the midpoint of the bin
-        input = as.vector(rbind(input_1, input_, input_, input_2))
-        pdf = rep(pdf, each = 4)
-        cdf = as.vector(rbind(lag_cdf, lag_cdf, cdf, cdf))
+        input = as.vector(rbind(input_1, input_1 + eps, input_, input_, input_2 - eps, input_2))
+        pdf = rep(pdf, each = 6)
+        cdf = as.vector(rbind(lag_cdf, lag_cdf, lag_cdf, cdf, cdf, cdf))
       } else {
         # have to return to 0 in between each bar so that bar outlines are drawn
-        input = as.vector(rbind(input_1, input_1, input_, input_, input_2, input_2))
-        pdf = as.vector(rbind(0, pdf, pdf, pdf, pdf, 0))
-        cdf = as.vector(rbind(lag_cdf, lag_cdf, lag_cdf, cdf, cdf, cdf))
+        input = as.vector(rbind(input_1, input_1, input_1 + eps, input_, input_, input_2 - eps, input_2, input_2))
+        pdf = as.vector(rbind(0, pdf, pdf, pdf, pdf, pdf, pdf, 0))
+        cdf = as.vector(rbind(lag_cdf, lag_cdf, lag_cdf, lag_cdf, cdf, cdf, cdf, cdf))
       }
     } else {
       pdf = pdf_fun(input)
@@ -162,17 +165,9 @@ compute_slab_slabinterval = function(
     cdf = cdf_fun(input)
   }
 
-  f = switch(slab_type,
-    histogram = ,
-    pdf = pdf,
-    cdf = cdf,
-    ccdf = 1 - cdf,
-    stop0("Unknown `slab_type`: ", deparse0(slab_type), '. Must be "histogram", "pdf", "cdf", or "ccdf"')
-  )
-
   data.frame(
     .input = input,
-    f = f,
+    f = get_slab_function(slab_type, list(pdf = pdf, cdf = cdf)),
     pdf = pdf,
     cdf = cdf,
     n = if (distr_is_sample(dist)) length(distr_get_sample(dist)) else Inf
@@ -189,11 +184,10 @@ compute_slab_slabinterval = function(
 compute_slab_sample = function(
   x, scales, trans, input,
   slab_type, limits, n,
-  adjust, trim, expand, breaks, outline_bars,
+  adjust, trim, expand, breaks, align, outline_bars,
   density,
   ...
 ) {
-  density = match_function(density, prefix = "density_")
 
   if (is.integer(x) || inherits(x, "mapped_discrete")) {
     # discrete variables are always displayed as histograms
@@ -201,49 +195,21 @@ compute_slab_sample = function(
     breaks = seq(min(x, na.rm = TRUE), max(x, na.rm = TRUE) + 1) - 0.5
   }
 
-  # calculate pdf and cdf
-  cdf_fun = weighted_ecdf(x)
-  slab_df = if (slab_type == "histogram") {
-    # when using a histogram slab, that becomes the density function value
-    # TODO: this is a hack for now until we make it so that density estimators
-    # can be swapped out (which would be a better solution)
-    h = hist(x, breaks = breaks, plot = FALSE)
-    input_1 = h$breaks[-length(h$breaks)]  # first edge of bin
-    input_2 = h$breaks[-1]                 # second edge of bin
-    input_ = (input_1 + input_2)/2   # center of bin
-    cdf_1 = cdf_fun(input_1)
-    cdf_2 = cdf_fun(input_2)
-    cdf_ = cdf_fun(input_)
+  if (slab_type == "histogram") density = "histogram"
+  density = match_function(density, prefix = "density_")
 
-    if (!outline_bars) {
-      # as.vector(rbind(x, y)) interleaves vectors input_1 and input_2, giving
-      # us the bin endpoints --- then just need to repeat the same value of density
-      # for both endpoints of the same bin
-      data.frame(
-        .input = trans$inverse(as.vector(rbind(input_1, input_, input_, input_2))),
-        pdf = rep(h$density, each = 4),
-        cdf = as.vector(rbind(cdf_1, cdf_1, cdf_, cdf_2))
-      )
-    } else {
-      # have to return to 0 in between each bar so that bar outlines are drawn
-      data.frame(
-        .input = trans$inverse(as.vector(rbind(input_1, input_1, input_, input_, input_2, input_2))),
-        pdf = as.vector(rbind(0, h$density, h$density, h$density, h$density, 0)),
-        cdf = as.vector(rbind(cdf_1, cdf_1, cdf_1, cdf_, cdf_2, cdf_2))
-      )
-    }
-  } else {
-    # all other slab types use the density function as the pdf
-    # calculate the density first, since we'll use the x values from it
-    # to calculate the cdf
-    # calculate on the transformed scale to ensure density is correct
-    d = density(x, n = n, adjust = adjust, trim = trim)
-    data.frame(
-      .input = trans$inverse(d$x),
-      pdf = d$y,
-      cdf = cdf_fun(d$x)
-    )
-  }
+  # calculate pdf and cdf
+  # TODO: pass weights here
+  d = density(
+    x, n = n, adjust = adjust, trim = trim,
+    breaks = breaks, align = align, outline_bars = outline_bars
+  )
+  slab_df = data.frame(
+    .input = trans$inverse(d$x),
+    pdf = d$y,
+    # TODO: pass weights here
+    cdf = d$cdf %||% weighted_ecdf(x)(d$x)
+  )
 
   # extend x values to the range of the plot. To do that we have to include
   # x values requested from the original `input` if they are outside the
@@ -251,7 +217,7 @@ compute_slab_sample = function(
   expand = rep_len(expand, 2L)
 
   if (expand[[1]]) {
-    input_below_slab = input[input < min(slab_df$.input)]
+    input_below_slab = input[input < min(slab_df$.input) - .Machine$double.eps]
     if (length(input_below_slab) > 0) {
       slab_df = rbind(data.frame(
         .input = input_below_slab,
@@ -261,7 +227,7 @@ compute_slab_sample = function(
     }
   }
   if (expand[[2]]) {
-    input_above_slab = input[input > max(slab_df$.input)]
+    input_above_slab = input[input > max(slab_df$.input) + .Machine$double.eps]
     if (length(input_above_slab) > 0) {
       slab_df = rbind(slab_df, data.frame(
         .input = input_above_slab,
@@ -271,14 +237,7 @@ compute_slab_sample = function(
     }
   }
 
-  slab_df[["f"]] = switch(slab_type,
-    histogram = ,
-    pdf = slab_df$pdf,
-    cdf = slab_df$cdf,
-    ccdf = 1 - slab_df$cdf,
-    stop0("Unknown `slab_type`: ", deparse0(slab_type), '. Must be "histogram", "pdf", "cdf", or "ccdf"')
-  )
-
+  slab_df[["f"]] = get_slab_function(slab_type, slab_df)
   slab_df$n = length(x)
   slab_df
 }
@@ -341,10 +300,13 @@ compute_interval_slabinterval = function(
 #' @eval rd_layer_params("slabinterval", stat = StatSlabinterval, as_dots = TRUE)
 #'
 #' @inheritParams geom_slabinterval
+#' @inheritParams density_histogram
 #' @param geom Use to override the default connection between
 #' [stat_slabinterval()] and [geom_slabinterval()]
-#' @param slab_type The type of slab function to calculate: probability density (or mass) function (`"pdf"`),
-#' cumulative distribution function (`"cdf"`), or complementary CDF (`"ccdf"`).
+#' @param slab_type (deprecated) The type of slab function to calculate: probability density (or mass) function (`"pdf"`),
+#' cumulative distribution function (`"cdf"`), or complementary CDF (`"ccdf"`). Instead of using `slab_type` to
+#' change `f` and then mapping `f` onto an aesthetic, it is now recommended to simply map the corresponding
+#' computed variable (e.g. `pdf`, `cdf`, or  `1 - cdf`) directly onto the desired aesthetic.
 #' @param p_limits Probability limits (as a vector of size 2) used to determine the lower and upper
 #' limits of the slab. E.g., if this is `c(.001, .999)`, then a slab is drawn
 #' for the distribution from the quantile at `p = .001` to the quantile at `p = .999`. If the lower
@@ -353,11 +315,11 @@ compute_interval_slabinterval = function(
 #' `p_limits` is `c(NA, NA)` on a gamma distribution the effective value of `p_limits` would be
 #' `c(0, .999)` since the gamma distribution is defined on `(0, Inf)`; whereas on a normal distribution
 #' it would be equivalent to `c(.001, .999)` since the normal distribution is defined on `(-Inf, Inf)`.
-#' @param outline_bars For sample data (if `slab_type` is `"histogram"`) and for discrete analytical
+#' @param outline_bars For sample data (if `density` is `"histogram"`) and for discrete analytical
 #' distributions (whose slabs are drawn as histograms), determines
 #' if outlines in between the bars are drawn when the `slab_color` aesthetic is used. If `FALSE`
 #' (the default), the outline is drawn only along the tops of the bars; if `TRUE`, outlines in between
-#' bars are also drawn.
+#' bars are also drawn. See [density_histogram()].
 #' @param density Density estimator for sample data. One of:
 #'  - A function which takes a numeric vector and returns a list with elements
 #'    `x` (giving grid points for the density estimator) and `y` (the
@@ -365,15 +327,16 @@ compute_interval_slabinterval = function(
 #'    following this format, including [density_unbounded()] and
 #'    [density_bounded()]. This format is also compatible with [stats::density()].
 #'  - A string giving the suffix of a function name that starts with `"density_"`;
-#'    e.g. `"bounded"` for `[density_bounded()]`.
-#' @param adjust If `slab_type` is `"pdf"`, bandwidth for the density estimator for sample data
-#' is adjusted by multiplying it by this value. See [density()] for more information.
+#'    e.g. `"bounded"` for `[density_bounded()]`, `"unbounded"` for `[density_unbounded()]`,
+#'    or `"histogram"` for [density_histogram()].
+#'    Defaults to `"bounded"`, i.e. [density_bounded()], which estimates the bounds from
+#'    the data and then uses a bounded density estimator based on the reflection method.
+#' @param adjust Passed to `density`: the bandwidth for the density estimator for sample data
+#' is adjusted by multiplying it by this value. See e.g. [density_bounded()] for more information.
 #' @param trim For sample data, should the density estimate be trimmed to the range of the
-#' input data? Default `TRUE`.
+#' data? Passed on to the density estimator; see the `density` parameter. Default `TRUE`.
 #' @param expand For sample data, should the slab be expanded to the limits of the scale? Default `FALSE`.
 #' Can be length two to control expansion to the lower and upper limit respectively.
-#' @param breaks If `slab_type` is `"histogram"`, the `breaks` parameter that is passed to
-#' [hist()] to determine where to put breaks in the histogram (for sample data).
 #' @param limits Manually-specified limits for the slab, as a vector of length two. These limits are combined with those
 #' computed based on `p_limits` as well as the limits defined by the scales of the plot to determine the
 #' limits used to draw the slab functions: these limits specify the maximal limits; i.e., if specified, the limits
@@ -521,19 +484,27 @@ StatSlabinterval = ggproto("StatSlabinterval", AbstractStatSlabinterval,
   group_by_dist = TRUE,
 
   default_params = defaults(list(
-    slab_type = "pdf",
     p_limits = c(NA, NA),
-    density = "unbounded",
+    density = "bounded",
     adjust = 1,
     trim = TRUE,
     expand = FALSE,
     breaks = "Sturges",
+    align = "none",
     outline_bars = FALSE,
 
-    point_interval = "median_qi"
+    point_interval = "median_qi",
+
+    # deprecated parameters
+    slab_type = NULL   # deprecated, set by default_slab_type (below)
   ), AbstractStatSlabinterval$default_params),
 
   layer_function = "layer_slabinterval",
+
+  # overrides slab_type in setup_params() when slab_type is NULL (the default).
+  # This allows us to detect if the user sets slab_type (which is deprecated)
+  # and throw a warning.
+  default_slab_type = "pdf",
 
   # orientation auto-detection here is different from base AbstractStatSlabinterval
   # (main_is_orthogonal needs to be FALSE)
@@ -595,6 +566,30 @@ StatSlabinterval = ggproto("StatSlabinterval", AbstractStatSlabinterval,
     data
   },
 
+  setup_params = function(self, data, params) {
+    params = ggproto_parent(AbstractStatSlabinterval, self)$setup_params(data, params)
+
+    # override deprecated slab_type with default_slab_type
+    if (is.null(params$slab_type)) {
+      params$slab_type = self$default_slab_type
+    } else {
+      cli_warn(c(
+        'The {.arg slab_type} parameter for {.pkg ggdist} stats is deprecated.',
+        'i' = 'Instead of using {.arg slab_type}, use {.fun ggplot2::after_stat} to
+          map the desired computed variable, e.g. {.code pdf} or {.code cdf}, onto
+          an aesthetic, e.g. {.code aes(thickness = after_stat(pdf))}. Specifically:',
+        '*' = 'To replace {.code slab_type = "pdf"}, map {.code after_stat(pdf)} onto an aesthetic.',
+        '*' = 'To replace {.code slab_type = "cdf"}, map {.code after_stat(cdf)} onto an aesthetic.',
+        '*' = 'To replace {.code slab_type = "ccdf"}, map {.code after_stat(1 - cdf)} onto an aesthetic.',
+        '*' = 'To replace {.code slab_type = "histogram"}, map {.code after_stat(pdf)} onto an aesthetic and
+          pass {.code density = "histogram"} to the stat.',
+        'i' = 'For more information, see the {.emph Computed Variables} section of {.fun ggdist::stat_slabinterval}.'
+      ))
+    }
+
+    params
+  },
+
   compute_panel = function(self, data, scales,
     orientation,
     na.rm,
@@ -633,6 +628,8 @@ StatSlabinterval = ggproto("StatSlabinterval", AbstractStatSlabinterval,
     if (is_distribution(data$dist)) {
       is_logical = map_lgl_(data$dist, distr_is_logical)
       data$dist[is_logical] = data$dist[is_logical] + 0L
+    } else if (inherits(data$dist, "rvar") && distr_is_logical(data$dist)) {
+      data$dist = data$dist + 0L
     }
 
     # handle rvar factors / categorical dists: our modified version of Layer$compute_aesthetics will
@@ -732,10 +729,11 @@ StatCcdfinterval = ggproto("StatCcdfinterval", StatSlabinterval,
   ), StatSlabinterval$default_aes),
 
   default_params = defaults(list(
-    slab_type = "ccdf",
     normalize = "none",
     expand = TRUE
-  ), StatSlabinterval$default_params)
+  ), StatSlabinterval$default_params),
+
+  default_slab_type = "ccdf"
 )
 #' @eval rd_slabinterval_shortcut_stat("ccdfinterval", "CCDF bar", geom_name = "slabinterval", example_layers = "expand_limits(x = 0)")
 #' @export
@@ -746,9 +744,7 @@ StatCdfinterval = ggproto("StatCdfinterval", StatCcdfinterval,
     thickness = after_stat(thickness(cdf)),
   ), StatCcdfinterval$default_aes),
 
-  default_params = defaults(list(
-    slab_type = "cdf"
-  ), StatCcdfinterval$default_params)
+  default_slab_type = "cdf"
 )
 #' @eval rd_slabinterval_shortcut_stat("cdfinterval", "CDF bar", geom_name = "slabinterval")
 #' @export
@@ -780,8 +776,10 @@ stat_gradientinterval = make_stat(StatGradientinterval, geom = "slabinterval")
 
 StatHistinterval = ggproto("StatHistinterval", StatSlabinterval,
   default_params = defaults(list(
-    slab_type = "histogram"
-  ), StatSlabinterval$default_params)
+    density = "histogram"
+  ), StatSlabinterval$default_params),
+
+  default_slab_type = "histogram"
 )
 #' @eval rd_slabinterval_shortcut_stat("histinterval", "histogram + interval", geom_name = "slabinterval")
 #' @export
@@ -847,4 +845,21 @@ args_from_aes = function(args = list(), ...) {
   }
 
   c(unnamed_args, named_args)
+}
+
+#' Given the slab_type parameter and a data frame or list containing `pdf` and
+#' `cdf` computed variables, return the value of the slab function (the `f`
+#' computed variable)
+#' @param slab_type string: `"pdf"`, `"cdf"`, `"histogram"`, or `"ccdf"`. If
+#' the `slab_type` is not valid, an appropriate error will be raised.
+#' @param slab_df a list or data frame containing elements `"pdf"` and `"cdf"`.
+#' @noRd
+get_slab_function = function(slab_type, slab_df) {
+  switch(slab_type,
+    histogram = ,
+    pdf = slab_df$pdf,
+    cdf = slab_df$cdf,
+    ccdf = 1 - slab_df$cdf,
+    stop0("Unknown `slab_type`: ", deparse0(slab_type), '. Must be "histogram", "pdf", "cdf", or "ccdf"')
+  )
 }

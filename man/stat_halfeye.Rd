@@ -10,15 +10,16 @@ stat_halfeye(
   geom = "slabinterval",
   position = "identity",
   ...,
-  slab_type = "pdf",
   p_limits = c(NA, NA),
-  density = "unbounded",
+  density = "bounded",
   adjust = 1,
   trim = TRUE,
   expand = FALSE,
   breaks = "Sturges",
+  align = "none",
   outline_bars = FALSE,
   point_interval = "median_qi",
+  slab_type = NULL,
   limits = NULL,
   n = 501,
   .width = c(0.66, 0.95),
@@ -82,7 +83,7 @@ like in \code{\link[=stat_gradientinterval]{stat_gradientinterval()}}).
 large numbers of unique fill colors, but requires R >= 4.1 and is not yet supported on all graphics devices.
 As of this writing, the \code{png()} graphics device with \code{type = "cairo"}, the \code{svg()} device, the \code{pdf()}
 device, and the \code{ragg::agg_png()} devices are known to support this option. On R < 4.1, this option
-will fall back to \code{fill_type = "segment"} with a message.
+will fall back to \code{fill_type = "segments"} with a message.
 \item \code{"auto"}: attempts to use \code{fill_type = "gradient"} if support for it can be auto-detected. On R >= 4.2,
 support for gradients can be auto-detected on some graphics devices; if support is not detected, this
 option will fall back to \code{fill_type = "segments"} (in case of a false negative, \code{fill_type = "gradient"}
@@ -109,9 +110,6 @@ aesthetic and \code{\link[=scale_point_size_continuous]{scale_point_size_continu
 specified with that aesthetic will not be adjusted using \code{fatten_point}.}
 }}
 
-\item{slab_type}{The type of slab function to calculate: probability density (or mass) function (\code{"pdf"}),
-cumulative distribution function (\code{"cdf"}), or complementary CDF (\code{"ccdf"}).}
-
 \item{p_limits}{Probability limits (as a vector of size 2) used to determine the lower and upper
 limits of the slab. E.g., if this is \code{c(.001, .999)}, then a slab is drawn
 for the distribution from the quantile at \code{p = .001} to the quantile at \code{p = .999}. If the lower
@@ -129,26 +127,59 @@ corresponding densities). \pkg{ggdist} provides a family of functions
 following this format, including \code{\link[=density_unbounded]{density_unbounded()}} and
 \code{\link[=density_bounded]{density_bounded()}}. This format is also compatible with \code{\link[stats:density]{stats::density()}}.
 \item A string giving the suffix of a function name that starts with \code{"density_"};
-e.g. \code{"bounded"} for \verb{[density_bounded()]}.
+e.g. \code{"bounded"} for \verb{[density_bounded()]}, \code{"unbounded"} for \verb{[density_unbounded()]},
+or \code{"histogram"} for \code{\link[=density_histogram]{density_histogram()}}.
+Defaults to \code{"bounded"}, i.e. \code{\link[=density_bounded]{density_bounded()}}, which estimates the bounds from
+the data and then uses a bounded density estimator based on the reflection method.
 }}
 
-\item{adjust}{If \code{slab_type} is \code{"pdf"}, bandwidth for the density estimator for sample data
-is adjusted by multiplying it by this value. See \code{\link[=density]{density()}} for more information.}
+\item{adjust}{Passed to \code{density}: the bandwidth for the density estimator for sample data
+is adjusted by multiplying it by this value. See e.g. \code{\link[=density_bounded]{density_bounded()}} for more information.}
 
 \item{trim}{For sample data, should the density estimate be trimmed to the range of the
-input data? Default \code{TRUE}.}
+data? Passed on to the density estimator; see the \code{density} parameter. Default \code{TRUE}.}
 
 \item{expand}{For sample data, should the slab be expanded to the limits of the scale? Default \code{FALSE}.
 Can be length two to control expansion to the lower and upper limit respectively.}
 
-\item{breaks}{If \code{slab_type} is \code{"histogram"}, the \code{breaks} parameter that is passed to
-\code{\link[=hist]{hist()}} to determine where to put breaks in the histogram (for sample data).}
+\item{breaks}{Determines the breakpoints defining bins. Similar to (but not
+exactly the same as) the \code{breaks} argument to \code{\link[graphics:hist]{graphics::hist()}}. One of:
+\itemize{
+\item A scalar (length-1) numeric giving the number of bins
+\item A vector numeric giving the breakpoints between histogram bins
+\item A function taking \code{x} and \code{weights} and returning either the
+number of bins or a vector of breakpoints
+\item A string giving the suffix of a function that starts with
+\code{"breaks_"}. \pkg{ggdist} provides weighted implementations of the
+\code{"Sturges"}, \code{"Scott"}, and \code{"FD"} break-finding algorithms from
+\code{\link[graphics:hist]{graphics::hist()}}, as well as \code{\link[=breaks_fixed]{breaks_fixed()}} for manually setting
+the bin width. See \link{breaks}.
+}
 
-\item{outline_bars}{For sample data (if \code{slab_type} is \code{"histogram"}) and for discrete analytical
+For example, \code{breaks = "Sturges"} will use the \code{\link[=breaks_Sturges]{breaks_Sturges()}} algorithm,
+\code{breaks = 9} will create 9 bins, and \code{breaks = breaks_fixed(width = 1)} will
+set the bin width to \code{1}.}
+
+\item{align}{Determines how to align the breakpoints defining bins. One of:
+\itemize{
+\item A scalar (length-1) numeric giving an offset that is subtracted from the breaks.
+The offset must be between \code{0} and the bin width.
+\item A function taking a sorted vector of \code{breaks} (bin edges) and returning
+an offset to subtract from the breaks.
+\item A string giving the suffix of a function that starts with
+\code{"align_"} used to determine the alignment, such as \code{\link[=align_none]{align_none()}},
+\code{\link[=align_boundary]{align_boundary()}}, or \code{\link[=align_center]{align_center()}}.
+}
+
+For example, \code{align = "none"} will provide no alignment, \code{align = align_center(at = 0)}
+will center a bin on \code{0}, and \code{align = align_boundary(at = 0)} will align a bin
+edge on \code{0}.}
+
+\item{outline_bars}{For sample data (if \code{density} is \code{"histogram"}) and for discrete analytical
 distributions (whose slabs are drawn as histograms), determines
 if outlines in between the bars are drawn when the \code{slab_color} aesthetic is used. If \code{FALSE}
 (the default), the outline is drawn only along the tops of the bars; if \code{TRUE}, outlines in between
-bars are also drawn.}
+bars are also drawn. See \code{\link[=density_histogram]{density_histogram()}}.}
 
 \item{point_interval}{A function from the \code{\link[=point_interval]{point_interval()}} family (e.g., \code{median_qi},
 \code{mean_qi}, \code{mode_hdi}, etc), or a string giving the name of a function from that family
@@ -158,6 +189,11 @@ for the function, followed by the \pkg{ggdist} environment). This function deter
 highest-density interval, \code{hdi}; or highest-density continuous interval, \code{hdci}). Output will
 be converted to the appropriate \code{x}- or \code{y}-based aesthetics depending on the value of \code{orientation}.
 See the \code{\link[=point_interval]{point_interval()}} family of functions for more information.}
+
+\item{slab_type}{(deprecated) The type of slab function to calculate: probability density (or mass) function (\code{"pdf"}),
+cumulative distribution function (\code{"cdf"}), or complementary CDF (\code{"ccdf"}). Instead of using \code{slab_type} to
+change \code{f} and then mapping \code{f} onto an aesthetic, it is now recommended to simply map the corresponding
+computed variable (e.g. \code{pdf}, \code{cdf}, or  \code{1 - cdf}) directly onto the desired aesthetic.}
 
 \item{limits}{Manually-specified limits for the slab, as a vector of length two. These limits are combined with those
 computed based on \code{p_limits} as well as the limits defined by the scales of the plot to determine the
@@ -258,10 +294,12 @@ for the PDF at the lower and upper ends of the interval.
 If \code{options("ggdist.experimental.slab_data_in_intervals")} is \code{TRUE}:
 For intervals, the CDF at the point summary; intervals also have \code{cdf_min} and \code{cdf_max}
 for the CDF at the lower and upper ends of the interval.
-\item \code{f}: For slabs, the output values from the slab function (such as the PDF, CDF, or CCDF),
-determined by \code{slab_type}.
 \item \code{n}: For slabs, the number of data points summarized into that slab. If the slab was created from
 an analytical distribution via the \code{xdist}, \code{ydist}, or \code{dist} aesthetic, \code{n} will be \code{Inf}.
+\item \code{f}: (deprecated) For slabs, the output values from the slab function (such as the PDF, CDF, or CCDF),
+determined by \code{slab_type}. Instead of using \code{slab_type} to change \code{f} and then mapping \code{f} onto an
+aesthetic, it is now recommended to simply map the corresponding computed variable (e.g. \code{pdf}, \code{cdf}, or
+\code{1 - cdf}) directly onto the desired aesthetic.
 }
 }
 
@@ -456,6 +494,7 @@ Other slabinterval stats:
 \code{\link{stat_histinterval}()},
 \code{\link{stat_interval}()},
 \code{\link{stat_pointinterval}()},
-\code{\link{stat_slab}()}
+\code{\link{stat_slab}()},
+\code{\link{stat_spike}()}
 }
 \concept{slabinterval stats}

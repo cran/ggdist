@@ -24,8 +24,14 @@
 #' - The `smooth_` family, such as [smooth_bounded()], [smooth_unbounded()],
 #'   [smooth_discrete()], and [smooth_bar()].
 #'
-#' - The `density_` family, such as [density_auto()], [density_bounded()] and
-#'   [density_unbounded()].
+#' - The `density_` family, such as [density_bounded()], [density_unbounded()] and
+#'   [density_histogram()].
+#'
+#' - The [align] family.
+#'
+#' - The [breaks] family.
+#'
+#' - The [bandwidth] family.
 #'
 #' Partial application makes it easier to supply custom parameters to these
 #' functions when using them inside other functions, such as geoms and stats.
@@ -47,10 +53,10 @@
 #' # the first required argument, `x`, of the density_ family is the vector
 #' # to calculate a kernel density estimate from. If it is not provided, the
 #' # function is partially applied and returned as-is
-#' density_auto()
+#' density_unbounded()
 #'
 #' # we could create a new function that uses half the default bandwidth
-#' density_half_bw = density_auto(adjust = 0.5)
+#' density_half_bw = density_unbounded(adjust = 0.5)
 #' density_half_bw
 #'
 #' # we can overwrite partially-applied arguments

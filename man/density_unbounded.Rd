@@ -8,10 +8,14 @@ density_unbounded(
   x,
   weights = NULL,
   n = 512,
-  bandwidth = "nrd0",
+  bandwidth = "dpi",
   adjust = 1,
   kernel = "gaussian",
-  trim = FALSE
+  trim = FALSE,
+  adapt = 1,
+  na.rm = FALSE,
+  ...,
+  range_only = FALSE
 )
 }
 \arguments{
@@ -25,8 +29,8 @@ density_unbounded(
 \itemize{
 \item a numeric: the bandwidth, as the standard deviation of the kernel
 \item a function: a function taking \code{x} (the sample) and returning the bandwidth
-\item a string: the suffix of the name of a function starting with \code{"bw."} that
-will be used to determine the bandwidth. See \code{\link[=bw.nrd0]{bw.nrd0()}} for a list.
+\item a string: the suffix of the name of a function starting with \code{"bandwidth_"} that
+will be used to determine the bandwidth. See \link{bandwidth} for a list.
 }}
 
 \item{adjust}{numeric: the bandwidth for the density estimator is multiplied
@@ -37,10 +41,28 @@ match one of \code{"gaussian"}, \code{"rectangular"}, \code{"triangular"}, \code
 \code{"biweight"}, \code{"cosine"}, or \code{"optcosine"}. See \code{\link[stats:density]{stats::density()}}.}
 
 \item{trim}{Should the density estimate be trimmed to the bounds of the data?}
+
+\item{adapt}{(\strong{very experimental}) The name and interpretation of this argument
+are subject to change without notice. Positive integer. If \code{adapt > 1}, uses
+an adaptive approach to calculate the density. First, uses the
+adaptive bandwidth algorithm of Abramson (1982) to determine local (pointwise)
+bandwidths, then groups these bandwidths into \code{adapt} groups, then calculates
+and sums the densities from each group. You can set this to a very large number
+(e.g. \code{Inf}) for a fully adaptive approach, but this will be very slow; typically
+something around 100 yields nearly identical results.}
+
+\item{na.rm}{Should missing (\code{NA}) values in \code{x} be removed?}
+
+\item{...}{Additional arguments (ignored).}
+
+\item{range_only}{If \code{TRUE}, the range of the output of this density estimator
+is computed and is returned in the \verb{$x} element of the result, and \code{c(NA, NA)}
+is returned in \verb{$y}. This gives a faster way to determine the range of the output
+than \code{density_XXX(n = 2)}.}
 }
 \value{
 An object of class \code{"density"}, mimicking the output format of
-\code{stats:density()}, with the following components:
+\code{\link[stats:density]{stats::density()}}, with the following components:
 \itemize{
 \item \code{x}: The grid of points at which the density was estimated.
 \item \code{y}: The estimated density values.
@@ -49,12 +71,14 @@ An object of class \code{"density"}, mimicking the output format of
 \item \code{call}: The call used to produce the result, as a quoted expression.
 \item \code{data.name}: The deparsed name of the \code{x} input argument.
 \item \code{has.na}: Always \code{FALSE} (for compatibility).
+\item \code{cdf}: Values of the (possibly weighted) empirical cumulative distribution
+function at \code{x}. See \code{\link[=weighted_ecdf]{weighted_ecdf()}}.
 }
 
-This allows existing methods (like \code{print()} and \code{plot()}) to work if desired.
+This allows existing methods for density objects, like \code{\link[=print]{print()}} and \code{\link[=plot]{plot()}}, to work if desired.
 This output format (and in particular, the \code{x} and \code{y} components) is also
 the format expected by the \code{density} argument of the \code{\link[=stat_slabinterval]{stat_slabinterval()}}
-and the \code{smooth_} family of functions.
+and the \code{\link[=smooth_density]{smooth_}} family of functions.
 }
 \description{
 Unbounded density estimator using \code{\link[stats:density]{stats::density()}}.
@@ -94,7 +118,7 @@ data.frame(x) \%>\%
 }
 \seealso{
 Other density estimators: 
-\code{\link{density_auto}()},
-\code{\link{density_bounded}()}
+\code{\link{density_bounded}()},
+\code{\link{density_histogram}()}
 }
 \concept{density estimators}

@@ -1,3 +1,68 @@
+# ggdist 3.3.0
+
+Breaking changes: The following changes, mostly due to new default density 
+estimators, may cause some plots on sample data to change. Changes should usually
+be small, and generally should result in more accurate density estimation. Revert
+to the old behavior by setting `density = density_unbounded(bandwidth = "nrd0")`.
+
+* `stat_slabinterval()` now uses `density_bounded()` as its default density
+  estimator, which uses a bounded density estimator that also estimates the 
+  bounds of the data. The default bandwidth estimator is also now `bandwidth_dpi()`,
+  which is the Sheather-Jones direct plug-in estimator (the same as
+  `stats::bw.SJ(..., method = "dpi")`). These changes may cause existing charts
+  using densities to change; usually only slightly. These changes should be worth
+  it, as they should drastically improve the accuracy of density estimates, 
+  especially on bounded data, and should have little noticeable impact on densities 
+  on unbounded data.
+* `density_bounded()` now estimates bounds from the data when not provided
+  (i.e. when one of `bounds` is `NA`). See the `bounder_` functions (e.g.
+  `bounder_cdf()`, `bounder_cooke()`) for more on bounds estimation.
+* Improved `Mode()` and `hdi()` estimators based on bounded density estimator.
+
+New features and enhancements:
+
+* Improved `hdci()` estimator using quantile estimation.
+* Histograms are now implemented using `density_histogram()`, a histogram
+  density estimator. Finer-grained control of bin positions is now possible
+  using the `breaks` argument (including the new `breaks_fixed()` for manually-specified
+  bin widths) and the `align` argument (including the new `align_boundary()` and
+  `align_center()` for choosing how to align bin positions to reference points). (#118)
+* New `geom_spike()` and `stat_spike()` for adding spike annotations to slabs
+  created with `geom_slabinterval()` or `stat_slabinterval()`. See example
+  in `vignette("slabinterval")`. (#58, #124)
+* `parse_dist()` now outputs *distributional* objects in a `.dist_obj` column in
+  addition to the name-plus-arguments (`.dist`+`.args`) format, and these objects respect truncation
+  parameters from prior specifications. This makes it easier to  visualize standard
+  deviation priors, for example, giving a better solution to #20.
+* `marginalize_lkjcorr()` adjusts the `.dist_obj` column output by `parse_dist()`
+  in addition to the `.dist` and `.args` columns.
+* `geom_lineribbon()` now obeys the `order` aesthetic, allowing you to arbitrarily
+  set the draw order of ribbons (#171). Enabled by this change, `stat_lineribbon()` 
+  now sets `order = after_stat(level)` by default, making its draw order more correct
+  by ensuring all ribbons of the same level are drawn together.
+* Some improved error messages using `cli`.
+* *Very* experimental adaptive KDE is available through the `adapt` parameter; 
+  note that it is unsupported and both the implementation and interface are 
+  highly likely to change.
+
+Deprecations:
+
+* The `slab_type` parameter for `stat_slabinterval()` is now deprecated in favor
+  of mapping the corresponding computed variable (`pdf` or `cdf`) onto the desired
+  aesthetic. For `slab_type = "histogram"`, use the `pdf` computed variable 
+  combined with the new `density_histogram()` density estimator (e.g. set
+  `density = "histogram"`). (#165)
+
+Bug fixes:
+
+* Ensure scale transformations work even when no slab is present; e.g. in
+  `stat_interval()`. (#168)
+* Ensure `curve_interval()` works with `posterior::rvar`s. (#158)
+* `geom_lineribbon()` draw order is now correct even when some portions of a 
+  ribbon has `NA` widths. (#171)
+* Improve the appearance of logical fill conditions at bin edges on histograms. (#175)
+
+
 # ggdist 3.2.1
 
 New features and enhancements:

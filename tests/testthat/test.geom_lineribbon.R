@@ -5,6 +5,7 @@
 
 library(dplyr)
 library(tidyr)
+library(distributional)
 
 
 
@@ -232,4 +233,60 @@ test_that("geom_lineribbon without line works", {
 })
 
 
+# missing data in ymin / ymax is removed when draw order is determined --------
 
+test_that("geom_lineribbon with some NA ymin/ymax has correct draw order", {
+  skip_if_no_vdiffr()
+
+  df = tibble(
+    x = 1:6,
+    y = (1:6)^2/2
+  )
+
+  # make intervals on first point NA so that line (but not intervals)
+  # should show up and draw order (95% then 50%) should still be correct
+  df = rbind(
+    mutate(df,
+      lower = c(NA, y[-1] - 6/(6:2)),
+      upper = c(NA, y[-1] + 6/(6:2)),
+      .width = .5
+    ),
+    mutate(df,
+      lower = c(NA, y[-1] - 12/(6:2)),
+      upper = c(NA, y[-1] + 12/(6:2)),
+      .width = .9
+    )
+  )
+
+  vdiffr::expect_doppelganger("geom_lineribbon with NAs in ymin / ymax",
+    df %>%
+      ggplot(aes(x = x, y = y, ymin = lower, ymax = upper)) +
+      geom_lineribbon() +
+      scale_fill_brewer()
+  )
+})
+
+
+# ribbon order ------------------------------------------------------------
+
+test_that("stat_lineribbon draw order works", {
+  skip_if_no_vdiffr()
+
+  p = data.frame(
+    x = c(1:10, 1:10),
+    y = c(1:10, 10:1),
+    sd = rep(c(1, 2), each = 10),
+    g = rep(c("a","b"), each = 10)
+  ) %>%
+    ggplot(aes(x = x, ydist = dist_normal(y, sd), fill = g, fill_ramp = after_stat(level)))
+
+  # interleaving levels...
+  vdiffr::expect_doppelganger("default draw order interleaves levels",
+    p + stat_lineribbon()
+  )
+
+  # group over group
+  vdiffr::expect_doppelganger("draw group by group",
+    p + stat_lineribbon(aes(order = after_stat(interaction(level, group))))
+  )
+})

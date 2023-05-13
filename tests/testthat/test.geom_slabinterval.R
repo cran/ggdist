@@ -203,7 +203,7 @@ test_that("incorrect side, orientation are caught", {
 
   expect_error(print(newpage = FALSE,
     p + geom_slabinterval(fill_type = "foo")
-  ), "Unknown fill_type")
+  ), "Unknown `fill_type`")
 
 })
 
@@ -246,7 +246,7 @@ test_that("NAs in thickness produce gaps", {
 test_that("all-NA thickness produces no slab", {
   grob = layer_grob(ggplot() + geom_slab(aes(x = 1, thickness = NA)))
   expect_length(grob, 1)
-  expect_is(grob[[1]], "gTree")
+  expect_s3_class(grob[[1]], "gTree")
   expect_equal(grob[[1]]$children, gList())
 })
 
@@ -259,7 +259,7 @@ test_that("NAs and Infs in x work", {
         geom_slab(aes(y = "NA", x = c(NA,2:4,NA), thickness = c(0,1,2,0.5,0.25)), color = "black") +
         geom_slab(aes(y = "Inf", x = c(-Inf,2:4,Inf), thickness = c(0,1,2,0.5,0.25)), color = "black")
     ),
-    "Removed 2 rows containing missing values"
+    "Removed 2 rows\\s+containing\\s+missing\\s+values"
   )
 })
 
