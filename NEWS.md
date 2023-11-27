@@ -1,3 +1,28 @@
+# ggdist 3.3.1
+
+New features and enhancements:
+
+* Use derivatives supplied by transformations in *scales* >= 1.2.2 to make
+  transformations of densities more reliable (r-lib/scales#341).
+* New `layout = "bar"` for `geom_dotsinterval()` that provides better bar 
+  dotplots (with thanks to @sharoz for feedback; #190).
+* Bandwidth estimators (including the default, `bandwidth_dpi()`) now fall back
+  to `bandwidth_nrd0()` when they fail, with a warning that suggests trying 
+  a dotplot or histogram (as these failures tend to happen on data that is not
+  a good candidate for a density plot in the first place) (#196).
+* Much faster (C++) implementation of Wilkinson dotplot binning, especially
+  for large dotplots.
+
+Bug fixes:
+
+* Ensure `scale_side_mirrored()` supports `start = "left"` and `start = "right"`
+* Ensure `geom_spike()` draws the point on the correct end of the line depending on `side`.
+* Future-proof `guide_rampbar()` for ggplot2 > 3.4.2 (#186). Thanks to @teunbrand.
+* Future-proof some minor tests for ggplot2 > 3.4.2 (#187).
+* Allow the `size` aesthetic to be overridden for the `geom_dots()` legend.
+* Ensure `hdi()` supports constants. (#194)
+
+
 # ggdist 3.3.0
 
 Breaking changes: The following changes, mostly due to new default density 

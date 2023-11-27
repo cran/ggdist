@@ -1,10 +1,21 @@
 ## ----chunk_options, include=FALSE---------------------------------------------
-tiny_width = 5.5
-tiny_height = 3 + 2/3
-small_width = med_width = 6.75
-small_height = med_height = 4.5
-large_width = 8
-large_height = 5.25
+if (requireNamespace("pkgdown", quietly = TRUE) && pkgdown::in_pkgdown()) {
+  tiny_width = 5.5
+  tiny_height = 3 + 2/3
+  small_width = med_width = 6.75
+  small_height = med_height = 4.5
+  large_width = 8
+  large_height = 5.25
+} else {
+  tiny_width = 5
+  tiny_height = 3 + 1/3
+  small_width = 5
+  small_height = 3 + 1/3
+  med_width = 5
+  med_height = 3 + 1/3
+  large_width = 5.5
+  large_height = 2/3
+}
 
 knitr::opts_chunk$set(
   fig.width = small_width,
@@ -275,7 +286,7 @@ layout_plot = function(layout, side, ...) {
   layout_plot("swarm", side = "both")) +
   plot_annotation(title = 'geom_dots() layouts with side = "both"')
 
-## ----beeswarm_bin-----------------------------------------------------------------------------------------------------
+## ----beeswarm_bin, fig.width = small_width, fig.height = small_height-------------------------------------------------
 set.seed(1234)
 
 abc_df = data.frame(
@@ -288,19 +299,13 @@ abc_df %>%
   geom_dots(side = "both") +
   ggtitle('geom_dots(side = "both")')
 
-## ----beeswarm_hex-----------------------------------------------------------------------------------------------------
+## ----beeswarm_hex, fig.width = small_width, fig.height = small_height-------------------------------------------------
 abc_df %>%
   ggplot(aes(x = abc, y = value)) +
   geom_dots(side = "both", layout = "hex", stackratio = 0.92) +
   ggtitle('geom_dots(side = "both", layout = "hex")')
 
-## ----beeswarm---------------------------------------------------------------------------------------------------------
-abc_df %>%
-  ggplot(aes(x = abc, y = value)) +
-  geom_dots(side = "both", layout = "swarm") +
-  ggtitle('geom_dots(side = "both", layout = "swarm")')
-
-## ----geom_weave-------------------------------------------------------------------------------------------------------
+## ----geom_weave, fig.width = small_width, fig.height = small_height---------------------------------------------------
 set.seed(1234)
 
 swarm_data = data.frame(
@@ -310,17 +315,17 @@ swarm_data = data.frame(
 
 swarm_plot = swarm_data %>%
   ggplot(aes(x = g, y = y)) +
-  geom_swarm(linewidth = 0) +
+  geom_swarm(linewidth = 0, alpha = 0.75) +
   labs(title = "geom_swarm()")
 
 weave_plot = swarm_data %>%
   ggplot(aes(x = g, y = y)) +
-  geom_weave(linewidth = 0) +
+  geom_weave(linewidth = 0, alpha = 0.75) +
   labs(title = "geom_weave()")
 
 swarm_plot + weave_plot
 
-## ----beeswarm_dodge---------------------------------------------------------------------------------------------------
+## ----beeswarm_dodge, fig.width = small_width, fig.height = small_height-----------------------------------------------
 set.seed(12345)
 
 abcc_df = data.frame(
@@ -331,24 +336,14 @@ abcc_df = data.frame(
 
 abcc_df %>%
   ggplot(aes(y = value, x = abc, fill = hi)) +
-  geom_weave(position = "dodge", linewidth = 0) +
-  scale_color_brewer(palette = "Dark2") +
+  geom_weave(position = "dodge", linewidth = 0, alpha = 0.75) +
+  scale_fill_brewer(palette = "Dark2") +
   ggtitle(
     'geom_weave(position = "dodge")',
-    'aes(fill = hi)'
+    'aes(fill = hi, shape = hi)'
   )
 
-## ----beeswarm_shape_color---------------------------------------------------------------------------------------------
-abcc_df %>%
-  ggplot(aes(y = value, x = abc, shape = abc, color = hi)) +
-  geom_weave(position = "dodge") +
-  scale_color_brewer(palette = "Dark2") +
-  ggtitle(
-    'geom_weave(position = "dodge")',
-    'aes(shape = abc, fill = hi)'
-  )
-
-## ----beeswarm_shape_color_together------------------------------------------------------------------------------------
+## ----beeswarm_shape_color_together, fig.width = small_width, fig.height = small_height--------------------------------
 abcc_df %>%
   ggplot(aes(y = value, x = abc, fill = hi, group = NA)) +
   geom_dots(linewidth = 0) +
@@ -358,7 +353,7 @@ abcc_df %>%
     'aes(fill = hi, group = NA)'
   )
 
-## ----beeswarm_shape_color_together_stacked----------------------------------------------------------------------------
+## ----beeswarm_shape_color_together_stacked, fig.width = small_width, fig.height = small_height------------------------
 abcc_df %>%
   ggplot(aes(y = value, x = abc, fill = hi, group = NA, order = hi)) +
   geom_dots(linewidth = 0) +
@@ -368,7 +363,7 @@ abcc_df %>%
     'aes(fill = hi, group = NA, order = hi)'
   )
 
-## ----beeswarm_shape_color_continuous----------------------------------------------------------------------------------
+## ----beeswarm_shape_color_continuous, fig.width = small_width, fig.height = small_height------------------------------
 abcc_df %>%
   arrange(hi) %>%
   ggplot(aes(y = value, x = abc, shape = abc, color = value)) +
@@ -399,17 +394,7 @@ ggplot() +
   ) +
   scale_y_continuous(breaks = NULL)
 
-## ----large_sample_smooth_hex, fig.width = small_width, fig.height = small_width/2-------------------------------------
-ggplot() +
-  geom_dots(aes(x), smooth = "unbounded", layout = "hex", stackratio = 0.9, side = "both") +
-  labs(
-    title = 'geom_dots() with 2000 dots',
-    subtitle = 'smooth = "unbounded", layout = "hex", stackratio = 0.9, side = "both")',
-    x = NULL
-  ) +
-  scale_y_continuous(breaks = NULL)
-
-## ----smooth_bounded_versus_unbounded----------------------------------------------------------------------------------
+## ----smooth_bounded_versus_unbounded, fig.width = small_width, fig.height = small_height------------------------------
 set.seed(1234)
 x = rbeta(2000, 0.5, 0.5)
 
@@ -451,11 +436,11 @@ abcd_df %>%
 
 ## ----discrete_dots_bar, fig.width = small_width, fig.height = small_height--------------------------------------------
 abcd_df %>%
-  ggplot(aes(x = x)) +
-  geom_dots(smooth = "bar", group = NA) +
+  ggplot(aes(x = x, fill = g, order = g)) +
+  geom_dots(layout = "bar", group = NA, color = NA) +
   scale_y_continuous(breaks = NULL) +
   labs(
-    title = 'geom_dots(smooth = "bar", group = NA)',
+    title = 'geom_dots(aes(fill = g), layout = "bar", group = NA)',
     subtitle = "on a large discrete sample"
   )
 
@@ -469,7 +454,7 @@ abcd_df %>%
     subtitle = "on a large discrete sample"
   )
 
-## ----dotsinterval_dist------------------------------------------------------------------------------------------------
+## ----dotsinterval_dist, fig.width = small_width, fig.height = small_height--------------------------------------------
 dist_df = tibble(
   dist = c(dist_normal(1,0.25), dist_beta(3,3), dist_gamma(5,5)),
   dist_name = format(dist)
@@ -483,26 +468,17 @@ dist_df %>%
     "aes(y = dist_name, xdist = dist)"
   )
 
-## ----dotsinterval_dist_1000-------------------------------------------------------------------------------------------
+## ----dotsinterval_dist_1000_level_color, fig.width = small_width, fig.height = small_height---------------------------
 dist_df %>%
-  ggplot(aes(y = dist_name, xdist = dist)) +
-  stat_dotsinterval(quantiles = 1000, point_interval = mode_hdci) +
+  ggplot(aes(y = dist_name, xdist = dist, slab_fill = after_stat(level))) +
+  stat_dotsinterval(quantiles = 1000, point_interval = mode_hdci, layout = "weave", slab_color = NA) +
+  scale_color_manual(values = scales::brewer_pal()(3)[-1], aesthetics = "slab_fill") +
   ggtitle(
     "stat_dotsinterval(quantiles = 1000, point_interval = mode_hdci)",
-    "aes(y = dist_name, xdist = dist)"
+    "aes(y = dist_name, xdist = dist, slab_fill = after_stat(level))"
   )
 
-## ----dotsinterval_dist_1000_level_color-------------------------------------------------------------------------------
-dist_df %>%
-  ggplot(aes(y = dist_name, xdist = dist, slab_color = after_stat(level))) +
-  stat_dotsinterval(quantiles = 1000, point_interval = mode_hdci, layout = "weave") +
-  scale_color_manual(values = scales::brewer_pal()(3)[-1], aesthetics = "slab_color") +
-  ggtitle(
-    "stat_dotsinterval(quantiles = 1000, point_interval = mode_hdci)",
-    "aes(y = dist_name, xdist = dist, slab_color = after_stat(level))"
-  )
-
-## ----dotsinterval_dist_color------------------------------------------------------------------------------------------
+## ----dotsinterval_dist_color, fig.width = small_width, fig.height = small_height--------------------------------------
 dist_df %>%
   ggplot(aes(y = dist_name, xdist = dist, slab_color = after_stat(x))) +
   stat_dotsinterval(slab_shape = 19, quantiles = 500) +
@@ -512,29 +488,13 @@ dist_df %>%
     'aes(slab_color = after_stat(x)) +\nscale_color_distiller(aesthetics = "slab_color", guide = "colorbar2")'
   )
 
-## ----dist_dots_shape_color, fig.width = med_width, fig.height = med_height--------------------------------------------
+## ----dist_dots_weave, fig.width = small_width, fig.height = small_height----------------------------------------------
 ab_df = tibble(
   ab = c("a", "b"),
   mean = c(5, 7),
   sd = c(1, 1.5)
 )
 
-ab_df %>%
-  ggplot(aes(
-    y = ab, xdist = dist_normal(mean, sd),
-    fill = after_stat(x < 6), shape = after_stat(x < 6)
-  )) +
-  stat_dots(position = "dodge", color = NA) +
-  labs(
-    title = "stat_dots()",
-    subtitle = "aes(xdist = dist_normal(mean, sd), fill and shape = after_stat(x < 6))"
-  ) +
-  geom_vline(xintercept = 6, alpha = 0.25) +
-  scale_x_continuous(breaks = 2:10) +
-  # we'll use these shapes since they have fill and outlines
-  scale_shape_manual(values = c(21,22))
-
-## ----dist_dots_weave, fig.width = med_width, fig.height = med_height--------------------------------------------------
 ab_df %>%
   ggplot(aes(y = ab, xdist = dist_normal(mean, sd), fill = after_stat(x < 6))) +
   stat_dots(position = "dodge", color = NA, layout = "weave") +
@@ -545,7 +505,7 @@ ab_df %>%
   geom_vline(xintercept = 6, alpha = 0.25) +
   scale_x_continuous(breaks = 2:10)
 
-## ----halfeye_dotplot--------------------------------------------------------------------------------------------------
+## ----halfeye_dotplot, fig.width = small_width, fig.height = small_height----------------------------------------------
 set.seed(12345) # for reproducibility
 
 data.frame(

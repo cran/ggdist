@@ -1,10 +1,21 @@
 ## ----chunk_options, include=FALSE---------------------------------------------
-tiny_width = 5.5
-tiny_height = 3 + 2/3
-small_width = med_width = 6.75
-small_height = med_height = 4.5
-large_width = 8
-large_height = 5.25
+if (requireNamespace("pkgdown", quietly = TRUE) && pkgdown::in_pkgdown()) {
+  tiny_width = 5.5
+  tiny_height = 3 + 2/3
+  small_width = med_width = 6.75
+  small_height = med_height = 4.5
+  large_width = 8
+  large_height = 5.25
+} else {
+  tiny_width = 5
+  tiny_height = 3 + 1/3
+  small_width = 5
+  small_height = 3 + 1/3
+  med_width = 5
+  med_height = 3 + 1/3
+  large_width = 5.5
+  large_height = 2/3
+}
 
 knitr::opts_chunk$set(
   fig.width = small_width,
@@ -76,28 +87,12 @@ df %>%
   stat_lineribbon() +
   scale_fill_brewer()
 
-## ----stat_lineribbon_width, fig.width = tiny_width, fig.height = tiny_height------------------------------------------
-df %>%
-  ggplot(aes(x = x, y = y)) +
-  stat_lineribbon(.width = c(.66, .95)) +
-  scale_fill_brewer()
-
 ## ----stat_lineribbon_gradient, fig.width = tiny_width, fig.height = tiny_height---------------------------------------
 df %>%
   ggplot(aes(x = x, y = y, fill = after_stat(.width))) +
   stat_lineribbon(.width = ppoints(50)) +
   scale_fill_distiller() +
   labs(title = "stat_lineribbon(.width = ppoints(50))")
-
-## ----stat_lineribbon_gradient_ramp, fig.width = tiny_width, fig.height = tiny_height----------------------------------
-df %>%
-  ggplot(aes(x = x, y = y, fill_ramp = after_stat(.width))) +
-  stat_lineribbon(.width = ppoints(50), fill = "#2171b5") +
-  scale_fill_ramp_continuous(range = c(1, 0)) +
-  labs(
-    title = "stat_lineribbon(.width = ppoints(50))",
-    subtitle = "aes(fill_ramp = after_stat(.width))"
-  )
 
 ## ----stat_lineribbon_gradient_rampbar, fig.width = tiny_width, fig.height = tiny_height-------------------------------
 df %>%

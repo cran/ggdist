@@ -82,7 +82,7 @@ makeContent.dots_grob = function(x) {
     # find the best bin widths across all the dotplots we are going to draw
     binwidths = map_dbl_(datas, function(d) {
       maxheight = max(d[[ymax]] - d[[ymin]])
-      find_dotplot_binwidth(d[[x]], maxheight, heightratio, stackratio)
+      find_dotplot_binwidth(d[[x]], maxheight, heightratio, stackratio, layout = layout)
     })
 
     binwidth = min(binwidths, user_max_binwidth)
@@ -130,7 +130,7 @@ makeContent.dots_grob = function(x) {
     # factor based on how big the circle glyph is as a ratio of font size
     # (font_size_ratio) plus need to account for stroke width
     lwd = d$linewidth * .stroke/2
-    lwd[is.na(lwd)] = 0
+    lwd[is.na(lwd) | is.na(d$colour)] = 0
     dot_pointsize = convertUnit(unit(binwidth * dotsize, "native"),
       "points", axisFrom = x, axisTo = "y", typeFrom = "dimension", valueOnly = TRUE)
     dot_fontsize = max(
@@ -416,9 +416,10 @@ GeomDotsinterval = ggproto("GeomDotsinterval", GeomSlabinterval,
         \\item `"swarm"`: uses the `"compactswarm"` layout from [beeswarm::beeswarm()]. Does not maintain alignment of rows or
           columns, but can be more compact and neat looking, especially for sample data (as opposed to quantile
           dotplots of theoretical distributions, which may look better with `"bin"`, `"weave"`, or `"hex"`).
+        \\item `"bar"`: for discrete distributions, lays out duplicate values in rectangular bars.
       }'),
     overlaps = glue_doc('How to handle overlapping dots or bins in the `"bin"`,
-      `"weave"`, and `"hex"` layouts (dots never overlap in the `"swarm"` layout).
+      `"weave"`, and `"hex"` layouts (dots never overlap in the `"swarm"` or `"bar"` layouts).
       For the purposes of this argument, dots are only considered to be overlapping
       if they would be overlapping when `dotsize = 1` and `stackratio = 1`; i.e.
       if you set those arguments to other values, overlaps may still occur.
@@ -495,7 +496,9 @@ GeomDotsinterval = ggproto("GeomDotsinterval", GeomSlabinterval,
 
       # what point calls "stroke" is what we call "linewidth", since "linewidth" is determined automatically
       s_key_data$stroke = s_key_data$linewidth
-      # TODO: allow size of points in the key to be modified
+      # TODO: allow size of points in the key to be modified (not clear how to do this
+      # without breaking the override for slab_size / slab_linewidth, so will just leave
+      # this for now and expect people to use geom_dots if they want good legends anyway...)
       s_key_data$size = 2
       draw_key_point(s_key_data, params, size)
     }
@@ -521,6 +524,7 @@ GeomDots = ggproto("GeomDots", GeomDotsinterval,
   default_key_aes = defaults(aes(
     shape = 21,
     linewidth = 0.75,
+    size = 2,
     colour = "gray65"
   ), GeomSlabinterval$default_key_aes),
 
@@ -554,8 +558,7 @@ GeomDots = ggproto("GeomDots", GeomDotsinterval,
 
     # what point calls "stroke" is what we call "linewidth", since "linewidth" is determined automatically
     s_key_data$stroke = s_key_data$linewidth
-    # TODO: allow size of points in the key to be modified
-    s_key_data$size = 2
+    s_key_data$size = s_key_data$size %||% 2
     draw_key_point(s_key_data, params, size)
   }
 )

@@ -1,10 +1,21 @@
 ## ----chunk_options, include=FALSE---------------------------------------------
-tiny_width = 5.5
-tiny_height = 3 + 2/3
-small_width = med_width = 6.75
-small_height = med_height = 4.5
-large_width = 8
-large_height = 5.25
+if (requireNamespace("pkgdown", quietly = TRUE) && pkgdown::in_pkgdown()) {
+  tiny_width = 5.5
+  tiny_height = 3 + 2/3
+  small_width = med_width = 6.75
+  small_height = med_height = 4.5
+  large_width = 8
+  large_height = 5.25
+} else {
+  tiny_width = 5
+  tiny_height = 3 + 1/3
+  small_width = 5
+  small_height = 3 + 1/3
+  med_width = 5
+  med_height = 3 + 1/3
+  large_width = 5.5
+  large_height = 2/3
+}
 
 knitr::opts_chunk$set(
   fig.width = small_width,
@@ -56,7 +67,7 @@ summary(m_ABC)
 ## ----m_ABC_coefs------------------------------------------------------------------------------------------------------
 tidy(m_ABC)
 
-## ----halfeye----------------------------------------------------------------------------------------------------------
+## ----halfeye, fig.width = tiny_width, fig.height = tiny_height--------------------------------------------------------
 m_ABC %>%
   tidy() %>%
   ggplot(aes(y = term)) +
@@ -64,7 +75,7 @@ m_ABC %>%
     aes(xdist = dist_student_t(df = df.residual(m_ABC), mu = estimate, sigma = std.error))
   )
 
-## ----halfeye_with_data------------------------------------------------------------------------------------------------
+## ----halfeye_with_data, fig.width = tiny_width, fig.height = tiny_height----------------------------------------------
 ABC %>%
   data_grid(condition) %>%
   augment(m_ABC, newdata = ., se_fit = TRUE) %>%
@@ -77,7 +88,7 @@ ABC %>%
   # that the data fit in as well)
   geom_point(aes(x = response), data = ABC, pch = "|", size = 2, position = position_nudge(y = -.15))
 
-## ----gradientinterval-------------------------------------------------------------------------------------------------
+## ----gradientinterval, fig.width = tiny_width, fig.height = tiny_height-----------------------------------------------
 ABC %>%
   data_grid(condition) %>%
   augment(m_ABC, newdata = ., se_fit = TRUE) %>%
@@ -87,7 +98,7 @@ ABC %>%
     scale = .5, fill_type = "gradient"
   )
 
-## ----ccdfinterval-----------------------------------------------------------------------------------------------------
+## ----ccdfinterval, fig.width = tiny_width, fig.height = tiny_height---------------------------------------------------
 ABC %>%
   data_grid(condition) %>%
   augment(m_ABC, newdata = ., se_fit = TRUE) %>%
@@ -96,7 +107,7 @@ ABC %>%
     aes(xdist = dist_student_t(df = df.residual(m_ABC), mu = .fitted, sigma = .se.fit))
   )
 
-## ----dotplot----------------------------------------------------------------------------------------------------------
+## ----dotplot, fig.width = tiny_width, fig.height = tiny_height--------------------------------------------------------
 ABC %>%
   data_grid(condition) %>%
   augment(m_ABC, newdata = ., se_fit = TRUE) %>%
@@ -109,7 +120,7 @@ ABC %>%
 ## ----m_mpg------------------------------------------------------------------------------------------------------------
 m_mpg = lm(mpg ~ hp * cyl, data = mtcars)
 
-## ----lineribbon-------------------------------------------------------------------------------------------------------
+## ----lineribbon, fig.width = tiny_width, fig.height = tiny_height-----------------------------------------------------
 mtcars %>%
   group_by(cyl) %>%
   data_grid(hp = seq_range(hp, n = 101)) %>%
@@ -129,7 +140,7 @@ mtcars %>%
     y = "mpg"
   )
 
-## ----lineribbon_lightened---------------------------------------------------------------------------------------------
+## ----lineribbon_lightened, fig.width = tiny_width, fig.height = tiny_height-------------------------------------------
 mtcars %>%
   group_by(cyl) %>%
   data_grid(hp = seq_range(hp, n = 101)) %>%

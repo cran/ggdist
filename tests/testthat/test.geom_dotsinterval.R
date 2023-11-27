@@ -176,7 +176,7 @@ test_that("stat_dist_dots works on NA data", {
 
   expect_warning(vdiffr::expect_doppelganger("stat_dist_dots with na.rm = FALSE",
     p + stat_dist_dots(na.rm = FALSE, quantiles = 20)
-  ), "Removed 1 rows containing")
+  ), "Removed 1 row")
 
   vdiffr::expect_doppelganger("stat_dist_dots with na.rm = TRUE",
     p + stat_dist_dots(na.rm = TRUE, quantiles = 20)
@@ -260,17 +260,20 @@ test_that("dotplot layouts work", {
       facet_grid(~ side)
   )
 
-  vdiffr::expect_doppelganger("swarm",
-    df %>%
-      ggplot(aes(x = mpg)) +
-      geom_dots(aes(side = side), layout = "swarm") +
-      facet_grid(~ side)
-  )
-
   vdiffr::expect_doppelganger("hex",
     df %>%
       ggplot(aes(x = mpg)) +
       geom_dots(aes(side = side), layout = "hex", stackratio = 0.92) +
+      facet_grid(~ side)
+  )
+
+
+  skip_if_not_installed("beeswarm")
+
+  vdiffr::expect_doppelganger("swarm",
+    df %>%
+      ggplot(aes(x = mpg)) +
+      geom_dots(aes(side = side), layout = "swarm") +
       facet_grid(~ side)
   )
 
@@ -279,7 +282,6 @@ test_that("dotplot layouts work", {
       ggplot(aes(y = mpg)) +
       geom_dots(layout = "swarm")
   )
-
 })
 
 test_that("dot order is correct", {
@@ -292,25 +294,28 @@ test_that("dot order is correct", {
 
   vdiffr::expect_doppelganger("bin dot order",
     p +
-      geom_dots(layout = "bin", size = 5) +
+      geom_dots(layout = "bin", linewidth = 5) +
       geom_vline(xintercept = 0)
   )
 
   vdiffr::expect_doppelganger("bin dot order, kept",
     p +
-      geom_dots(aes(order = g), layout = "bin", size = 5) +
+      geom_dots(aes(order = g), layout = "bin", linewidth = 5) +
       geom_vline(xintercept = 0)
   )
 
   vdiffr::expect_doppelganger("weave dot order",
     p +
-      geom_dots(layout = "weave", size = 5) +
+      geom_dots(layout = "weave", linewidth = 5) +
       geom_vline(xintercept = 0)
   )
 
+
+  skip_if_not_installed("beeswarm")
+
   vdiffr::expect_doppelganger("swarm dot order",
     p +
-      geom_dots(layout = "swarm", size = 5) +
+      geom_dots(layout = "swarm", linewidth = 5) +
       geom_vline(xintercept = 0)
   )
 
@@ -321,6 +326,21 @@ test_that("overflow = compress works", {
 
   vdiffr::expect_doppelganger("overflow = compress",
     ggplot(mtcars) + geom_dots(aes(x = mpg), binwidth = 4, overflow = "compress", alpha = 0.5)
+  )
+})
+
+test_that("bar layout works", {
+  skip_if_no_vdiffr()
+
+  df = data.frame(
+    x = factor(c(rep(1:5, times = 5:1 * 11), 6, 6, 7)),
+    g = c("a","b")
+  )
+
+  vdiffr::expect_doppelganger("bar layout with order",
+    df %>%
+      ggplot(aes(x, fill = g, group = NA, order = g)) +
+      geom_dots(layout = "bar")
   )
 })
 
