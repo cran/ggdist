@@ -13,6 +13,7 @@ geom_interval(
   orientation = NA,
   interval_size_range = c(1, 6),
   interval_size_domain = c(1, 6),
+  arrow = NULL,
   na.rm = FALSE,
   show.legend = NA,
   inherit.aes = TRUE
@@ -76,11 +77,13 @@ the actual sizes used to draw intervals). Most of the time it is not recommended
 argument, as it may result in strange scaling of legends; this argument is a holdover from earlier versions
 that did not have size aesthetics targeting the point and interval separately. If you want to adjust the
 size of the interval or points separately, you can also use the \code{linewidth} or \code{point_size}
-aesthetics; see \link{scales}.}
+aesthetics; see \link{sub-geometry-scales}.}
 
-\item{interval_size_domain}{A length-2 numeric vector giving the minimum and maximum of the values of the \code{size} and \code{linewidth} aesthetics that will be
-translated into actual sizes for intervals drawn according to \code{interval_size_range} (see the documentation
-for that argument.)}
+\item{interval_size_domain}{A length-2 numeric vector giving the minimum and maximum of the values of the \code{size} and \code{linewidth} aesthetics
+that will be translated into actual sizes for intervals drawn according to \code{interval_size_range} (see the
+documentation for that argument.)}
+
+\item{arrow}{\code{\link[grid:arrow]{grid::arrow()}} giving the arrow heads to use on the interval, or \code{NULL} for no arrows.}
 
 \item{na.rm}{If \code{FALSE}, the default, missing values are removed with a warning. If \code{TRUE}, missing
 values are silently removed.}
@@ -103,13 +106,17 @@ be added to a \code{\link[=ggplot]{ggplot()}} object.
 \description{
 Shortcut version of \code{\link[=geom_slabinterval]{geom_slabinterval()}} for creating multiple-interval plots.
 
-Roughly equivalent to:
+\strong{Roughly equivalent to:}
 
-\if{html}{\out{<div class="sourceCode">}}\preformatted{geom_slabinterval(
-  aes(datatype = "interval", side = "both"),
-  interval_size_range = c(1, 6), show_slab = FALSE, show_point = FALSE
-)
-}\if{html}{\out{</div>}}
+\preformatted{geom_slabinterval(
+  aes(
+    datatype = "interval",
+    side = "both"
+  ),
+  interval_size_range = c(1, 6),
+  show_slab = FALSE,
+  show_point = FALSE
+)}
 }
 \details{
 This geom wraps \code{\link[=geom_slabinterval]{geom_slabinterval()}} with defaults designed to produce
@@ -180,7 +187,7 @@ and the outline of the \strong{slab} (if it is visible). Use the \code{slab_line
 \code{interval_linetype} aesthetics (below) to set sub-geometry line types separately.}
 }
 
-\strong{Interval-specific color/line override aesthetics}
+\strong{Interval-specific color and line override aesthetics}
 
 \itemize{
 \item{\code{interval_colour}: (or \code{interval_color}) Override for \code{colour}/\code{color}: the color of the interval.}

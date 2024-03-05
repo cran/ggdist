@@ -8,8 +8,8 @@
 # stat/geom shortcuts -----------------------------------------------------
 
 rd_shortcut_geom = function(geom_name, from_name = "slabinterval") {
-  from = get(paste0("Geom", title_case(from_name)))
-  geom = get(paste0("Geom", title_case(geom_name)))
+  from = get(paste0("Geom", camel_case(from_name)))
+  geom = get(paste0("Geom", camel_case(geom_name)))
 
   changed = changed_geom_values(from = from, to = geom)
 
@@ -21,19 +21,17 @@ rd_shortcut_geom = function(geom_name, from_name = "slabinterval") {
 
   glue_doc('
     @description
-    ```
-    geom_<<from_name>>(
+    \\preformatted{geom_<<from_name>>(
       <<geom_args>>
-    )
-    ```
+    )}
     '
   )
 }
 
 rd_shortcut_stat = function(stat_name, geom_name = stat_name, from_name = "slabinterval") {
-  from = get(paste0("Stat", title_case(from_name)))
-  stat = get(paste0("Stat", title_case(stat_name)))
-  geom = get(paste0("Geom", title_case(geom_name)))
+  from = get(paste0("Stat", camel_case(from_name)))
+  stat = get(paste0("Stat", camel_case(stat_name)))
+  geom = get(paste0("Geom", camel_case(geom_name)))
 
   changed = changed_geom_values(
     from = from, to = stat,
@@ -49,11 +47,9 @@ rd_shortcut_stat = function(stat_name, geom_name = stat_name, from_name = "slabi
 
   glue_doc('
     @description
-    ```
-    stat_<<from_name>>(
+    \\preformatted{stat_<<from_name>>(
       <<stat_args>>
-    )
-    ```
+    )}
     '
   )
 }
@@ -69,7 +65,7 @@ rd_shortcut_stat = function(stat_name, geom_name = stat_name, from_name = "slabi
 rd_aesthetics_sections = function(
   geom_name = "slabinterval", stat = NULL, vignette = geom_name
 ) {
-  geom = get(paste0("Geom", title_case(geom_name)))
+  geom = get(paste0("Geom", camel_case(geom_name)))
 
   hidden_aes = union(geom$hidden_aes, stat$hidden_aes)
 
@@ -109,7 +105,7 @@ rd_aesthetics_sections = function(
   for (i in seq_along(geom_aes_sections)) {
     section = names(geom_aes_sections)[[i]]
     geom_aes = filter_aes(geom_aes_sections[[i]], geom$aesthetics())
-    if (length(geom_aes) == 0) next;
+    if (length(geom_aes) == 0) next
     out = c(out, glue_doc('
       **<<section>>**
 
@@ -146,7 +142,7 @@ rd_aesthetics_sections = function(
 #' Provides documentation of params for layers containing AbstractGeoms
 #' @noRd
 rd_layer_params = function(geom_name, stat = NULL, as_dots = FALSE) {
-  geom = get(paste0("Geom", title_case(geom_name)))
+  geom = get(paste0("Geom", camel_case(geom_name)))
 
   params = geom$get_param_docs()
 
@@ -157,9 +153,9 @@ rd_layer_params = function(geom_name, stat = NULL, as_dots = FALSE) {
   )
   params = params[param_names]
 
-  missing_docs = sapply(params, is.null)
+  missing_docs = vapply(params, is.null, logical(1))
   if (any(missing_docs)) {
-    stop("Missing docs for params: ", paste0(param_names[missing_docs], collapse = ", "))
+    cli_abort("Missing docs for params: {param_names[missing_docs]}")
   }
 
   if (length(params)) {
@@ -219,8 +215,12 @@ glue_doc = function(...) {
 }
 
 title_case = function(x) {
-  substring(x, 1, 1) = toupper(substring(x, 1, 1))
+  substr(x, 1, 1) = toupper(substr(x, 1, 1))
   x
+}
+
+camel_case = function(x) {
+  gsub("(^|_)([a-z])", "\\U\\2", x, perl = TRUE)
 }
 
 snake_case = function(x) {
@@ -244,11 +244,12 @@ changed_geom_values = function(
   exclude_args = character()
 ) {
   # find the changed aesthetics and params for this stat
-  changed_values = function(list, exclude) {
+  changed_values = function(list, exclude, sep = ",\n  ", multi_start = "", multi_end = "") {
     # find values changes in the child stat
     values = to[[list]][
-      map_lgl_(names(to[[list]]), function(name)
-        !identical(to[[list]][[name]], from[[list]][[name]])
+      map_lgl_(
+        names(to[[list]]),
+        function(name) !identical(to[[list]][[name]], from[[list]][[name]])
       )
     ]
     # find deleted values
@@ -260,11 +261,19 @@ changed_geom_values = function(
     # turn values into strings like x = "foo", y = "bar"
     value_text = lapply(values, function(x) deparse0(get_expr(x)))
     value_text = value_text[!names(value_text) %in% exclude]
-    if (length(value_text)) paste(names(value_text), "=", value_text, collapse = ", ")
+    n = length(value_text)
+    if (n) paste0(
+      if (n > 1) multi_start,
+      paste(names(value_text), "=", value_text, collapse = sep),
+      if (n > 1) multi_end
+    )
   }
 
   list(
-    aes = changed_values("default_aes", exclude = exclude_aes),
+    aes = changed_values(
+      "default_aes", exclude = exclude_aes,
+      sep = ",\n    ", multi_start = "\n    ", multi_end = "\n  "
+    ),
     params = changed_values("default_params", exclude = exclude_params),
     args = changed_values("layer_args", exclude = exclude_args)
   )

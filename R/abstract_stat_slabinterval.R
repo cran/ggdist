@@ -4,8 +4,6 @@
 ###############################################################################
 
 
-
-#' @importFrom dplyr bind_rows
 #' @importFrom rlang as_function
 #' @rdname ggdist-ggproto
 #' @format NULL
@@ -25,7 +23,7 @@ AbstractStatSlabinterval = ggproto("AbstractStatSlabinterval", AbstractStat,
     n = 501,
 
     point_interval = NULL,
-    .width = c(.66, .95),
+    .width = c(0.66, 0.95),
 
     show_slab = TRUE,
     show_point = TRUE,
@@ -127,10 +125,10 @@ AbstractStatSlabinterval = ggproto("AbstractStatSlabinterval", AbstractStat,
     # detect rvar or distribution missingness correctly, so we do the removal
     # manually and then generate a call to remove_missing on a dummy data frame
     # that will create the appropriate warning message, if needed
-    missing = is.na(data$dist)
-    if (any(missing)) {
-      data = data[!missing, ]
-      remove_missing(data.frame(dist = ifelse(missing, NA_real_, 0)), na.rm, "dist", name = "stat_slabinterval")
+    is_missing = is.na(data$dist)
+    if (any(is_missing)) {
+      data = data[!is_missing, ]
+      remove_missing(data.frame(dist = ifelse(is_missing, NA_real_, 0)), na.rm, "dist", name = "stat_slabinterval")
     }
     if (nrow(data) == 0) return(data.frame())
 
@@ -218,7 +216,7 @@ AbstractStatSlabinterval = ggproto("AbstractStatSlabinterval", AbstractStat,
         # find the smallest interval that contains each x value
         contains_x = outer(i_data[[xmin]], s_data[[x]], `<=`) & outer(i_data[[xmax]], s_data[[x]], `>=`)
         # need a fake interval guaranteed to contain all points (for NAs, points out of range...)
-        contains_x = rbind(TRUE, contains_x)
+        contains_x = rbind(rep(TRUE, NCOL(contains_x)), contains_x)
         width = c(Inf, i_data$.width)
         smallest_interval = apply(ifelse(contains_x, width, NA), 2, which.min)
 
@@ -232,7 +230,7 @@ AbstractStatSlabinterval = ggproto("AbstractStatSlabinterval", AbstractStat,
       # SLAB INFO ADDED TO INTERVAL COMPONENT
       if (
         getOption("ggdist.experimental.slab_data_in_intervals", FALSE) &&
-        show_interval && nrow(s_data) - sum(is.na(s_data$pdf) | is.na(s_data$cdf)) >= 2
+          show_interval && nrow(s_data) - sum(is.na(s_data$pdf) | is.na(s_data$cdf)) >= 2
       ) {
         # fill in relevant data from the slab component
         # this is expensive, so we only do it if we are actually showing the interval
@@ -250,7 +248,7 @@ AbstractStatSlabinterval = ggproto("AbstractStatSlabinterval", AbstractStat,
       # remove point data if it is not being shown
       if (!show_point) i_data[[x]] = NA_real_
 
-      bind_rows(
+      vec_rbind(
         if (show_slab) s_data,
         if (show_interval) i_data
       )
@@ -329,7 +327,7 @@ compute_panel_limits = function(
     na_(min, min_limits[[2]], max_limits[[2]])
   )
   #default to 0 (min) and 1 (max) for unknown limits
-  limits = ifelse(is.na(limits), c(0,1), limits)
+  limits = ifelse(is.na(limits), c(0, 1), limits)
 
   limits
 }
@@ -356,7 +354,7 @@ approx_pdf = function(dist, x, f_x) {
 approx_cdf = function(dist, x, F_x) {
   if (distr_is_constant(dist)) {
     dist_value = distr_quantile(dist)(0.5)
-    function(x) ifelse(x >= dist_value, 1, 0)
+    function(x) as.numeric(x >= dist_value)
   } else {
     approxfun(x, F_x, yleft = 0, yright = 1, method = "constant", ties = max)
   }

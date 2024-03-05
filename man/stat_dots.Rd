@@ -82,20 +82,28 @@ stack relative to the dot height. The default, \code{1}, makes dots in the same
 stack just touch each other.}
 \item{\code{layout}}{The layout method used
 for the dots: \itemize{
-\item \code{"bin"} (default): places dots on the off-axis at the midpoint of their bins as in the classic Wilkinson dotplot.
-This maintains the alignment of rows and columns in the dotplot. This layout is slightly different from the
-classic Wilkinson algorithm in that: (1) it nudges bins slightly to avoid overlapping bins and (2) if
-the input data are symmetrical it will return a symmetrical layout.
-\item \code{"weave"}: uses the same basic binning approach of \code{"bin"}, but places dots in the off-axis at their actual
-positions (unless \code{overlaps = "nudge"}, in which case overlaps may be nudged out of the way). This maintains
-the alignment of rows but does not align dots within columns.
-\item \code{"hex"}: uses the same basic binning approach of \code{"bin"}, but alternates placing dots \code{+ binwidth/4} or
-\code{- binwidth/4} in the off-axis from the bin center. This allows hexagonal packing by setting a \code{stackratio}
-less than 1 (something like \code{0.9} tends to work).
-\item \code{"swarm"}: uses the \code{"compactswarm"} layout from \code{\link[beeswarm:beeswarm]{beeswarm::beeswarm()}}. Does not maintain alignment of rows or
-columns, but can be more compact and neat looking, especially for sample data (as opposed to quantile
-dotplots of theoretical distributions, which may look better with \code{"bin"}, \code{"weave"}, or \code{"hex"}).
-\item \code{"bar"}: for discrete distributions, lays out duplicate values in rectangular bars.
+\item \code{"bin"} (default): places dots on the off-axis at the midpoint of
+their bins as in the classic Wilkinson dotplot. This maintains the
+alignment of rows and columns in the dotplot. This layout is slightly
+different from the classic Wilkinson algorithm in that: (1) it nudges
+bins slightly to avoid overlapping bins and (2) if the input data are
+symmetrical it will return a symmetrical layout.
+\item \code{"weave"}: uses the same basic binning approach of \code{"bin"}, but
+places dots in the off-axis at their actual positions (unless
+\code{overlaps = "nudge"}, in which case overlaps may be nudged out of the
+way). This maintains the alignment of rows but does not align dots
+within columns.
+\item \code{"hex"}: uses the same basic binning approach of \code{"bin"}, but
+alternates placing dots \code{+ binwidth/4} or \code{- binwidth/4} in the
+off-axis from the bin center. This allows hexagonal packing by setting
+a \code{stackratio} less than 1 (something like \code{0.9} tends to work).
+\item \code{"swarm"}: uses the \code{"compactswarm"} layout from
+\code{\link[beeswarm:beeswarm]{beeswarm::beeswarm()}}. Does not maintain alignment of rows or columns,
+but can be more compact and neat looking, especially for sample data
+(as opposed to quantile dotplots of theoretical distributions, which
+may look better with \code{"bin"}, \code{"weave"}, or \code{"hex"}).
+\item \code{"bar"}: for discrete distributions, lays out duplicate values in
+rectangular bars.
 }}
 \item{\code{overlaps}}{How to handle overlapping dots or bins in the \code{"bin"},
 \code{"weave"}, and \code{"hex"} layouts (dots never overlap in the \code{"swarm"} or \code{"bar"} layouts).
@@ -129,6 +137,8 @@ when a minimum \code{binwidth} (or an exact \code{binwidth}) is supplied.
 One of:
 \itemize{
 \item \code{"keep"}: Keep the overflow, drawing dots outside the geom bounds.
+\item \code{"warn"}: Keep the overflow, but produce a warning suggesting solutions,
+such as setting \code{binwidth = NA} or \code{overflow = "compress"}.
 \item \code{"compress"}: Compress the layout. Reduces the \code{binwidth} to the size necessary
 to keep the dots within bounds, then adjusts \code{stackratio} and \code{dotsize} so that
 the apparent dot size is the user-specified minimum \code{binwidth} times the
@@ -146,6 +156,17 @@ selected bin width to fit within a desired area, it is probably easier to use
 \code{scale} than to copy and scale \code{binwidth} manually, and if you just want to
 provide constraints on the bin width, you can pass a length-2 vector to \code{binwidth}.
 }
+\item{\code{subguide}}{Sub-guide used to annotate the \code{thickness} scale. One of:
+\itemize{
+\item A function that takes a \code{scale} argument giving a \link[ggplot2:ggplot2-ggproto]{ggplot2::Scale}
+object and an \code{orientation} argument giving the orientation of the
+geometry and then returns a \link[grid:grid.grob]{grid::grob} that will draw the axis
+annotation, such as \code{\link[=subguide_axis]{subguide_axis()}} (to draw a traditional axis) or
+\code{\link[=subguide_none]{subguide_none()}} (to draw no annotation). See \code{\link[=subguide_axis]{subguide_axis()}}
+for a list of possibilities and examples.
+\item A string giving the name of such a function when prefixed
+with \code{"subguide"}; e.g. \code{"axis"} or \code{"none"}.
+}}
 }}
 
 \item{quantiles}{Setting this to a value other than \code{NA}
@@ -196,15 +217,15 @@ analytical distributions, and will perform the summarization using a \code{\link
 function. Geoms based on \code{\link[=geom_dotsinterval]{geom_dotsinterval()}} create dotplots that automatically determine a bin width that
 ensures the plot fits within the available space. They can also ensure dots do not overlap.
 
-Roughly equivalent to:
+\strong{Roughly equivalent to:}
 
-\if{html}{\out{<div class="sourceCode">}}\preformatted{stat_dotsinterval(
+\preformatted{stat_dotsinterval(
   aes(size = NULL),
   geom = "dots",
-  show_point = FALSE, show_interval = FALSE,
+  show_point = FALSE,
+  show_interval = FALSE,
   show.legend = NA
-)
-}\if{html}{\out{</div>}}
+)}
 }
 \details{
 The \emph{dots} family of stats and geoms are similar to \code{\link[=geom_dotplot]{geom_dotplot()}} but with a number of differences:
@@ -221,7 +242,7 @@ dots from overlapping each other.
 \code{dotsinterval} family) or the \code{shape} or \code{slab_shape} aesthetic (when using the \code{dots} family)
 }
 
-Stat and geoms include in this family include:
+Stats and geoms in this family include:
 \itemize{
 \item \code{\link[=geom_dots]{geom_dots()}}: dotplots on raw data. Ensures the dotplot fits within available space by reducing the size
 of the dots automatically (may result in very small dots).
@@ -230,9 +251,12 @@ Used \code{side = "both"} by default, and sets the default dot size to the same 
 (\code{binwidth = unit(1.5, "mm")}), allowing dots to overlap instead of getting very small.
 \item \code{\link[=stat_dots]{stat_dots()}}: dotplots on raw data, \pkg{distributional} objects, and \code{\link[posterior:rvar]{posterior::rvar()}}s
 \item \code{\link[=geom_dotsinterval]{geom_dotsinterval()}}: dotplot + interval plots on raw data with already-calculated
-intervals (rarely useful directly)
+intervals (rarely useful directly).
 \item \code{\link[=stat_dotsinterval]{stat_dotsinterval()}}: dotplot + interval plots on raw data, \pkg{distributional} objects,
-and \code{\link[posterior:rvar]{posterior::rvar()}}s (will calculate intervals for you)
+and \code{\link[posterior:rvar]{posterior::rvar()}}s (will calculate intervals for you).
+\item \code{\link[=geom_blur_dots]{geom_blur_dots()}}: blurry dotplots that allow the standard deviation of a blur applied to
+each dot to be specified using the \code{sd} aesthetic.
+\item \code{\link[=stat_mcse_dots]{stat_mcse_dots()}}: blurry dotplots of quantiles using the Monte Carlo Standard Error of each quantile.
 }
 
 \code{\link[=stat_dots]{stat_dots()}} and \code{\link[=stat_dotsinterval]{stat_dotsinterval()}}, when used with the \code{quantiles} argument,
@@ -311,6 +335,8 @@ These \code{stat}s support the following aesthetics:
 (when \code{orientation = "horizontal"} with sample data).}
 \item{\code{y}: y position of the geometry (when orientation = \code{"horizontal"}); or sample data to be summarized
 (when \code{orientation = "vertical"} with sample data).}
+\item{\code{weight}: When using samples (i.e. the \code{x} and \code{y} aesthetics, not \code{xdist} or \code{ydist}), optional
+weights to be applied to each draw.}
 \item{\code{xdist}: When using analytical distributions, distribution to map on the x axis: a \pkg{distributional}
 object (e.g. \code{\link[=dist_normal]{dist_normal()}}) or a \code{\link[posterior:rvar]{posterior::rvar()}} object.}
 \item{\code{ydist}: When using analytical distributions, distribution to map on the y axis: a \pkg{distributional}
@@ -339,7 +365,9 @@ to be drawn on the bottom or the left depending on if \code{orientation} is \cod
 causes the slab to be drawn on the bottom or the right. \code{"both"} draws the slab mirrored on both
 sides (as in a violin plot).}
 \item{\code{scale}: What proportion of the region allocated to this geom to use to draw the slab. If \code{scale = 1},
-slabs that use the maximum range will just touch each other. Default is \code{0.9} to leave some space.}
+slabs that use the maximum range will just touch each other. Default is \code{0.9} to leave some space
+between adjacent slabs. For a comprehensive discussion and examples of slab scaling and normalization,
+see the \href{https://mjskay.github.io/ggdist/articles/thickness.html}{\code{thickness} scale article}.}
 \item{\code{justification}: Justification of the interval relative to the slab, where \code{0} indicates bottom/left
 justification and \code{1} indicates top/right justification (depending on \code{orientation}). If \code{justification}
 is \code{NULL} (the default), then it is set automatically based on the value of \code{side}: when \code{side} is
@@ -403,7 +431,7 @@ and the outline of the \strong{slab} (if it is visible). Use the \code{slab_line
 \code{interval_linetype} aesthetics (below) to set sub-geometry line types separately.}
 }
 
-\strong{Slab-specific color/line override aesthetics}
+\strong{Slab-specific color and line override aesthetics}
 
 \itemize{
 \item{\code{slab_fill}: Override for \code{fill}: the fill color of the slab.}
@@ -414,7 +442,7 @@ and the outline of the \strong{slab} (if it is visible). Use the \code{slab_line
 \item{\code{slab_shape}: Override for \code{shape}: the shape of the dots used to draw the dotplot slab.}
 }
 
-\strong{Interval-specific color/line override aesthetics}
+\strong{Interval-specific color and line override aesthetics}
 
 \itemize{
 \item{\code{interval_colour}: (or \code{interval_color}) Override for \code{colour}/\code{color}: the color of the interval.}
@@ -422,7 +450,7 @@ and the outline of the \strong{slab} (if it is visible). Use the \code{slab_line
 \item{\code{interval_linetype}: Override for \code{linetype}: the line type of the interval.}
 }
 
-\strong{Point-specific color/line override aesthetics}
+\strong{Point-specific color and line override aesthetics}
 
 \itemize{
 \item{\code{point_fill}: Override for \code{fill}: the fill color of the point.}
@@ -460,9 +488,11 @@ library(distributional)
 theme_set(theme_ggdist())
 
 # ON SAMPLE DATA
-tibble(x = 1:10) \%>\%
-  group_by_all() \%>\%
-  do(tibble(y = rnorm(100, .$x))) \%>\%
+set.seed(12345)
+tibble(
+  x = rep(1:10, 100),
+  y = rnorm(1000, x)
+) \%>\%
   ggplot(aes(x = x, y = y)) +
   stat_dots()
 
@@ -490,6 +520,7 @@ See \code{\link[=geom_dots]{geom_dots()}} for the geom underlying this stat.
 See \code{vignette("dotsinterval")} for a variety of examples of use.
 
 Other dotsinterval stats: 
-\code{\link{stat_dotsinterval}()}
+\code{\link{stat_dotsinterval}()},
+\code{\link{stat_mcse_dots}()}
 }
 \concept{dotsinterval stats}

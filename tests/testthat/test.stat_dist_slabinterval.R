@@ -9,6 +9,8 @@ suppressWarnings(suppressPackageStartupMessages({
 }))
 
 
+mapped_discrete = getFromNamespace("mapped_discrete", "ggplot2")
+
 test_that("distribution eye plots work with the args aesthetic", {
   skip_if_no_vdiffr()
 
@@ -155,16 +157,20 @@ test_that("mapping dist to x or y gives helpful error", {
   df = data.frame(var = c(1,2), dist = dist_normal(0:1,1))
 
   expect_error(
-    ggplot_build(df %>%
-      ggplot(aes(x = var, y = dist)) +
-      stat_dist_halfeye(n = 15)),
+    ggplot_build(
+      df %>%
+        ggplot(aes(x = var, y = dist)) +
+        stat_dist_halfeye(n = 15)
+    ),
     "Cannot use distribution or rvar"
   )
 
   expect_error(
-    ggplot_build(df %>%
-      ggplot(aes(x = dist, y = var)) +
-      stat_dist_halfeye(n = 15)),
+    ggplot_build(
+      df %>%
+        ggplot(aes(x = dist, y = var)) +
+        stat_dist_halfeye(n = 15)
+    ),
     "Cannot use distribution or rvar"
   )
 })
@@ -174,8 +180,14 @@ test_that("stat fill aesthetic on halfeye works", {
 
 
   vdiffr::expect_doppelganger("gradient fill/color halfeye",
-    data.frame(dist = "norm", mean = 0, sd = 1) %>%
-      ggplot(aes(y = 1, dist = dist, arg1 = mean, arg2 = sd, slab_color = after_stat(x > 0), fill = after_stat(f), slab_linetype = after_stat(x > -1), slab_linewidth = after_stat(x > 1))) +
+    tibble(dist = "norm", mean = 0, sd = 1) %>%
+      ggplot(aes(
+        y = 1, dist = dist, arg1 = mean, arg2 = sd,
+        slab_color = after_stat(x > 0),
+        fill = after_stat(f),
+        slab_linetype = after_stat(x > -1),
+        slab_linewidth = after_stat(x > 1)
+      )) +
       stat_dist_halfeye(n = 10)
   )
 })
@@ -202,7 +214,7 @@ test_that("stat_dist_gradientinterval works", {
 
 test_that("fill_type = 'gradient' works", {
   skip_if_no_vdiffr()
-  skip_if_no_linearGradient()
+  skip_if_no_gradient()
 
 
   p = tribble(
@@ -279,7 +291,7 @@ test_that("scale transformation works", {
 
 
   # this setup should yield a 95% interval from a little above 1e-3 to a little below 1e+5
-  p_log = data.frame(dist = "lnorm") %>%
+  p_log = tibble(dist = "lnorm") %>%
     ggplot(aes(y = 1, dist = dist, arg1 = log(10), arg2 = 2*log(10))) +
     scale_x_log10(breaks = 10^seq(-5,7, by = 2))
 
@@ -291,6 +303,10 @@ test_that("scale transformation works", {
     p_log + stat_dist_ccdfinterval(n = 20)
   )
 
+  vdiffr::expect_doppelganger("dist_halfeyeh log scale mode_hdi",
+    p_log + stat_dist_halfeye(n = 20, point_interval = mode_hdi)
+  )
+
 
   p_log_wrap = data.frame(x = dist_wrap("lnorm")) %>%
     ggplot(aes(xdist = x, y = 0))
@@ -300,7 +316,7 @@ test_that("scale transformation works", {
   )
 
 
-  p_rev = data.frame(dist = "lnorm") %>%
+  p_rev = tibble(dist = "lnorm") %>%
     ggplot(aes(y = 1, dist = dist, arg1 = 1, arg2 = 0.5)) +
     scale_x_reverse()
 
@@ -313,6 +329,7 @@ test_that("scale transformation works", {
   )
 
 
+  # transform that should require numerical diff
   p_logit = data.frame(dist = dist_beta(2,2)) %>%
     ggplot(aes(xdist = dist)) +
     scale_x_continuous(trans = scales::trans_new("logit", qlogis, plogis))
@@ -321,9 +338,16 @@ test_that("scale transformation works", {
     p_logit + stat_eye(n = 15, slab_color = "gray50")
   )
 
-  vdiffr::expect_doppelganger("dist_halfeyeh log scale mode_hdi",
-    p_log + stat_dist_halfeye(n = 20, point_interval = mode_hdi)
+
+  # transform that should work with symbolic diff
+  p_log_sym = data.frame(dist = dist_lognormal(2,2)) %>%
+    ggplot(aes(xdist = dist)) +
+    scale_x_continuous(trans = scales::trans_new("log", function(x) log(x), function(x) exp(x)))
+
+  vdiffr::expect_doppelganger("dist_halfeyeh log scale sym diff",
+    p_log_sym + stat_dist_halfeye(n = 20, point_interval = mode_hdi)
   )
+
 })
 
 
@@ -339,7 +363,7 @@ test_that("scale transformation works on dist_sample", {
     p_log_dist +
       stat_dist_halfeye(n = 20, point_interval = mode_hdci) +
       scale_x_log10() +
-      geom_point(aes(x =x), data =  data.frame(x=range(qlnorm(ppoints(200)))))
+      geom_point(aes(x = x), data =  data.frame(x = range(qlnorm(ppoints(200)))))
   )
 
   p_log_samp = data.frame(x = qlnorm(ppoints(200))) %>%
@@ -421,10 +445,11 @@ test_that("auto-grouping works on stat_dist", {
   skip_if_no_vdiffr()
 
 
-  p = data.frame(
+  p = tibble(
     dist = c("norm", "norm"),
-    x = c(1,2)
-  ) %>% ggplot(aes(dist = dist, arg1 = x, y = 0))
+    x = c(1, 2)
+  ) %>%
+    ggplot(aes(dist = dist, arg1 = x, y = 0))
 
   vdiffr::expect_doppelganger("stat_dist with no grouping",
     p + stat_dist_slab(alpha = 0.5, n = 10)
@@ -611,7 +636,7 @@ test_that("rvar_factor works", {
     .width = NA_real_,
     stringsAsFactors = FALSE
   )
-  slab_ref$x = ggplot2:::mapped_discrete(c(.5,.5, 1,1, 1.5,1.5,1.5,1.5, 2,2, 2.5,2.5,2.5,2.5, 3,3, 3.5,3.5))
+  slab_ref$x = mapped_discrete(c(.5,.5, 1,1, 1.5,1.5,1.5,1.5, 2,2, 2.5,2.5,2.5,2.5, 3,3, 3.5,3.5))
   expect_equal(p$data[[1]][p$data[[1]]$datatype == "slab", names(slab_ref)], slab_ref)
 
   interval_ref = data.frame(
@@ -619,9 +644,9 @@ test_that("rvar_factor works", {
     .width = c(0.66, 0.95),
     stringsAsFactors = FALSE
   )
-  interval_ref$xmin = ggplot2:::mapped_discrete(c(NA_real_, NA_real_))
-  interval_ref$xmax = ggplot2:::mapped_discrete(c(NA_real_, NA_real_))
-  interval_ref$x = ggplot2:::mapped_discrete(c(NA_real_, NA_real_))
+  interval_ref$xmin = mapped_discrete(c(NA_real_, NA_real_))
+  interval_ref$xmax = mapped_discrete(c(NA_real_, NA_real_))
+  interval_ref$x = mapped_discrete(c(NA_real_, NA_real_))
   attr(interval_ref, "row.names") = c(19L, 20L)
   expect_equal(p$data[[1]][p$data[[1]]$datatype == "interval", names(interval_ref)], interval_ref)
 
@@ -648,7 +673,7 @@ test_that("rvar_ordered works and integer dist_sample works", {
     .width = c(NA,NA, .66,.66,.66,.66,.66,.66,.66,.66, .95,.95,.95,.95, NA,NA,NA,NA),
     stringsAsFactors = FALSE
   )
-  slab_ref$x = ggplot2:::mapped_discrete(c(.5,.5, 1,1, 1.5,1.5,1.5,1.5, 2,2, 2.5,2.5,2.5,2.5, 3,3, 3.5,3.5))
+  slab_ref$x = mapped_discrete(c(.5,.5, 1,1, 1.5,1.5,1.5,1.5, 2,2, 2.5,2.5,2.5,2.5, 3,3, 3.5,3.5))
   expect_equal(p$data[[1]][p$data[[1]]$datatype == "slab", names(slab_ref)], slab_ref)
 
   interval_ref = data.frame(
@@ -656,9 +681,9 @@ test_that("rvar_ordered works and integer dist_sample works", {
     .width = c(0.66, 0.95),
     stringsAsFactors = FALSE
   )
-  interval_ref$xmin = ggplot2:::mapped_discrete(c(1, 1))
-  interval_ref$xmax = ggplot2:::mapped_discrete(c(2.15, 2.875))
-  interval_ref$x = ggplot2:::mapped_discrete(c(1.5, 1.5))
+  interval_ref$xmin = mapped_discrete(c(1, 1))
+  interval_ref$xmax = mapped_discrete(c(2.15, 2.875))
+  interval_ref$x = mapped_discrete(c(1.5, 1.5))
   attr(interval_ref, "row.names") = c(19L, 20L)
   expect_equal(p$data[[1]][p$data[[1]]$datatype == "interval", names(interval_ref)], interval_ref)
 
@@ -699,7 +724,7 @@ test_that("rvar_ordered works with modified scale limits", {
     .width = c(NA,NA, .66,.66,.66,.66,.66,.66, .95,.95,.95,.95,.95,.95, NA,NA,NA,NA),
     stringsAsFactors = FALSE
   )
-  slab_ref$x = ggplot2:::mapped_discrete(c(.5,.5, 1,1, 1.5,1.5,1.5,1.5, 2,2, 2.5,2.5,2.5,2.5, 3,3, 3.5,3.5))
+  slab_ref$x = mapped_discrete(c(.5,.5, 1,1, 1.5,1.5,1.5,1.5, 2,2, 2.5,2.5,2.5,2.5, 3,3, 3.5,3.5))
   expect_equal(p$data[[1]][, names(slab_ref)], slab_ref)
 })
 
@@ -747,7 +772,7 @@ test_that("dist_bernoulli works", {
   expect_equal(p$data[[1]][p$data[[1]]$datatype == "interval", names(interval_ref)], interval_ref)
 
   x_scale = p$plot$scales$get_scales("x")
-  expect_true(!x_scale$is_discrete())
+  expect_false(x_scale$is_discrete())
   expect_equal(x_scale$get_limits(), c(0, 1))
 })
 
@@ -767,7 +792,7 @@ test_that("dist_categorical works", {
     .width = NA_real_,
     stringsAsFactors = FALSE
   )
-  slab_ref$x = ggplot2:::mapped_discrete(c(.5,.5, 1,1, 1.5,1.5,1.5,1.5, 2,2, 2.5,2.5,2.5,2.5, 3,3, 3.5,3.5))
+  slab_ref$x = mapped_discrete(c(.5,.5, 1,1, 1.5,1.5,1.5,1.5, 2,2, 2.5,2.5,2.5,2.5, 3,3, 3.5,3.5))
   expect_equal(p$data[[1]][p$data[[1]]$datatype == "slab", names(slab_ref)], slab_ref)
 
   interval_ref = data.frame(
@@ -775,9 +800,9 @@ test_that("dist_categorical works", {
     .width = c(0.66, 0.95),
     stringsAsFactors = FALSE
   )
-  interval_ref$xmin = ggplot2:::mapped_discrete(c(NA_real_, NA_real_))
-  interval_ref$xmax = ggplot2:::mapped_discrete(c(NA_real_, NA_real_))
-  interval_ref$x = ggplot2:::mapped_discrete(c(NA_real_, NA_real_))
+  interval_ref$xmin = mapped_discrete(c(NA_real_, NA_real_))
+  interval_ref$xmax = mapped_discrete(c(NA_real_, NA_real_))
+  interval_ref$x = mapped_discrete(c(NA_real_, NA_real_))
   attr(interval_ref, "row.names") = c(19L, 20L)
   expect_equal(p$data[[1]][p$data[[1]]$datatype == "interval", names(interval_ref)], interval_ref)
 
@@ -811,7 +836,7 @@ test_that("dist_categorical works with modified scale limits", {
     .width = NA_real_,
     stringsAsFactors = FALSE
   )
-  slab_ref$x = ggplot2:::mapped_discrete(c(.5,.5, 1,1, 1.5,1.5,1.5,1.5, 2,2, 2.5,2.5,2.5,2.5, 3,3, 3.5,3.5))
+  slab_ref$x = mapped_discrete(c(.5,.5, 1,1, 1.5,1.5,1.5,1.5, 2,2, 2.5,2.5,2.5,2.5, 3,3, 3.5,3.5))
   expect_equal(p$data[[1]][, names(slab_ref)], slab_ref)
 
 })
@@ -832,7 +857,7 @@ test_that("dist_categorical works with explicit integer levels", {
     .width = NA_real_,
     stringsAsFactors = FALSE
   )
-  slab_ref$x = ggplot2:::mapped_discrete(c(.5,.5, 1,1, 1.5,1.5,1.5,1.5, 2,2, 2.5,2.5))
+  slab_ref$x = mapped_discrete(c(.5,.5, 1,1, 1.5,1.5,1.5,1.5, 2,2, 2.5,2.5))
   expect_equal(p$data[[1]][, names(slab_ref)], slab_ref)
 })
 
@@ -852,7 +877,7 @@ test_that("dist_sample works", {
     .width = NA_real_,
     stringsAsFactors = FALSE
   )
-  slab_ref$x = ggplot2:::mapped_discrete(c(.5,.5, 1,1, 1.5,1.5,1.5,1.5, 2,2, 2.5,2.5,2.5,2.5, 3,3, 3.5,3.5))
+  slab_ref$x = mapped_discrete(c(.5,.5, 1,1, 1.5,1.5,1.5,1.5, 2,2, 2.5,2.5,2.5,2.5, 3,3, 3.5,3.5))
   expect_equal(p$data[[1]][p$data[[1]]$datatype == "slab", names(slab_ref)], slab_ref)
 
   interval_ref = data.frame(
@@ -860,9 +885,9 @@ test_that("dist_sample works", {
     .width = c(0.66, 0.95),
     stringsAsFactors = FALSE
   )
-  interval_ref$xmin = ggplot2:::mapped_discrete(c(NA_real_, NA_real_))
-  interval_ref$xmax = ggplot2:::mapped_discrete(c(NA_real_, NA_real_))
-  interval_ref$x = ggplot2:::mapped_discrete(c(NA_real_, NA_real_))
+  interval_ref$xmin = mapped_discrete(c(NA_real_, NA_real_))
+  interval_ref$xmax = mapped_discrete(c(NA_real_, NA_real_))
+  interval_ref$x = mapped_discrete(c(NA_real_, NA_real_))
   attr(interval_ref, "row.names") = c(19L, 20L)
   expect_equal(p$data[[1]][p$data[[1]]$datatype == "interval", names(interval_ref)], interval_ref)
 
@@ -885,7 +910,11 @@ test_that("logical conditions at bin edges on histograms work", {
     scale_fill_manual(values = c("red", "blue"))
 
   ref = data.frame(
-    x = c(-0.5, -0.5, 0, 0, 0.5, 0.5, 0.5, 0.5, 1, 1, 1.5, 1.5, 1.5, 1.5, 2, 2, 2.5, 2.5, 2.5, 2.5, 3, 3, 3.5, 3.5, 3.5, 3.5, 4, 4, 4.5, 4.5, 4.5, 4.5, 5, 5, 5.5, 5.5),
+    x = c(
+      -0.5, -0.5, 0, 0, 0.5, 0.5, 0.5, 0.5, 1, 1, 1.5, 1.5, 1.5, 1.5,
+      2, 2, 2.5, 2.5, 2.5, 2.5, 3, 3, 3.5, 3.5, 3.5, 3.5, 4, 4, 4.5,
+      4.5, 4.5, 4.5, 5, 5, 5.5, 5.5
+    ),
     fill = c(rep("red", 7), rep("blue", 29)),
     stringsAsFactors = FALSE
   )
@@ -900,7 +929,12 @@ test_that("logical conditions at bin edges on histograms work", {
     scale_fill_manual(values = c("red", "blue"))
 
   ref = data.frame(
-    x = c(-0.5, -0.5, -0.5, 0, 0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1, 1,  1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 2, 2, 2.5, 2.5, 2.5, 2.5, 2.5,  2.5, 3, 3, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 4, 4, 4.5, 4.5, 4.5,  4.5, 4.5, 4.5, 5, 5, 5.5, 5.5, 5.5),
+    x = c(
+      -0.5, -0.5, -0.5, 0, 0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1, 1,
+      1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 2, 2, 2.5, 2.5, 2.5, 2.5, 2.5,
+      2.5, 3, 3, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 4, 4, 4.5, 4.5, 4.5,
+      4.5, 4.5, 4.5, 5, 5, 5.5, 5.5, 5.5
+    ),
     fill = c(rep("red", 10), rep("blue", 38)),
     stringsAsFactors = FALSE
   )
@@ -944,7 +978,7 @@ test_that("constant distributions work", {
   skip_if_no_vdiffr()
 
 
-  p = data.frame(
+  p = tibble(
     x = c("constant = 1", "normal(2,1)", "constant = 2"),
     y = c(dist_normal(1:2, 0:1), dist_sample(list(2)))
   ) %>%
@@ -963,7 +997,7 @@ test_that("constant distributions work", {
   )
 
   # with a scale transformation...
-  p = data.frame(
+  p = tibble(
     x = c("constant = 10", "lognormal(2,1)", "constant = 2"),
     y = c(dist_wrap("lnorm", c(log(10), 2), 0:1), dist_sample(list(2)))
   ) %>%
@@ -1038,9 +1072,9 @@ test_that("rvars work", {
 
   set.seed(1234)
   p = tibble(
-      mu = 1:2,
-      x = posterior::rvar_rng(rnorm, 2, mu, 1:2)
-    ) %>%
+    mu = 1:2,
+    x = posterior::rvar_rng(rnorm, 2, mu, 1:2)
+  ) %>%
     ggplot(aes(y = mu, xdist = x, fill = after_stat(cdf)))
 
   vdiffr::expect_doppelganger("halfeye with rvar and cdf",
@@ -1079,7 +1113,7 @@ test_that("missing rvars work", {
         ggplot() +
           stat_slabinterval(aes(xdist = posterior::rvar(c("a","b")))) +
           scale_x_discrete(limits = "a")
-        ),
+      ),
       data.frame()
     ),
     "Removed 1 row.+missing values"
@@ -1093,9 +1127,9 @@ test_that("stats work without attaching the ggdist namespace", {
   skip_if_no_vdiffr()
 
   ggdist_pos = which(search() == "package:ggdist")
-  detach("package:ggdist")
+  detach("package:ggdist")                                         # nolint
   on.exit(suppressPackageStartupMessages(
-    attach(getNamespace("ggdist"), ggdist_pos, "package:ggdist")
+    attach(getNamespace("ggdist"), ggdist_pos, "package:ggdist")   # nolint
   ))
 
   vdiffr::expect_doppelganger("simple halfeye",
@@ -1112,9 +1146,9 @@ test_that("multiple dists supplied to the same group", {
   skip_if_no_vdiffr()
 
   p = data.frame(
-      y = dist_normal(c(0, 10, 20, 0, 10, 20)),
-      x = c(0,0,0,1,1,1)
-    ) %>%
+    y = dist_normal(c(0, 10, 20, 0, 10, 20)),
+    x = c(0,0,0,1,1,1)
+  ) %>%
     ggplot(aes(ydist = y, x = x, group = rep(c("a","a","b"), 2)))
 
 

@@ -14,6 +14,7 @@ geom_pointinterval(
   interval_size_domain = c(1, 6),
   interval_size_range = c(0.6, 1.4),
   fatten_point = 1.8,
+  arrow = NULL,
   na.rm = FALSE,
   show.legend = c(size = FALSE),
   inherit.aes = TRUE
@@ -68,9 +69,9 @@ For compatibility with the base ggplot naming scheme for \code{orientation}, \co
 for \code{"vertical"} and \code{"y"} as an alias for \code{"horizontal"} (\pkg{ggdist} had an \code{orientation} parameter
 before base ggplot did, hence the discrepancy).}
 
-\item{interval_size_domain}{A length-2 numeric vector giving the minimum and maximum of the values of the \code{size} and \code{linewidth} aesthetics that will be
-translated into actual sizes for intervals drawn according to \code{interval_size_range} (see the documentation
-for that argument.)}
+\item{interval_size_domain}{A length-2 numeric vector giving the minimum and maximum of the values of the \code{size} and \code{linewidth} aesthetics
+that will be translated into actual sizes for intervals drawn according to \code{interval_size_range} (see the
+documentation for that argument.)}
 
 \item{interval_size_range}{A length-2 numeric vector. This geom scales the raw size aesthetic values when drawing interval and point
 sizes, as they tend to be too thick when using the default settings of \code{\link[=scale_size_continuous]{scale_size_continuous()}}, which give
@@ -81,12 +82,14 @@ the actual sizes used to draw intervals). Most of the time it is not recommended
 argument, as it may result in strange scaling of legends; this argument is a holdover from earlier versions
 that did not have size aesthetics targeting the point and interval separately. If you want to adjust the
 size of the interval or points separately, you can also use the \code{linewidth} or \code{point_size}
-aesthetics; see \link{scales}.}
+aesthetics; see \link{sub-geometry-scales}.}
 
 \item{fatten_point}{A multiplicative factor used to adjust the size of the point relative to the size of the
 thickest interval line. If you wish to specify point sizes directly, you can also use the \code{point_size}
 aesthetic and \code{\link[=scale_point_size_continuous]{scale_point_size_continuous()}} or \code{\link[=scale_point_size_discrete]{scale_point_size_discrete()}}; sizes
 specified with that aesthetic will not be adjusted using \code{fatten_point}.}
+
+\item{arrow}{\code{\link[grid:arrow]{grid::arrow()}} giving the arrow heads to use on the interval, or \code{NULL} for no arrows.}
 
 \item{na.rm}{If \code{FALSE}, the default, missing values are removed with a warning. If \code{TRUE}, missing
 values are silently removed.}
@@ -107,14 +110,16 @@ be added to a \code{\link[=ggplot]{ggplot()}} object.
 \description{
 Shortcut version of \code{\link[=geom_slabinterval]{geom_slabinterval()}} for creating point + multiple-interval plots.
 
-Roughly equivalent to:
+\strong{Roughly equivalent to:}
 
-\if{html}{\out{<div class="sourceCode">}}\preformatted{geom_slabinterval(
-  aes(datatype = "interval", side = "both"),
+\preformatted{geom_slabinterval(
+  aes(
+    datatype = "interval",
+    side = "both"
+  ),
   show_slab = FALSE,
   show.legend = c(size = FALSE)
-)
-}\if{html}{\out{</div>}}
+)}
 }
 \details{
 This geom wraps \code{\link[=geom_slabinterval]{geom_slabinterval()}} with defaults designed to produce
@@ -191,7 +196,7 @@ and the outline of the \strong{slab} (if it is visible). Use the \code{slab_line
 \code{interval_linetype} aesthetics (below) to set sub-geometry line types separately.}
 }
 
-\strong{Interval-specific color/line override aesthetics}
+\strong{Interval-specific color and line override aesthetics}
 
 \itemize{
 \item{\code{interval_colour}: (or \code{interval_color}) Override for \code{colour}/\code{color}: the color of the interval.}
@@ -199,7 +204,7 @@ and the outline of the \strong{slab} (if it is visible). Use the \code{slab_line
 \item{\code{interval_linetype}: Override for \code{linetype}: the line type of the interval.}
 }
 
-\strong{Point-specific color/line override aesthetics}
+\strong{Point-specific color and line override aesthetics}
 
 \itemize{
 \item{\code{point_fill}: Override for \code{fill}: the fill color of the point.}

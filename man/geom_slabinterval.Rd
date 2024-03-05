@@ -16,9 +16,11 @@ geom_slabinterval(
   interval_size_domain = c(1, 6),
   interval_size_range = c(0.6, 1.4),
   fatten_point = 1.8,
+  arrow = NULL,
   show_slab = TRUE,
   show_point = TRUE,
   show_interval = TRUE,
+  subguide = "none",
   na.rm = FALSE,
   show.legend = NA,
   inherit.aes = TRUE
@@ -83,7 +85,9 @@ that the maximum height at each value of the opposite axis is \code{1}.
 group so that the maximum height in each group is \code{1}.
 \item \code{"none"}: values are taken as is with no normalization (this should probably
 only be used with functions whose values are in [0,1], such as CDFs).
-}}
+}
+For a comprehensive discussion and examples of slab scaling and normalization, see the
+\href{https://mjskay.github.io/ggdist/articles/thickness.html}{\code{thickness} scale article}.}
 
 \item{fill_type}{What type of fill to use when the fill color or alpha varies within a slab. One of:
 \itemize{
@@ -104,9 +108,9 @@ fall back to \code{fill_type = "segments"}, in which case you can set \code{fill
 if you are using a graphics device that support gradients.
 }}
 
-\item{interval_size_domain}{A length-2 numeric vector giving the minimum and maximum of the values of the \code{size} and \code{linewidth} aesthetics that will be
-translated into actual sizes for intervals drawn according to \code{interval_size_range} (see the documentation
-for that argument.)}
+\item{interval_size_domain}{A length-2 numeric vector giving the minimum and maximum of the values of the \code{size} and \code{linewidth} aesthetics
+that will be translated into actual sizes for intervals drawn according to \code{interval_size_range} (see the
+documentation for that argument.)}
 
 \item{interval_size_range}{A length-2 numeric vector. This geom scales the raw size aesthetic values when drawing interval and point
 sizes, as they tend to be too thick when using the default settings of \code{\link[=scale_size_continuous]{scale_size_continuous()}}, which give
@@ -117,18 +121,32 @@ the actual sizes used to draw intervals). Most of the time it is not recommended
 argument, as it may result in strange scaling of legends; this argument is a holdover from earlier versions
 that did not have size aesthetics targeting the point and interval separately. If you want to adjust the
 size of the interval or points separately, you can also use the \code{linewidth} or \code{point_size}
-aesthetics; see \link{scales}.}
+aesthetics; see \link{sub-geometry-scales}.}
 
 \item{fatten_point}{A multiplicative factor used to adjust the size of the point relative to the size of the
 thickest interval line. If you wish to specify point sizes directly, you can also use the \code{point_size}
 aesthetic and \code{\link[=scale_point_size_continuous]{scale_point_size_continuous()}} or \code{\link[=scale_point_size_discrete]{scale_point_size_discrete()}}; sizes
 specified with that aesthetic will not be adjusted using \code{fatten_point}.}
 
+\item{arrow}{\code{\link[grid:arrow]{grid::arrow()}} giving the arrow heads to use on the interval, or \code{NULL} for no arrows.}
+
 \item{show_slab}{Should the slab portion of the geom be drawn?}
 
 \item{show_point}{Should the point portion of the geom be drawn?}
 
 \item{show_interval}{Should the interval portion of the geom be drawn?}
+
+\item{subguide}{Sub-guide used to annotate the \code{thickness} scale. One of:
+\itemize{
+\item A function that takes a \code{scale} argument giving a \link[ggplot2:ggplot2-ggproto]{ggplot2::Scale}
+object and an \code{orientation} argument giving the orientation of the
+geometry and then returns a \link[grid:grid.grob]{grid::grob} that will draw the axis
+annotation, such as \code{\link[=subguide_axis]{subguide_axis()}} (to draw a traditional axis) or
+\code{\link[=subguide_none]{subguide_none()}} (to draw no annotation). See \code{\link[=subguide_axis]{subguide_axis()}}
+for a list of possibilities and examples.
+\item A string giving the name of such a function when prefixed
+with \code{"subguide"}; e.g. \code{"axis"} or \code{"none"}.
+}}
 
 \item{na.rm}{If \code{FALSE}, the default, missing values are removed with a warning. If \code{TRUE}, missing
 values are silently removed.}
@@ -220,7 +238,9 @@ to be drawn on the bottom or the left depending on if \code{orientation} is \cod
 causes the slab to be drawn on the bottom or the right. \code{"both"} draws the slab mirrored on both
 sides (as in a violin plot).}
 \item{\code{scale}: What proportion of the region allocated to this geom to use to draw the slab. If \code{scale = 1},
-slabs that use the maximum range will just touch each other. Default is \code{0.9} to leave some space.}
+slabs that use the maximum range will just touch each other. Default is \code{0.9} to leave some space
+between adjacent slabs. For a comprehensive discussion and examples of slab scaling and normalization,
+see the \href{https://mjskay.github.io/ggdist/articles/thickness.html}{\code{thickness} scale article}.}
 \item{\code{justification}: Justification of the interval relative to the slab, where \code{0} indicates bottom/left
 justification and \code{1} indicates top/right justification (depending on \code{orientation}). If \code{justification}
 is \code{NULL} (the default), then it is set automatically based on the value of \code{side}: when \code{side} is
@@ -284,7 +304,7 @@ and the outline of the \strong{slab} (if it is visible). Use the \code{slab_line
 \code{interval_linetype} aesthetics (below) to set sub-geometry line types separately.}
 }
 
-\strong{Slab-specific color/line override aesthetics}
+\strong{Slab-specific color and line override aesthetics}
 
 \itemize{
 \item{\code{slab_fill}: Override for \code{fill}: the fill color of the slab.}
@@ -294,7 +314,7 @@ and the outline of the \strong{slab} (if it is visible). Use the \code{slab_line
 \item{\code{slab_linetype}: Override for \code{linetype}: the line type of the outline of the slab.}
 }
 
-\strong{Interval-specific color/line override aesthetics}
+\strong{Interval-specific color and line override aesthetics}
 
 \itemize{
 \item{\code{interval_colour}: (or \code{interval_color}) Override for \code{colour}/\code{color}: the color of the interval.}
@@ -302,7 +322,7 @@ and the outline of the \strong{slab} (if it is visible). Use the \code{slab_line
 \item{\code{interval_linetype}: Override for \code{linetype}: the line type of the interval.}
 }
 
-\strong{Point-specific color/line override aesthetics}
+\strong{Point-specific color and line override aesthetics}
 
 \itemize{
 \item{\code{point_fill}: Override for \code{fill}: the fill color of the point.}

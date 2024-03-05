@@ -3,9 +3,10 @@
 # Author: mjskay
 ###############################################################################
 
-library(dplyr)
-library(tidyr)
-
+suppressWarnings(suppressPackageStartupMessages({
+  library(dplyr)
+  library(tidyr)
+}))
 
 
 test_that("theme helper functions work", {
@@ -15,7 +16,8 @@ test_that("theme helper functions work", {
   p = data.frame(
     x = 1:2,
     y = 0,
-    g = c("aaa","bbb")
+    g = c("aaa","bbb"),
+    stringsAsFactors = FALSE
   ) %>%
     ggplot(aes(x, y)) +
     geom_point() +

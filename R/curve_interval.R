@@ -21,7 +21,7 @@ globalVariables(".value")
 #' to data depth and curve boxplots / functional boxplots.
 #'
 #' @param .data One of:
-#'   - A data frame (or grouped data frame as returned by [group_by()])
+#'   - A data frame (or grouped data frame as returned by [dplyr::group_by()])
 #'     that contains draws to summarize.
 #'   - A [posterior::rvar] vector.
 #'   - A matrix; in which case the first dimension should be draws and the second
@@ -33,7 +33,7 @@ globalVariables(".value")
 #' This can be numeric columns, list columns containing numeric vectors, or
 #' [posterior::rvar()]s.
 #' @param .along Which columns are the input values to the function describing the curve (e.g., the "x"
-#' values). Supports tidyselect syntax, as in [dplyr::select()]. Intervals are calculated jointly with
+#' values). Supports [tidyselect][tidyselect::language] syntax. Intervals are calculated jointly with
 #' respect to these variables, conditional on all other grouping variables in the data frame. The default
 #' (`NULL`) causes [curve_interval()] to use all grouping variables in the input data frame as the value
 #' for `.along`, which will generate the most conservative intervals. However, if you want to calculate
@@ -133,12 +133,10 @@ globalVariables(".value")
 #'   ggtitle("50% curvewise intervals with curve_interval()") +
 #'   theme_ggdist()
 #'
-#' @importFrom dplyr group_vars summarise_at %>% group_split
 #' @importFrom rlang quos quos_auto_name eval_tidy quo_get_expr syms enquo
-#' @importFrom tidyselect eval_select
 #' @export
 curve_interval = function(
-  .data, ..., .along = NULL, .width = .5, na.rm = FALSE,
+  .data, ..., .along = NULL, .width = 0.5, na.rm = FALSE,
   .interval = c("mhd", "mbd", "bd", "bd-mbd")
 ) {
   UseMethod("curve_interval")
@@ -147,12 +145,10 @@ curve_interval = function(
 #' @rdname curve_interval
 #' @export
 curve_interval.matrix = function(
-  .data, ..., .along = NULL, .width = .5, na.rm = FALSE,
+  .data, ..., .along = NULL, .width = 0.5, na.rm = FALSE,
   .interval = c("mhd", "mbd", "bd", "bd-mbd")
 ) {
-  if (!requireNamespace("posterior", quietly = TRUE)) {
-    stop0('curve_interval() requires the `posterior` package to be installed.') #nocov
-  }
+  stop_if_not_installed("posterior", "{.help curve_interval}")
   check_along_is_null(.along)
 
   curve_interval(
@@ -165,7 +161,7 @@ curve_interval.matrix = function(
 #' @rdname curve_interval
 #' @export
 curve_interval.rvar = function(
-  .data, ..., .along = NULL, .width = .5, na.rm = FALSE,
+  .data, ..., .along = NULL, .width = 0.5, na.rm = FALSE,
   .interval = c("mhd", "mbd", "bd", "bd-mbd")
 ) {
   check_along_is_null(.along)
@@ -180,13 +176,11 @@ curve_interval.rvar = function(
 #' @rdname curve_interval
 #' @export
 curve_interval.data.frame = function(
-  .data, ..., .along = NULL, .width = .5, na.rm = FALSE,
+  .data, ..., .along = NULL, .width = 0.5, na.rm = FALSE,
   .interval = c("mhd", "mbd", "bd", "bd-mbd"),
   .simple_names = TRUE, .exclude = c(".chain", ".iteration", ".draw", ".row")
 ) {
-  if (!requireNamespace("posterior", quietly = TRUE)) {
-    stop0('curve_interval() requires the `posterior` package to be installed.') #nocov
-  }
+  stop_if_not_installed(c("posterior", "dplyr"), "{.help curve_interval}")
 
   .interval = match.arg(.interval)
   data = .data    # to avoid conflicts with tidy eval's `.data` pronoun
@@ -195,24 +189,20 @@ curve_interval.data.frame = function(
   # get the grouping variables we will jointly calculate intervals on
   .along = enquo(.along)
   if (is.null(quo_get_expr(.along))) {
-    .along = group_vars(data)
+    .along = group_vars_(data)
   } else {
-    .along = names(data)[eval_select(.along, data)]
-    data = group_by_at(data, .along, .add = TRUE)
+    .along = names(data)[eval_select_(.along, data)]
+    data = dplyr::group_by_at(data, .along, .add = TRUE)
   }
 
   # get the groups we will condition before doing the joint intervals
-  .conditional_groups = setdiff(group_vars(data), .along)
+  .conditional_groups = setdiff(group_vars_(data), .along)
 
   if (length(col_exprs) == 0) {
     # no column expressions provided => summarise all columns that are not groups and which
     # are not in .exclude
-    col_exprs = names(data) %>%
-      #don't aggregate groups because we aggregate within these
-      setdiff(group_vars(data)) %>%
-      setdiff(.exclude) %>%
-      syms() %>%
-      quos_auto_name()
+    col_names = setdiff(names(data), c(group_vars_(data), .exclude))
+    col_exprs = quos_auto_name(syms(col_names))
 
     if (length(col_exprs) == 0) {
       #still nothing to aggregate? not sure what the user wants
@@ -232,7 +222,7 @@ curve_interval.data.frame = function(
     # if the value we are going to summarise is not already a list column, make it into a list column
     # (making it a list column first is faster than anything else I've tried)
     if (!is.list(data[[col_name]])) {
-      data = summarise_at(data, col_name, list)
+      data = make_list_cols(data, col_name)
     }
 
     .curve_interval(data, col_name, ".lower", ".upper", .width, .interval, .conditional_groups, na.rm = na.rm)
@@ -243,21 +233,22 @@ curve_interval.data.frame = function(
 
     # if the values we are going to summarise are not already list columns, make them into list columns
     # (making them list columns first is faster than anything else I've tried)
-    if (!all(map_lgl_(data[,names(col_exprs)], is.list))) {
-      data = summarise_at(data, names(col_exprs), list)
+    if (!all(map_lgl_(data[, names(col_exprs)], is.list))) {
+      data = make_list_cols(data, names(col_exprs))
     }
 
     result = NULL
     actual_widths = NULL
     for (col_name in names(col_exprs)) {
       col_result = .curve_interval(
-        data, col_name, paste0(col_name, ".lower"), paste0(col_name, ".upper"), .width, .interval, .conditional_groups, na.rm = na.rm
+        data, col_name, paste0(col_name, ".lower"), paste0(col_name, ".upper"),
+        .width, .interval, .conditional_groups, na.rm = na.rm
       )
 
       # actual widths aren't always going to be equal so we'll take the means of them
       actual_widths = cbind(actual_widths, col_result$.actual_width)
 
-      result = bind_cols(
+      result = vec_cbind(
         result[, names(result) != col_name],
         col_result[, names(col_result) == col_name | (!names(col_result) %in% names(result))]
       )
@@ -279,13 +270,13 @@ curve_interval.data.frame = function(
 check_along_is_null = function(.along) {
   if (!is.null(.along)) cli_abort(c(
     '{.fun ggdist::curve_interval} applied to a matrix or rvar does not support the {.arg .along} argument',
-    'i' = 'Intervals for {.code curve_interval(<rvar>)} and {.code curve_interval(<matrix>)}
+    `i` = 'Intervals for {.code curve_interval(<rvar>)} and {.code curve_interval(<matrix>)}
       are calculated jointly for all dimensions of the input.',
-    '>' = 'If you want all dimensions to be joint, simply do not pass anything to {.arg .along}.',
-    '>' = 'If you want only some dimensions to be joint (i.e., some to be conditional), consider
+    `>` = 'If you want all dimensions to be joint, simply do not pass anything to {.arg .along}.',
+    `>` = 'If you want only some dimensions to be joint (i.e., some to be conditional), consider
       using a data frame, and group by the conditional columns and pass the joint columns to
       {.arg .along}',
-    'i' = 'For more information, see the {.arg .along} argument of {.fun ggdist::curve_interval}.'
+    `i` = 'For more information, see the {.arg .along} argument of {.fun ggdist::curve_interval}.'
   ))
 }
 
@@ -300,7 +291,7 @@ halfspace_depth = function(x) {
     stop0("Must have the same number of values in each group.")
   }
 
-  dfs = group_split(group_by_at(data, .conditional_groups))
+  dfs = split_df(dplyr::ungroup(data), .conditional_groups)
 
   # translate our names to names fda::fbplot understands
   .interval_internal = switch(.interval,
@@ -331,12 +322,11 @@ halfspace_depth = function(x) {
       # mean depth of each draw
       draw_depth = rowMeans(pointwise_depths, na.rm = na.rm)
     } else { # band depth using fbplot
-      if (!requireNamespace("fda", quietly = TRUE)) {
-        stop0(                                                                           # nocov
-          'curve_interval(.interval = "', .interval, '") requires the `fda` package.\n', # nocov
-          'Please install the `fda` package or use .interval = "mhd".'                   # nocov
-        )                                                                                # nocov
-      }
+      stop_if_not_installed(
+        "fda",
+        paste0('{.help curve_interval}(interval = "', .interval, '")'),
+        ">" = 'Or use {.code interval = "mhd"} instead.'
+      )
       # depth of each draw
       draw_depth = fda::fbplot(t(draws), plot = FALSE, method = .interval_internal)$depth
     }
@@ -364,7 +354,7 @@ halfspace_depth = function(x) {
     map_dfr_(.width, function(w) {
       # The naive approach would be to just use quantiles of draw depths to determine
       # the cutoff; something like:
-      #   depth_cutoff = quantile(draw_depth, 1 - w, na.rm = na.rm)
+      # >  depth_cutoff = quantile(draw_depth, 1 - w, na.rm = na.rm)
       # However this does not work well, since the envelope around a w% set of curves
       # determined via quantiles tends to incidentally cover some other curves, making
       # the coverage be (sometimes substantially) more than w%.

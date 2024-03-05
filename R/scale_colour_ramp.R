@@ -6,25 +6,45 @@
 
 # scale_colour_ramp -------------------------------------------------------
 
-#' Secondary ggplot color scale that ramps from another color
+#' Secondary color scale that ramps from another color (ggplot2 scale)
 #'
 #' This scale creates a secondary scale that modifies the `fill` or `color` scale of
 #' geoms that support it ([geom_lineribbon()] and [geom_slabinterval()]) to "ramp"
 #' from a secondary color (by default white) to the primary fill color (determined
-#' by the standard `color` or `fill` aesthetics).
+#' by the standard `color` or `fill` aesthetics). It uses the
+#' [partial_colour_ramp()] data type.
 #'
 #' @inheritParams ggplot2::continuous_scale
 #' @param from The color to ramp from. Corresponds to `0` on the scale.
-#' @param ... Arguments passed to underlying scale or guide functions. E.g. [scale_colour_ramp_discrete()],
-#' passes arguments to [discrete_scale()], [scale_colour_ramp_continuous()] passes arguments
-#' to [continuous_scale()]. See those functions for more details.
-#' @param guide A function used to create a guide or its name. For `scale_colour_ramp_continuous()`
-#' and `scale_fill_ramp_continuous()`, `guide_rampbar()` can be used to create gradient
-#' color bars. See `guides()` for information on other guides.
+#' @param ... Arguments passed to underlying scale or guide functions. E.g.
+#' [scale_colour_ramp_discrete()] passes arguments to [discrete_scale()],
+#' [scale_colour_ramp_continuous()] passes arguments to [continuous_scale()].
+#' See those functions for more details.
+#' @param guide A function used to create a guide or its name. For
+#' [scale_colour_ramp_continuous()] and [scale_fill_ramp_continuous()],
+#' [guide_rampbar()] can be used to create gradient color bars. See
+#' [guides()] for information on other guides.
 #' @param aesthetics Names of aesthetics to set scales for.
 #' @param range a numeric vector of length 2 that specifies the minimum and maximum
 #' values after the scale transformation. These values should be between `0`
 #' (the `from` color) and `1` (the color determined by the `fill` aesthetic).
+#' @details
+#' These scales transform data into [`partial_colour_ramp`]s. Each [`partial_colour_ramp`]
+#' is a pair of two values: a `from` colour and a numeric `amount` between `0`
+#' and `1` representing a distance between `from` and the target color (where `0`
+#' indicates the `from` color and `1` the target color).
+#'
+#' The target color is determined by the corresponding aesthetic: for example,
+#' the `colour_ramp` aesthetic creates ramps between `from` and whatever the
+#' value of the `colour` aesthetic is; the `fill_ramp` aesthetic creates ramps
+#' between `from` and whatever the value of the `fill` aesthetic is. When the
+#' `colour_ramp` aesthetic is set, \pkg{ggdist} geometries will modify their
+#' `colour` by applying the colour ramp between `from` and `colour` (and
+#' similarly for `fill_ramp` and `fill`).
+#'
+#' Colour ramps can be applied (i.e. translated into colours) using
+#' [ramp_colours()], which can be used with [partial_colour_ramp()]
+#' to implement geoms that make use of `colour_ramp` or `fill_ramp` scales.
 #' @return
 #' A [ggplot2::Scale] representing a scale for the `colour_ramp` and/or `fill_ramp`
 #' aesthetics for `ggdist` geoms. Can be added to a [ggplot()] object.
@@ -32,7 +52,7 @@
 #' @aliases scale_color_ramp scale_fill_ramp
 #' @author Matthew Kay
 #' @family ggdist scales
-#' @seealso [guide_rampbar()]
+#' @family colour ramp functions
 #' @examples
 #'
 #' library(dplyr)
@@ -60,23 +80,28 @@ scale_colour_ramp_continuous = function(
   from = "white", ..., limits = function(l) c(min(0, l[[1]]), l[[2]]), range = c(0, 1),
   guide = "legend", aesthetics = "colour_ramp"
 ) {
+  scale = ggproto(NULL, ScaleColourRampContinuous, from = from)
   continuous_scale(
-    aesthetics, "colour_ramp_c", colour_ramp_pal(range, from), limits = limits, guide = guide, ...
+    aesthetics, palette = rescale_pal(range), limits = limits, guide = guide, ..., super = scale
   )
 }
+
 #' @rdname scale_colour_ramp
 #' @export
 scale_color_ramp_continuous = scale_colour_ramp_continuous
+
 #' @rdname scale_colour_ramp
 #' @export
 scale_colour_ramp_discrete = function(
   from = "white", ..., range = c(0.2, 1),
   aesthetics = "colour_ramp"
 ) {
-  scale = discrete_scale(
-    aesthetics, "colour_ramp_d", colour_ramp_pal_discrete(range, from), ...
+  scale = ggproto(NULL, ScaleColourRampDiscrete, from = from)
+  discrete_scale(
+    aesthetics, palette = function(n) seq(range[1], range[2], length.out = n), ..., super = scale
   )
 }
+
 #' @rdname scale_colour_ramp
 #' @export
 scale_color_ramp_discrete = scale_colour_ramp_discrete
@@ -96,48 +121,25 @@ scale_fill_ramp_discrete = function(..., aesthetics = "fill_ramp") {
 }
 
 
-# helpers -----------------------------------------------------------------
+# continuous scale --------------------------------------------------------
 
-#' @importFrom scales rescale
-colour_ramp_pal = function(range, from) {
-  force(range)
-  force(from)
-  function(x) {
-    # this is a stupid hack so we can pass the color through
-    # surely there is a better way?
-    lapply(rescale(x, range, c(0, 1)), function(y) {
-      attr(y, "from") = from
-      y
-    })
+ScaleColourRampContinuous = ggproto("ScaleColourRampContinuous", ScaleContinuous,
+  from = "white",
+
+  map = function(self, x, limits = self$get_limits()) {
+    out = ggproto_parent(ScaleContinuous, self)$map(x, limits)
+    partial_colour_ramp(out, self$from)
   }
-}
+)
 
-colour_ramp_pal_discrete = function(range, from) {
-  force(range)
-  force(from)
-  function(n) {
-    # this is a stupid hack so we can pass the color through
-    # surely there is a better way?
-    lapply(seq(range[1], range[2], length.out = n), function(y) {
-      attr(y, "from") = from
-      y
-    })
+
+# discrete scale --------------------------------------------------------
+
+ScaleColourRampDiscrete = ggproto("ScaleColourRampDiscrete", ScaleDiscrete,
+  from = "white",
+
+  map = function(self, x, limits = self$get_limits()) {
+    out = ggproto_parent(ScaleDiscrete, self)$map(x, limits)
+    partial_colour_ramp(out, self$from)
   }
-}
-
-# assuming equal-length vectors `colors` and `amounts`, where `colors` are
-# colors and `amounts` is a scaled ramp aesthetic column, returns a vector
-# of same length as input giving the transformed (ramped) colors. E.g.
-# inside a draw_group() or draw_panel() method of a geom, usage might be:
-# data$fill = apply_colour_ramp(data$fill, data$fill_ramp)
-# to apply the effects of the fill_ramp aesthetic to the fill aesthetic.
-apply_colour_ramp = function(colors, amounts) {
-  if (is.null(colors) || is.null(amounts)) return(colors)
-
-  map2_chr_(colors, amounts, function(color, amount) {
-    # null amounts come from missing values
-    amount = amount %||% NA
-    from = attr(amount, "from") %||% "white"
-    scales::seq_gradient_pal(from, color)(amount)
-  })
-}
+)

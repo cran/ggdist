@@ -5,7 +5,6 @@
 
 library(dplyr)
 library(tidyr)
-library(purrr)
 library(distributional)
 
 
@@ -140,7 +139,7 @@ test_that("fill_ramp works on lineribbons", {
     intercept = rnorm(n, 3, 1),
     slope = rnorm(n, 1, 0.25),
     x = list(-4:5),
-    y = map2(intercept, slope, ~ .x + .y * -4:5)
+    y = .mapply(function(x, y) x + y * -4:5, list(intercept, slope), NULL)
   ) %>%
     unnest(c(x, y))
 
@@ -154,4 +153,31 @@ test_that("fill_ramp works on lineribbons", {
       ggplot(aes(x = x, y = y, fill = g)) +
       stat_lineribbon(aes(fill_ramp = after_stat(level)))
   )
+})
+
+
+# partial_colour_ramp type ------------------------------------------------------
+
+test_that("partial_colour_ramp formatting works", {
+  expect_equal(vec_ptype_full(partial_colour_ramp()), "partial_colour_ramp")
+  expect_equal(vec_ptype_abbr(partial_colour_ramp()), "rmp")
+  expect_equal(format(partial_colour_ramp()), character())
+  expect_equal(format(partial_colour_ramp(1:2/2, c("red", "blue"))), c("[0.5 from red]", "[1 from blue]"))
+})
+
+test_that("partial_colour_ramp casting works", {
+  expect_equal(as_partial_colour_ramp(2), partial_colour_ramp(2))
+  expect_equal(vec_cast(partial_colour_ramp(2), double()), 2.0)
+  expect_equal(vec_cast(partial_colour_ramp(2L), integer()), 2L)
+  expect_equal(vec_cast(2.0, partial_colour_ramp()), partial_colour_ramp(2))
+  expect_equal(vec_cast(2L, partial_colour_ramp()), partial_colour_ramp(2))
+
+  expect_equal(c(partial_colour_ramp(1), partial_colour_ramp(2)), partial_colour_ramp(c(1, 2)))
+  expect_equal(c(partial_colour_ramp(1), 2), partial_colour_ramp(c(1, 2)))
+  expect_equal(c(partial_colour_ramp(1), 2L), partial_colour_ramp(c(1, 2)))
+
+  expect_equal(vec_c(2, partial_colour_ramp(1)), partial_colour_ramp(c(2, 1)))
+  expect_equal(vec_c(2L, partial_colour_ramp(1)), partial_colour_ramp(c(2, 1)))
+
+  expect_error(partial_colour_ramp(1) + character())
 })

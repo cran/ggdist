@@ -36,10 +36,10 @@ distr_function.distribution = function(dist, fun, ..., categorical_okay = FALSE)
     # for categorical distributions --- but only when requested --- treat
     # them as ordinal so we can generate values in their bins. This is used
     # for stat_dots to put dots in bins approximately proportional to bin probs.
-    levels = distr_levels(dist)
+    levs = distr_levels(dist)
     probs = distr_probs(dist)
-    Finv = stepfun(c(0, cumsum(probs)), c(1, seq_along(probs), length(probs)))
-    return(function(x, ...) levels[Finv(x)])
+    quantile_fun = stepfun(c(0, cumsum(probs)), c(1, seq_along(probs), length(probs)))
+    return(function(x, ...) levs[quantile_fun(x)])
   }
   # eat up extra args as they are ignored anyway
   # (and can cause problems, e.g. with cdf())
@@ -64,14 +64,14 @@ distr_function.rvar_factor = function(dist, fun, ...) {
   } else if (fun %in% c("density", "cdf")) {
     # for density and cdf we must translate numeric input to factor levels
     f = force(NextMethod())
-    levels = levels(dist)
+    levs = levels(dist)
     function(x, ...) {
       # only x values > 0 are valid; values <= 0 are 0s
       gt_0 = x > 0
-      x_gt_0_levels = levels[x[gt_0]]
-      f = numeric(length(x))
-      f[gt_0] = f(x_gt_0_levels, ...)
-      f
+      x_gt_0_levels = levs[x[gt_0]]
+      out = numeric(length(x))
+      out[gt_0] = f(x_gt_0_levels, ...)
+      out
     }
   } else {
     NextMethod()
@@ -108,19 +108,6 @@ distr_point_interval = function(dist, point_interval, trans, ...) {
   UseMethod("distr_point_interval")
 }
 #' @export
-distr_point_interval.numeric = function(dist, point_interval, trans, ...) {
-  point_interval(trans$transform(dist), .simple_names = TRUE, ...)
-}
-#' @export
-distr_point_interval.factor = function(dist, point_interval, trans, ...) {
-  # cannot calculate intervals on categorical distributions
-  distr_point_interval(NA_real_, point_interval, trans, ...)
-}
-#' @export
-distr_point_interval.ordered = function(dist, point_interval, trans, ...) {
-  distr_point_interval(as.numeric(dist), point_interval, trans, ...)
-}
-#' @export
 distr_point_interval.list = function(dist, point_interval, trans, ...) {
   check_dist_length_1(dist)
 
@@ -130,11 +117,16 @@ distr_point_interval.list = function(dist, point_interval, trans, ...) {
 #' @export
 distr_point_interval.distribution = function(dist, point_interval, trans, ...) {
   if (distr_is_sample(dist)) {
-    distr_point_interval(distr_get_sample(dist), point_interval, trans, ...)
+    x = distr_get_sample(dist)
+    if (is.ordered(x)) x = as.numeric(x)
+    # cannot calculate intervals on categorical distributions
+    else if (is.factor(x)) x = rep(NA_real_, length(x))
+
+    t_dist = distr_set_sample(dist, trans$transform(x))
   } else {
     t_dist = dist_transformed(dist, trans$transform, trans$inverse)
-    point_interval(t_dist, .simple_names = TRUE, ...)
   }
+  point_interval(t_dist, .simple_names = TRUE, ...)
 }
 #' @export
 distr_point_interval.rvar = distr_point_interval.distribution
@@ -194,7 +186,10 @@ distr_is_factor_like = function(dist) {
   inherits(dist, "rvar_factor") || if (inherits(dist, "distribution")) {
     is_factor_like = map_lgl_(vctrs::vec_data(dist), function(d) {
       inherits(d, c("dist_categorical", "ggdist__wrapped_categorical")) ||
-        (inherits(d, "dist_sample") && inherits(distr_get_sample(d), c("character", "factor"))) ||
+        (
+          inherits(d, c("dist_sample", "ggdist__weighted_sample")) &&
+            inherits(distr_get_sample(d), c("character", "factor"))
+        ) ||
         is.character(vctrs::field(support(vec_restore(list(d), dist_missing())), "x")[[1]])
     })
     length(dist) > 0 && all(is_factor_like)
@@ -209,8 +204,8 @@ distr_levels = function(dist) {
   if (inherits(dist, "rvar_factor")) {
     levels(dist)
   } else if (inherits(dist, "distribution")) {
-    levels = lapply(vec_data(dist), distr_levels)
-    unique(do.call(c, levels))
+    levs = lapply(vec_data(dist), distr_levels)
+    unique(do.call(c, levs))
   } else if (inherits(dist, "dist_categorical")) {
     as.character(dist[["x"]] %||% seq_along(dist[["p"]]))
   } else if (inherits(dist, "ggdist__wrapped_categorical")) {
@@ -223,7 +218,7 @@ distr_levels = function(dist) {
       unique(s)
     }
   } else {
-    warning("Don't know how to determine the levels of distribution: ", format(dist))
+    warning0("Don't know how to determine the levels of distribution: ", format(dist))
     NULL
   }
 }
@@ -238,7 +233,7 @@ distr_probs = function(dist) {
   } else if (inherits(dist, "ggdist__wrapped_categorical")) {
     distr_probs(dist[["wrapped_dist"]])
   } else {
-    warning("Don't know how to determine the category probabilities of distribution: ", format(dist))
+    warning0("Don't know how to determine the category probabilities of distribution: ", format(dist))
     NULL
   }
 }
@@ -259,11 +254,11 @@ distr_is_multivariate = function(dist) {
 #' Is a distribution sample based?
 #' @noRd
 distr_is_sample = function(dist) {
-  inherits(dist, c("rvar", "dist_sample")) ||
+  inherits(dist, c("rvar", "dist_sample", "ggdist__weighted_sample")) ||
     (
-      inherits(dist, c("distribution")) &&
-      length(dist) == 1 &&
-      inherits(vctrs::field(dist, 1), "dist_sample")
+      inherits(dist, "distribution") &&
+        length(dist) == 1 &&
+        inherits(vctrs::field(dist, 1), c("dist_sample", "ggdist__weighted_sample"))
     )
 }
 
@@ -273,9 +268,35 @@ distr_get_sample = function(dist) {
   if (inherits(dist, "rvar")) {
     posterior::draws_of(dist)
   } else if (inherits(dist, "distribution")) {
-    vctrs::field(vctrs::field(dist, 1), 1)
-  } else if (inherits(dist, "dist_sample")) {
-    vctrs::field(dist, 1)
+    vctrs::field(dist, 1)[["x"]]
+  } else if (inherits(dist, c("dist_sample", "ggdist__weighted_sample"))) {
+    dist[["x"]]
+  }
+}
+
+#' Modify samples from a sample-based distribution
+#' @noRd
+distr_set_sample = function(dist, value) {
+  if (inherits(dist, "rvar")) {
+    posterior::draws_of(dist) = value
+  } else if (inherits(dist, "distribution")) {
+    old_class = oldClass(dist)
+    dist = unclass(dist)
+    dist[[1]] = distr_set_sample(dist[[1]], value)
+    class(dist) = old_class
+  } else if (inherits(dist, c("dist_sample", "ggdist__weighted_sample"))) {
+    dist[["x"]] = value
+  }
+  dist
+}
+
+#' Get all weights from a weighted sample-based distribution
+#' @noRd
+distr_get_sample_weights = function(dist) {
+  if (inherits(dist, "distribution")) {
+    distr_get_sample_weights(vctrs::field(dist, 1))
+  } else {
+    weights(dist)
   }
 }
 
@@ -321,7 +342,7 @@ is_dist_like = function(x) {
 }
 
 
-# custom distributions ----------------------------------------------------
+# wrapped categorical distribution ----------------------------------------------------
 
 #' A wrapped categorical distribution with a different level set
 #' @noRd
@@ -364,6 +385,81 @@ generate.ggdist__wrapped_categorical = function(x, ...) {
 }
 
 
+# weighted sample distribution ----------------------------------------------------
+
+#' A sample distribution with weights
+#' @noRd
+.dist_weighted_sample = function(x, weights) {
+  x = vec_cast(x, list_of(x[[1]]))
+  weights = vec_cast(weights, list_of(numeric()))
+
+  weight_is_null = vapply(weights, is.null, logical(1))
+  stopifnot(lengths(x) == lengths(weights) | weight_is_null)
+
+  # only allow univariate samples since that's all we should ever end
+  # up with via mappings in ggplot
+  stopifnot(lengths(lapply(x, dim)) <= 1)
+
+  distributional::new_dist(
+    x = x,
+    weights = weights,
+    class = "ggdist__weighted_sample"
+  )
+}
+
+#' @export
+format.ggdist__weighted_sample = function(x, ...) {
+  paste0("weighted_sample[", length(x[["x"]]), "]")
+}
+
+#' @export
+density.ggdist__weighted_sample = function(x, at, ..., na.rm = TRUE) {
+  d = density_bounded(x[["x"]], weights = x[["weights"]], trim = TRUE, ..., na.rm = na.rm)
+  approx(d$x, d$y, xout = at, yleft = 0, yright = 0, ties = "ordered")$y
+}
+
+#' @export
+cdf.ggdist__weighted_sample = function(x, q, ..., na.rm = TRUE) {
+  F_x = weighted_ecdf(x[["x"]], weights = x[["weights"]], ..., na.rm = na.rm)
+  F_x(q)
+}
+
+#' @export
+quantile.ggdist__weighted_sample = function(x, p, ..., na.rm = TRUE, names = FALSE) {
+  weighted_quantile(x[["x"]], p, weights = x[["weights"]], ..., na.rm = na.rm, names = names)
+}
+
+#' @export
+generate.ggdist__weighted_sample = function(x, times, ...) {
+  i = sample.int(length(x[["x"]]), times, replace = TRUE, prob = x[["weights"]])
+  x[["x"]][i]
+}
+
+#' @export
+mean.ggdist__weighted_sample = function(x, ...) {
+  if (is.null(x[["weights"]])) {
+    mean(x[["x"]])
+  } else {
+    weighted.mean(x[["x"]], x[["weights"]])
+  }
+}
+
+#' @importFrom distributional variance
+#' @export
+variance.ggdist__weighted_sample = function(x, ...) {
+  if (is.null(x[["weights"]])) {
+    variance(x[["x"]])
+  } else {
+    weighted_var(x[["x"]], x[["weights"]])
+  }
+}
+
+#' @importFrom stats weights
+#' @export
+weights.ggdist__weighted_sample = function(object, ...) {
+  object[["weights"]]
+}
+
 
 # transforming density functions ------------------------------------------
 
@@ -377,32 +473,39 @@ inverse_deriv_at_y = function(trans, y) {
     # use the function for the derivative if it was supplied (it is optional
     # and so may not be present)
     trans$d_inverse(y)
-  } else tryCatch({
-    # attempt to find analytical derivative by pulling out the expression
-    # for the transformation from the transformation function. Because many
-    # scale functions are defined as simple wrappers around
-    # single expressions (with no { ... }), we can be pretty naive here and
-    # just try to pull out that single expression
-    f = trans$inverse
-    f_list = as.list(f)
-    y_name = names(f_list)[[1]]
-    f_expr = f_list[[length(f_list)]]
-    f_deriv_expr = D(f_expr, y_name)
+  } else {
+    tryCatch({
+      # attempt to find analytical derivative by pulling out the expression
+      # for the transformation from the transformation function. Because many
+      # scale functions are defined as simple wrappers around
+      # single expressions (with no { ... }), we can be pretty naive here and
+      # just try to pull out that single expression
+      f = trans$inverse
+      f_list = as.list(f)
+      y_name = names(f_list)[[1]]
+      f_expr = f_list[[length(f_list)]]
+      f_deriv_expr = D(f_expr, y_name)
 
-    # apply the analytical derivative to the y values
-    # must do this within the environment of the transformation function b/c
-    # some functions are defined as closures with other variables needed to
-    # fully define the transformation
-    args = list(y)
-    names(args) = y_name
-    eval(f_deriv_expr, args, environment(f))
-  }, error = function(e) {
-    # if analytical approach fails, use numerical approach.
-    # we use this (slightly less quick) approach instead of numDeriv::grad()
-    # because numDeriv::grad() errors out if any data point fails while this
-    # will return `NA` for those points
-    vapply(y, numDeriv::jacobian, func = trans$inverse, numeric(1))
-  })
+      # apply the analytical derivative to the y values
+      # must do this within the environment of the transformation function b/c
+      # some functions are defined as closures with other variables needed to
+      # fully define the transformation
+      f_args = list(y)
+      names(f_args) = y_name
+      eval(f_deriv_expr, f_args, environment(f))
+    }, error = function(e) {
+      # if analytical approach fails, use numerical approach.
+      # we use this (slightly less quick) approach instead of numDeriv::grad()
+      # on the whole vector because numDeriv::grad() errors out if any data
+      # point fails while this will return `NA` for those points
+      vapply(y, FUN.VALUE = numeric(1), function(y_i) {
+        tryCatch(
+          suppressWarnings(numDeriv::grad(func = trans$inverse, y_i)),
+          error = function(e) NA_real_
+        )
+      })
+    })
+  }
 }
 
 # return a version of the provided density function f_X(...)

@@ -14,6 +14,7 @@
 #'
 #' [theme_ggdist()] and [theme_tidybayes()] are aliases.
 #'
+#' @inheritParams ggplot2::theme_light
 #' @return A named list in the format of [ggplot2::theme()]
 #' @author Matthew Kay
 #' @seealso [ggplot2::theme()], [ggplot2::theme_set()]
@@ -25,8 +26,18 @@
 #'
 #' @import ggplot2
 #' @export
-theme_ggdist = function() {
-  theme_light() + theme(
+theme_ggdist = function(
+  base_size = 11,
+  base_family = "",
+  base_line_size = base_size/22,
+  base_rect_size = base_size/22
+) {
+  theme_light(
+    base_size = base_size,
+    base_family = base_family,
+    base_line_size = base_line_size,
+    base_rect_size = base_rect_size
+  ) + theme(
     axis.line.x = element_line(color = "gray70", linewidth = rel(0.5)),
     axis.line.y = element_line(color = "gray70", linewidth = rel(0.5)),
     axis.title.x = element_text(margin = margin(t = 7)),
@@ -34,7 +45,7 @@ theme_ggdist = function() {
     panel.grid.major = element_blank(),
     panel.grid.minor = element_blank(),
     panel.border = element_blank(),
-    strip.text = element_text(color = "black", margin = margin(6,6,6,6)),
+    strip.text = element_text(color = "black", margin = margin(6, 6, 6, 6)),
     strip.background = element_rect(fill = "gray90")
   )
 }

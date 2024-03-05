@@ -6,7 +6,7 @@
 
 # guide_rampbar -------------------------------------------------------
 
-#' Continuous colour ramp guide
+#' Continuous guide for colour ramp scales (ggplot2 guide)
 #'
 #' A colour ramp bar guide that shows continuous colour ramp scales mapped onto
 #' values as a smooth gradient. Designed for use with [scale_fill_ramp_continuous()]
@@ -28,7 +28,7 @@
 #' @return
 #' A guide object.
 #' @author Matthew Kay
-#' @seealso [scale_fill_ramp_continuous()], [scale_colour_ramp_continuous()].
+#' @family colour ramp functions
 #' @examples
 #'
 #' library(dplyr)
@@ -42,8 +42,8 @@
 #'   stat_slab(aes(fill_ramp = after_stat(x)), fill = "blue") +
 #'   scale_fill_ramp_continuous(from = "red")
 #'
-#' # We can guide_rampbar() to instead create a continuous guide, but
-#' # it does not know what ccolor to ramp to (defaults to "gray65"):
+#' # We can use guide_rampbar() to instead create a continuous guide, but
+#' # it does not know what color to ramp to (defaults to "gray65"):
 #' tibble(d = dist_uniform(0, 1)) %>%
 #'   ggplot(aes(y = 0, xdist = d)) +
 #'   stat_slab(aes(fill_ramp = after_stat(x)), fill = "blue") +
@@ -58,29 +58,29 @@
 #' @export
 guide_rampbar = function(..., to = "gray65", available_aes = c("fill_ramp", "colour_ramp")) {
   guide = guide_colourbar(..., available_aes = available_aes)
-  if (inherits(guide, "GuideColourbar")) {
-    # If ggplot2 >3.4.2, guides are written ggproto, so here we inherit from
-    # the colourbar guide
-    new = ggproto(
-      "GuideRampbar", guide,
-      params = c(list(to = to), guide$params),
-      extract_decor = function(scale, aesthetic, nbin = 300,
-                               reverse = FALSE, to = "gray65", ...) {
-        bar = guide$extract_decor(scale, aesthetic, nbin, reverse, ...)
-        bar$colour = apply_colour_ramp(to, bar$colour)
-        bar
-      }
-    )
-    return(new)
-  }
-  guide$to = to
-  class(guide) = c("guide", "rampbar", "colorbar")
-  guide
-}
 
-#' @export
-guide_train.rampbar <- function(guide, scale, aesthetic = NULL) {
-  guide = NextMethod()
-  guide$bar$colour = apply_colour_ramp(guide$to, guide$bar$colour)
-  guide
+  ggproto(
+    "GuideRampbar", guide,
+    params = c(list(to = to), guide$params),
+    extract_decor = function(
+      scale, aesthetic, nbin = 300, reverse = FALSE, alpha = NA,
+      to = "gray65", ...
+    ) {
+      limits = scale$get_limits()
+      bar = seq(limits[1], limits[2], length.out = nbin)
+      if (length(bar) == 0) {
+        bar = unique(limits)
+      }
+      bar = data_frame(
+        colour = scale$map(bar),
+        value  = bar,
+        .size  = length(bar)
+      )
+      if (reverse) {
+        bar = bar[rev(seq_len(nrow(bar))), , drop = FALSE]
+      }
+      bar$colour = alpha(ramp_colours(to, bar$colour), alpha)
+      bar
+    }
+  )
 }

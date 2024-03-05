@@ -13,6 +13,7 @@ geom_slab(
   orientation = NA,
   normalize = "all",
   fill_type = "segments",
+  subguide = "none",
   na.rm = FALSE,
   show.legend = NA,
   inherit.aes = TRUE
@@ -77,7 +78,9 @@ that the maximum height at each value of the opposite axis is \code{1}.
 group so that the maximum height in each group is \code{1}.
 \item \code{"none"}: values are taken as is with no normalization (this should probably
 only be used with functions whose values are in [0,1], such as CDFs).
-}}
+}
+For a comprehensive discussion and examples of slab scaling and normalization, see the
+\href{https://mjskay.github.io/ggdist/articles/thickness.html}{\code{thickness} scale article}.}
 
 \item{fill_type}{What type of fill to use when the fill color or alpha varies within a slab. One of:
 \itemize{
@@ -96,6 +99,18 @@ option will fall back to \code{fill_type = "segments"} (in case of a false negat
 can be set explicitly). On R < 4.2, support for gradients cannot be auto-detected, so this will always
 fall back to \code{fill_type = "segments"}, in which case you can set \code{fill_type = "gradient"} explicitly
 if you are using a graphics device that support gradients.
+}}
+
+\item{subguide}{Sub-guide used to annotate the \code{thickness} scale. One of:
+\itemize{
+\item A function that takes a \code{scale} argument giving a \link[ggplot2:ggplot2-ggproto]{ggplot2::Scale}
+object and an \code{orientation} argument giving the orientation of the
+geometry and then returns a \link[grid:grid.grob]{grid::grob} that will draw the axis
+annotation, such as \code{\link[=subguide_axis]{subguide_axis()}} (to draw a traditional axis) or
+\code{\link[=subguide_none]{subguide_none()}} (to draw no annotation). See \code{\link[=subguide_axis]{subguide_axis()}}
+for a list of possibilities and examples.
+\item A string giving the name of such a function when prefixed
+with \code{"subguide"}; e.g. \code{"axis"} or \code{"none"}.
 }}
 
 \item{na.rm}{If \code{FALSE}, the default, missing values are removed with a warning. If \code{TRUE}, missing
@@ -119,12 +134,12 @@ be added to a \code{\link[=ggplot]{ggplot()}} object.
 \description{
 Shortcut version of \code{\link[=geom_slabinterval]{geom_slabinterval()}} for creating slab (ridge) plots.
 
-Roughly equivalent to:
+\strong{Roughly equivalent to:}
 
-\if{html}{\out{<div class="sourceCode">}}\preformatted{geom_slabinterval(
-  show_point = FALSE, show_interval = FALSE
-)
-}\if{html}{\out{</div>}}
+\preformatted{geom_slabinterval(
+  show_point = FALSE,
+  show_interval = FALSE
+)}
 }
 \section{Aesthetics}{
 
@@ -152,7 +167,9 @@ to be drawn on the bottom or the left depending on if \code{orientation} is \cod
 causes the slab to be drawn on the bottom or the right. \code{"both"} draws the slab mirrored on both
 sides (as in a violin plot).}
 \item{\code{scale}: What proportion of the region allocated to this geom to use to draw the slab. If \code{scale = 1},
-slabs that use the maximum range will just touch each other. Default is \code{0.9} to leave some space.}
+slabs that use the maximum range will just touch each other. Default is \code{0.9} to leave some space
+between adjacent slabs. For a comprehensive discussion and examples of slab scaling and normalization,
+see the \href{https://mjskay.github.io/ggdist/articles/thickness.html}{\code{thickness} scale article}.}
 \item{\code{justification}: Justification of the interval relative to the slab, where \code{0} indicates bottom/left
 justification and \code{1} indicates top/right justification (depending on \code{orientation}). If \code{justification}
 is \code{NULL} (the default), then it is set automatically based on the value of \code{side}: when \code{side} is
@@ -197,7 +214,7 @@ and the outline of the \strong{slab} (if it is visible). Use the \code{slab_line
 \code{interval_linetype} aesthetics (below) to set sub-geometry line types separately.}
 }
 
-\strong{Slab-specific color/line override aesthetics}
+\strong{Slab-specific color and line override aesthetics}
 
 \itemize{
 \item{\code{slab_fill}: Override for \code{fill}: the fill color of the slab.}

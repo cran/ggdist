@@ -71,9 +71,9 @@ test_that("bandwidth estimators work", {
 test_that("bandwidth fallback works", {
   x = c(rep(1, 10), 1.1)
 
-  expect_warning(expect_equal(bandwidth_nrd(x), bw.nrd0(x)), class = "ggdist_warn_bandwidth_fallback")
-  expect_warning(expect_equal(bandwidth_SJ(x), bw.nrd0(x)), class = "ggdist_warn_bandwidth_fallback")
-  expect_warning(expect_equal(bandwidth_dpi(x), bw.nrd0(x)), class = "ggdist_warn_bandwidth_fallback")
+  expect_warning(expect_equal(bandwidth_nrd(x), bw.nrd0(x)), class = "ggdist_bandwidth_fallback_warning")
+  expect_warning(expect_equal(bandwidth_SJ(x), bw.nrd0(x)), class = "ggdist_bandwidth_fallback_warning")
+  expect_warning(expect_equal(bandwidth_dpi(x), bw.nrd0(x)), class = "ggdist_bandwidth_fallback_warning")
 })
 
 
@@ -90,8 +90,16 @@ test_that("adaptive density estimator works", {
   vdiffr::expect_doppelganger("adaptive KDE (red) better matches mode",
     ggplot() +
       stat_slab(aes(xdist = distributional::dist_lognormal(1/2, 1)), fill = NA, color = "gray50") +
-      stat_slab(aes(x), density = density_bounded(adapt = 1, bandwidth = "dpi", bounds = c(0, Inf)), fill = NA, color = "blue", linetype = "11") +
-      stat_slab(aes(x), density = density_bounded(adapt = 100, bandwidth = "dpi", bounds = c(0, Inf)), fill = NA, color = "red", linetype = "11") +
+      stat_slab(
+        aes(x),
+        density = density_bounded(adapt = 1, bandwidth = "dpi", bounds = c(0, Inf)),
+        fill = NA, color = "blue", linetype = "11"
+      ) +
+      stat_slab(
+        aes(x),
+        density = density_bounded(adapt = 100, bandwidth = "dpi", bounds = c(0, Inf)),
+        fill = NA, color = "red", linetype = "11"
+      ) +
       scale_thickness_shared() +
       coord_cartesian(xlim = c(0, 10))
   )
@@ -101,10 +109,36 @@ test_that("adaptive density estimator works", {
 
   vdiffr::expect_doppelganger("adapt = n better matches mode",
     ggplot() +
-    stat_slab(aes(xdist = distributional::dist_lognormal(1/2, 1)), fill = NA, color = "gray50") +
-    stat_slab(aes(x), density = density_bounded(adapt = 1, bandwidth = "dpi", bounds = c(0, Inf)), fill = NA, color = "blue", linetype = "11") +
-    stat_slab(aes(x), density = density_bounded(adapt = 100, bandwidth = "dpi", bounds = c(0, Inf)), fill = NA, color = "red", linetype = "11") +
-    scale_thickness_shared() +
-    coord_cartesian(xlim = c(0, 10))
+      stat_slab(aes(xdist = distributional::dist_lognormal(1/2, 1)), fill = NA, color = "gray50") +
+      stat_slab(
+        aes(x),
+        density = density_bounded(adapt = 1, bandwidth = "dpi", bounds = c(0, Inf)),
+        fill = NA, color = "blue", linetype = "11"
+      ) +
+      stat_slab(
+        aes(x),
+        density = density_bounded(adapt = 100, bandwidth = "dpi", bounds = c(0, Inf)),
+        fill = NA, color = "red", linetype = "11"
+      ) +
+      scale_thickness_shared() +
+      coord_cartesian(xlim = c(0, 10))
   )
+})
+
+
+# weighted density --------------------------------------------------------
+
+test_that("weighted density estimator works", {
+  x1 = 1:10
+  w1 = rep(1, 10)
+  x2 = c(1,2,10)
+  w2 = rep(2, 3)
+  x = c(x1, x2)
+  w = c(w1, w2)
+
+  du = density_unbounded(x, weights = w, bandwidth = 0.5)
+  d = density(x, weights = w/sum(w), bw = 0.5)
+
+  expect_equal(du$x, d$x)
+  expect_equal(du$y, d$y)
 })

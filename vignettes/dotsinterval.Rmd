@@ -30,13 +30,12 @@ library(distributional)
 library(ggdist)
 library(ggplot2)
 library(patchwork)
-library(palmerpenguins)
 
 theme_set(theme_ggdist())
 ```
 
 ```{r hidden_options, include=FALSE}
-.old_options = options(width = 120)
+.old_options = options(width = 100)
 ```
 
 
@@ -75,7 +74,7 @@ label_ = function(..., hjust = 0, color = red_) {
   )
 }
 arrow_ = function(..., curvature = 0, x, xend = x, y, yend = y) {
-  annotate("curve", 
+  annotate("curve",
     color = red_, arrow = arrow(angle = 45, length = unit(3, "points"), type = "closed"),
     curvature = curvature,
     x = x, xend = xend, y = y, yend = yend
@@ -90,7 +89,7 @@ tibble(dist = dist_normal(4, 1.2)) %>%
 
   stat_dotsinterval(
     aes(linewidth = NULL),
-    slab_color = "gray50", 
+    slab_color = "gray50",
     .width = 1 - 2*pnorm(-1, sd = 1.2),
     fill = "gray75",
     point_size = 5,
@@ -100,53 +99,63 @@ tibble(dist = dist_normal(4, 1.2)) %>%
     linewidth = 5,
     slab_linewidth = 1.5
   ) +
-  
+
   # height
   refline_(x = 0, xend = 8.4, y = 1) +
   bracket_(x = 8.4, y = 0, yend = 1) +
   label_(label = "height", x = 8.6, y = 1) +
-  
+
   # scale
   refline_(x = 4, xend = 8.6, y = 0.9) +
   bracket_(x = 8.6, y = 0, yend = 0.9) +
   label_(label = "scale = 0.9", x = 8.8, y = 0.9) +
-  
+
   # slab line properties
-  label_(x = 2.5, y = 0.7, 
+  label_(x = 2.5, y = 0.7,
     label = 'slab_color = "gray50"\nslab_linewidth = 1.5',
     vjust = 1, hjust = 1
   ) +
   arrow_(x = 2.52, xend = 3, y = 0.67, yend = thickness_(3.1) + 0.03, curvature = -0.2) +
-  
+
   # slab fill
   label_(x = 5.5, y = 0.7,
     label = 'slab_fill = fill = "gray75"\nslab_alpha = alpha = 1\nslab_shape = 21',
-    vjust = 1,
+    vjust = 1
   ) +
   arrow_(x = 5.48, xend = 4.81, y = 0.67, yend = thickness_(3.1) + 0.01, curvature = 0.2) +
 
-  # xmin / x / xmax
+  # xmin, x, xmax
   arrow_(x = 2.65, xend = 3, y = -0.1, yend = -0.01, curvature = -0.2) +
   label_(x = 2.7, y = -0.1, label = "xmin", hjust = 1, vjust = 1) +
   arrow_(x = 4, y = -0.1, yend = -0.05) +
   label_(x = 4, y = -0.1, label = "x", hjust = 0.5, vjust = 1) +
   arrow_(x = 5.35, xend = 5, y = -0.1, yend = -0.01, curvature = 0.2) +
   label_(x = 5.3, y = -0.1, label = "xmax", hjust = 0, vjust = 1) +
-  
+
   # interval properties
   label_(x = 3.5, y = -0.2,
-    label = 'interval_color = color = "black"\ninterval_alpha = alpha = 1\ninterval_linetype = linetype = "solid"\nlinewidth = size = 5',
+    label = paste0(
+      'interval_color = color = "black"\n',
+      'interval_alpha = alpha = 1\n',
+      'interval_linetype = linetype = "solid"\n',
+      'linewidth = size = 5'
+    ),
     vjust = 1, hjust = 1
   ) +
   arrow_(x = 3.3, xend = 3.4, y = -0.18, yend = -0.015, curvature = -0.1) +
 
   # point properties
   label_(x = 4.5, y = -0.2,
-    label = 'point_fill = fill = "gray75"\npoint_color = color = "black"\npoint_alpha = alpha = 1\npoint_size = size = 5\nshape = 22\nstroke = 1.5',
+    label = paste0(
+      'point_fill = fill = "gray75"\n',
+      'point_color = color = "black"\n',
+      'point_alpha = alpha = 1\n',
+      'point_size = size = 5\nshape = 22\nstroke = 1.5'
+    ),
     vjust = 1, hjust = 0
   ) +
   arrow_(x = 4.55, xend = 4.2, y = -0.18, yend = -0.03, curvature = 0.2) +
-  
+
   coord_cartesian(xlim = c(-1, 10), ylim = c(-0.6, 1)) +
   labs(subtitle = "Properties of geom_dotsinterval", x = NULL, y = NULL)
 ```
@@ -171,28 +180,28 @@ tibble(dist = dist_normal(4, 1.2)) %>%
     linewidth = 1.5,
     shape = 21
   ) +
-  
+
   # height
   refline_(x = 0, xend = 8.4, y = 1) +
   bracket_(x = 8.4, y = 0, yend = 1) +
   label_(label = "height", x = 8.6, y = 1) +
-  
+
   # scale
   refline_(x = 4, xend = 8.6, y = 0.9) +
   bracket_(x = 8.6, y = 0, yend = 0.9) +
   label_(label = "scale = 0.9", x = 8.8, y = 0.9) +
-  
+
   # slab line properties
-  label_(x = 2.5, y = 0.7, 
+  label_(x = 2.5, y = 0.7,
     label = 'color = "gray50"\nlinewidth = 1.5',
     vjust = 1, hjust = 1
   ) +
   arrow_(x = 2.52, xend = 3, y = 0.67, yend = thickness_(3.1) + 0.03, curvature = -0.2) +
-  
+
   # slab fill
   label_(x = 5.5, y = 0.7,
     label = 'fill = "gray75"\nalpha = 1\nshape = 21',
-    vjust = 1,
+    vjust = 1
   ) +
   arrow_(x = 5.48, xend = 4.81, y = 0.67, yend = thickness_(3.1) + 0.01, curvature = 0.2) +
 
@@ -218,11 +227,10 @@ Size and layout of dots in the dotplot are controlled by four parameters:
 
 ```{r layout_params, echo=FALSE, fig.height=3.7, fig.width=6}
 data.frame(x = c(.4, .7, .7, 1, 1, 1)) %>%
-# data.frame(x = c(.4, rep(.7, 2), rep(1, 3))) %>%
   ggplot(aes(x = x)) +
-  
+
   geom_hline(yintercept = 0:1, color = "gray95") +
-  
+
   # binwidth
   refline_(x = seq(.25, 1.15, by = .3), y = -0.025, yend = 0.9, color = green_) +
   bracket_(x = .25, xend = .55, y = -0.025, color = green_) +
@@ -232,12 +240,12 @@ data.frame(x = c(.4, .7, .7, 1, 1, 1)) %>%
   ) +
 
   geom_dots(scale = 0.9, dotsize = 1, alpha = 0.5) +
-  
+
   # height
   refline_(x = 0, xend = 2, y = 1) +
   bracket_(x = 2, y = 0, yend = 1) +
   label_(label = "height", x = 2.05, y = 1) +
-  
+
   # scale
   refline_(x = 0.25, xend = 2.1, y = 0.9) +
   bracket_(x = 2.1, y = 0, yend = 0.9) +
@@ -255,7 +263,7 @@ data.frame(x = c(.4, .7, .7, 1, 1, 1)) %>%
     label = "dotsize = 1\n(relative to binwidth)",
     x = 0.85, y = -0.08, vjust = 1, hjust = 0, color = blue_
   ) +
-  
+
   scale_x_continuous(limits = c(-0.1, 2.35)) +
   scale_y_continuous(limits = c(-0.35, 1)) +
   coord_fixed() +
@@ -359,20 +367,16 @@ layout_plot = function(layout, side, ...) {
     theme(panel.border = element_rect(color = "gray75", fill = NA))
 }
 
-(layout_plot("bin", side = "top") +
-  layout_plot("hex", side = "top")) /
-  (layout_plot("weave", side = "top") +
-  layout_plot("swarm", side = "top")) +
+(layout_plot("bin", side = "top") + layout_plot("hex", side = "top")) /
+  (layout_plot("weave", side = "top") + layout_plot("swarm", side = "top")) +
   plot_annotation(title = 'geom_dots() layouts with side = "top"')
 ```
 
 When `side` is `"both"`, these layouts look like this:
 
 ```{r layout_both, fig.width = small_width, fig.height = small_height}
-(layout_plot("bin", side = "both") +
-  layout_plot("hex", side = "both")) /
-  (layout_plot("weave", side = "both") +
-  layout_plot("swarm", side = "both")) +
+(layout_plot("bin", side = "both") + layout_plot("hex", side = "both")) /
+  (layout_plot("weave", side = "both") + layout_plot("swarm", side = "both")) +
   plot_annotation(title = 'geom_dots() layouts with side = "both"')
 ```
 
@@ -384,9 +388,9 @@ with `side = "both"`:
 ```{r beeswarm_bin, fig.width = small_width, fig.height = small_height}
 set.seed(1234)
 
-abc_df = data.frame(
+abc_df = tibble(
   value = rnorm(300, mean = c(1,2,3), sd = c(1,2,2)),
-  abc = c("a", "b", "c")
+  abc = rep(c("a", "b", "c"), 100)
 )
 
 abc_df %>%
@@ -416,9 +420,9 @@ plots *without* manually tweaking settings:
 ```{r geom_weave, fig.width = small_width, fig.height = small_height}
 set.seed(1234)
 
-swarm_data = data.frame(
+swarm_data = tibble(
   y = rnorm(300, c(1,4)),
-  g = c("a","b")
+  g = rep(c("a","b"), 150)
 )
 
 swarm_plot = swarm_data %>%
@@ -445,10 +449,10 @@ gray outline is not drawn:
 ```{r beeswarm_dodge, fig.width = small_width, fig.height = small_height}
 set.seed(12345)
 
-abcc_df = data.frame(
+abcc_df = tibble(
   value = rnorm(300, mean = c(1,2,3,4), sd = c(1,2,2,1)),
-  abc = c("a", "b", "c", "c"),
-  hi = c("h", "h", "h", "i")
+  abc = rep(c("a", "b", "c", "c"), 75),
+  hi = rep(c("h", "h", "h", "i"), 75)
 )
 
 abcc_df %>%
@@ -518,100 +522,87 @@ abcc_df %>%
   )
 ```
 
-## On large samples
+## Constraining dot size
 
-### Setting a minimum dot size
+When sample sizes can vary widely (and dynamically), it can be difficult to set
+a reasonable dot size that works on all charts. In this case, it can be useful
+to set constraints on the dot sizes picked by the automatic bin width selection
+algorithm.
 
-On very large samples, the dots may become smaller than desired. To avoid this, you can set 
-a desired dot size / bin width using the `binwidth` argument. To set a specific bin width,
-pass a 1-element vector; to set a minimum bin width, pass a 2-element vector, where the first
-element is the min and the second the max. The bin width can be in data units (if `numeric`)
-or in plotting units (using `grid::unit()`). 
+For example, on very large samples, dots may become smaller than desired. 
+Consider the following increasingly large samples:
 
-For example, we could set the minimum dot size
-to `unit(1.5, "mm")`, which is the default size of points in `ggplot2::geom_point()`. We'll
-also set `overflow = "compress"`, which allows dots to overlap if necessary to maintain
-the specified dot size (rather than having the tallest stacks of dots leave the top
-of the screen):
-
-```{r large_sample_min_binwidth, fig.width = small_width, fig.height = small_width/2}
+```{r increasing_samples, fig.width = med_width, fig.height = med_height}
 set.seed(1234)
-x = rnorm(2000)
 
-ggplot() +
-  geom_dots(aes(x), binwidth = unit(c(1.5, Inf), "mm"), overflow = "compress", alpha = 0.5) +
+ns = c(50, 200, 500, 5000)
+increasing_samples = data.frame(
+  x = rgamma(sum(ns), 2, 2),
+  n = rep(ns, ns)
+)
+
+increasing_samples %>%
+  ggplot(aes(x = x)) +
+  geom_dots() +
+  facet_wrap(~ n) +
   labs(
-    title = 'geom_dots()',
-    subtitle = 'binwidth = unit(c(1.5, Inf), "mm"), overflow = "compress")'
+    title = "geom_dots()",
+    subtitle = "on large samples, dots may get too small"
   )
 ```
 
-### "density" dotplots
+The dots become quite small on the 5000-dot dotplot, making it harder to read.
 
-The dotplot above on a sample of size 2000 is quite noisy. When applied to large 
-samples where you do not care too much about individual dot positions,
-you may want to apply some smoothing to make the layout more appealing.
+You can set constraints on the desired dot size / bin width by using the `binwidth` 
+argument. To set a specific bin width, pass a single value; to set constraints,
+pass a length-2 vector, where the first element is the min and the second the max. 
+The min can be `0` and the max can be `Inf` if you only want to constrain the
+other value (max or min, respectively). The bin width can be in data units 
+(using `numeric` values) or in plotting units (using `grid::unit()`s).
 
-`geom_dots()` supports a handful of *smoothers* which can be applied using the
-`smooth = ` parameter. These all correspond to functions that start with `smooth_`,
-like `smooth_bounded()`, `smooth_unbounded()`, and `smooth_discrete()`, and can be
-applied either by passing the suffix as a string (e.g. `smooth = "bounded"`)
-or by passing the function itself, to set specific options on it (e.g. 
-`smooth = smooth_bonuded(adjust = 0.5)`). For continuous distributions with
-unbounded support, `smooth_unbounded()` is a good choice; it applies a kernel density estimator
-the assumes infinite bounds (see `density_unbounded()`):
+For example, we could constrain the dot size to be greater than 1mm:
 
-
-```{r large_sample_smooth, fig.width = small_width, fig.height = small_width/2}
-ggplot() +
-  geom_dots(aes(x), smooth = "unbounded") +
+```{r increasing_samples_min_binwidth, fig.width = med_width, fig.height = med_height}
+increasing_samples %>%
+  ggplot(aes(x = x)) +
+  geom_dots(binwidth = unit(c(1, Inf), "mm")) +
+  facet_wrap(~ n) +
   labs(
-    title = 'geom_dots() with 2000 dots',
-    subtitle = 'smooth = "unbounded"',
-    x = NULL
-  ) +
-  scale_y_continuous(breaks = NULL)
-```
-
-Note that dot positions in the resulting plot will no longer be as accurate as before.
-With a large sample this may be an acceptable compromise. With a small sample, I **do
-not** recommend using this technique.
-
-On bounded distributions, you should use `smooth_bounded()`, providing 
-the bounds of the distribution. Otherwise, the dotplot will be smoothed incorrectly. 
-For example, on a Beta(0.5, 0.5) distribution, which is bounded between 0 and 1,
-we should use `smooth = smooth_bounded(bounds = c(0, 1))`:
-
-```{r smooth_bounded_versus_unbounded, fig.width = small_width, fig.height = small_height}
-set.seed(1234)
-x = rbeta(2000, 0.5, 0.5)
-
-ggplot(data.frame(x), aes(x)) +
-  geom_dots(aes(y = "bounded"), smooth = smooth_bounded(bounds = c(0, 1))) +
-  geom_dots(aes(y = "unbounded"), smooth = "unbounded") +
-  geom_vline(xintercept = c(0, 1), alpha = 0.25) +
-  scale_x_continuous(breaks = c(0, 0.5, 1)) +
-  labs(
-    title = "geom_dots(smooth = ...) on x ~ Beta(0.5, 0.5)",
-    y = "smooth ="
+    title = "geom_dots()",
+    subtitle = 'binwidth = unit(c(1.5, Inf), "mm")'
   )
 ```
 
-Notice how `smooth = "unbounded"` incorrectly smooths data points to be outside the
-range of the data when the data are bounded.
+Notice how the dots now go off the page and we receive a warning with suggestions on
+how to fix the layout. If we set `overflow = "compress"`, instead of overflowing,
+the layout will compress the spacing between dots to keep them within the geometry's
+bounds:
+
+```{r increasing_samples_min_binwidth_compress, fig.width = med_width, fig.height = med_height}
+increasing_samples %>%
+  ggplot(aes(x = x)) +
+  geom_dots(binwidth = unit(c(1, Inf), "mm"), overflow = "compress", alpha = 0.75) +
+  facet_wrap(~ n) +
+  labs(
+    title = "geom_dots()",
+    subtitle = 'binwidth = unit(c(1, Inf), "mm"), overflow = "compress"'
+  )
+```
+
+These settings give reasonable displays in small sample sizes and scale up
+to larger sample sizes without changing settings.
 
 ## On discrete distributions
 
 The dots family includes a variety of features to make visualizing discrete and categorical
-distributions easier. Dotplot smoothing can be particularly useful in for these distributions,
-particularly when bin counts are very high. For example, these distributions are hard to
-visualize under the default settings, because the dots become very small:
+distributions easier. These distributions can be hard to visualize under the default settings
+if the dots become very small:
 
 ```{r discrete_dots_too_small, fig.width = small_width, fig.height = small_height}
 set.seed(1234)
-abcd_df = data.frame(
+abcd_df = tibble(
   x = sample(c("a", "b", "c", "d"), 1000, replace = TRUE, prob = c(0.27, 0.6, 0.03, 0.005)),
-  g = c("a","b")
+  g = rep(c("a","b"), 500)
 )
 
 abcd_df %>%
@@ -627,23 +618,7 @@ abcd_df %>%
 The automatic bin width algorithm selects a dot size that is very small in order to ensure
 the tallest bin fits in the plot, but this means the dots are hard to see.
 
-Using the `smooth_discrete()` smoother, we can spread the dots in each bin out into
-rectangular shapes:
-
-```{r discrete_dots_rect, fig.width = small_width, fig.height = small_height}
-abcd_df %>%
-  ggplot(aes(x = x)) +
-  geom_dots(smooth = "discrete") +
-  scale_y_continuous(breaks = NULL) +
-  labs(
-    title = 'geom_dots(smooth = "discrete")',
-    subtitle = "on a large discrete sample"
-  )
-```
-
-More regular bar-like shapes can be achieved by using `layout = "bar"`, so long
-as you override the default `ggplot2` behavior of grouping data by all discrete
-variables. This allows the layout to be calculated taking all groups into account:
+Bar-like layouts can be achieved by using `layout = "bar"`:
 
 ```{r discrete_dots_bar, fig.width = small_width, fig.height = small_height}
 abcd_df %>%
@@ -655,6 +630,16 @@ abcd_df %>%
     subtitle = "on a large discrete sample"
   )
 ```
+
+Notice how we set `group = NA` to override the default `ggplot2` behavior of 
+grouping data by all discrete variables. This allows the layout to be calculated 
+taking all groups into account.
+
+We can also use the `smooth` parameter to improve the display of discrete distributions,
+for which `geom_dots()` supports a handful of *smoothers*. These all correspond to 
+functions that start with `smooth_`, like `smooth_bounded()`, `smooth_unbounded()`, and `smooth_discrete()`, and can be applied either by passing the suffix as a string 
+(e.g. `smooth = "bounded"`) or by passing the function itself, to set specific options
+on it (e.g. `smooth = smooth_bounded(adjust = 0.5)`).
 
 `smooth_discrete()` applies a kernel density smoother whose default bandwidth is 
 less than the distances between bins. We can use the `kernel` argument (passed to
@@ -703,12 +688,16 @@ dist_df = tibble(
 
 dist_df %>%
   ggplot(aes(y = dist_name, xdist = dist)) +
-  stat_dotsinterval() +
+  stat_dotsinterval(subguide = 'integer') +
   ggtitle(
-    "stat_dotsinterval()",
+    "stat_dotsinterval(subguide = 'integer')",
     "aes(y = dist_name, xdist = dist)"
   )
 ```
+
+This example also shows the use of sub-guides to label dot counts. See the documentation
+of `subguide_axis()` and its shortcuts (particularly `subguide_integer()` and `subguide_count()`)
+for more examples.
 
 Analytical distributions are shown by default using 100 quantiles, sometimes
 referred to as a *quantile dotplot*, which can help people make better decisions under uncertainty ([Kay 2016](https://doi.org/10.1145/2858036.2858558), [Fernandes 2018](https://doi.org/10.1145/3173574.3173718)). 
@@ -823,15 +812,16 @@ dataset.
 ```{r halfeye_dotplot, fig.width = small_width, fig.height = small_height}
 set.seed(12345) # for reproducibility
 
-data.frame(
-  abc = c("a", "b", "b", "c"),
+tibble(
+  abc = rep(c("a", "b", "b", "c"), 50),
   value = rnorm(200, c(1, 8, 8, 3), c(1, 1.5, 1.5, 1))
 ) %>%
   ggplot(aes(y = abc, x = value, fill = abc)) +
   stat_slab(aes(thickness = after_stat(pdf*n)), scale = 0.7) +
   stat_dotsinterval(side = "bottom", scale = 0.7, slab_linewidth = NA) +
   scale_fill_brewer(palette = "Set2") +
-  ggtitle(paste0(
+  ggtitle(
+    paste0(
       'stat_slab(aes(thickness = after_stat(pdf*n)), scale = 0.7) +\n',
       'stat_dotsinterval(side = "bottom", scale = 0.7, slab_linewidth = NA)'
     ),
@@ -839,37 +829,71 @@ data.frame(
   )
 ```
 
+## Dotplots with Monte Carlo Standard Error
+
+A specialized variant of `geom_dots()`, `geom_blur_dots()`, supports visualizing
+dotplots with blur applied to each dot. `stat_mcse_dots()` uses `geom_blur_dots()`
+with `posterior::mcse_quantile()` to show the error in each quantile of a quantile
+dotplot:
+
+```{r mcse_blur_dots, fig.width=med_width, fig.height=med_height, warning=FALSE, eval=requireNamespace("posterior", quietly = TRUE) && getRversion() >= "4.1"}
+increasing_samples %>%
+  ggplot(aes(x = x)) +
+  stat_mcse_dots(quantiles = 100) +
+  facet_wrap(~ n) +
+  labs(
+    title = "stat_mcse_dots(quantiles = 100)",
+    subtitle = "Monte Carlo Standard Error of each quantile shown as blur"
+  )
+```
+
+Custom blur functions can be selected using the `blur` parameter, including the
+built-in `blur_interval()`, which draws an interval with a default width of 95%:
+
+```{r mcse_interval_dots, fig.width=med_width, fig.height=med_height, warning=FALSE, eval=requireNamespace("posterior", quietly = TRUE) && getRversion() >= "4.1"}
+increasing_samples %>%
+  ggplot(aes(x = x)) +
+  stat_mcse_dots(quantiles = 100, blur = "interval") +
+  facet_wrap(~ n) +
+  labs(
+    title = 'stat_mcse_dots(quantiles = 100, blur = "interval")',
+    subtitle = "Monte Carlo Standard Error of each quantile shown as 95% intervals"
+  )
+```
+
+
 ## Logit dotplots
 
 To demonstrate another useful plot type, the *logit dotplot* (courtesy [Ladislas Nalborczyk](https://lnalborczyk.github.io/post/glm/)), we'll fit a 
-logistic regression to some data on the sex and body mass of Gentoo penguins.
+logistic regression to some data on the petal length of the *Iris versicolor* 
+and *Iris virginica* flowers.
 
 First, we'll demo varying the `side` aesthetic to create two dotplots that are
 "facing" each other: `scale_side_mirrored()` will set the `side` aesthetic to 
 `"top"` or `"bottom"` if two categories are assigned to `side`". We also adjust 
 the `scale` so that the dots don't overlap:
 
-```{r gentoo_raw, fig.width = med_width, fig.height = med_height}
-gentoo = penguins %>%
-  filter(species == "Gentoo", !is.na(sex))
+```{r iris_v, fig.width = med_width, fig.height = med_height}
+iris_v = iris %>%
+  filter(Species != "setosa")
 
-gentoo %>%
-  ggplot(aes(x = body_mass_g, y = sex, side = sex)) +
+iris_v %>%
+  ggplot(aes(x = Petal.Length, y = Species, side = Species)) +
   geom_dots(scale = 0.5) +
   scale_side_mirrored(guide = "none") +
   ggtitle(
     "geom_dots(scale = 0.5)",
-    'aes(side = sex) + scale_side_mirrored()'
-  ) 
+    'aes(side = Species) + scale_side_mirrored()'
+  )
 ```
 
 This can also be accomplished by setting side directly and omitting
-`scale_side_mirrored()`; e.g. via `aes(side = ifelse(sex == "male", "bottom", "top"))`.
+`scale_side_mirrored()`; e.g. via `aes(side = ifelse(Species == "virginica", "bottom", "top"))`.
 
-Now we fit a logistic regression predicting sex based on body mass:
+Now we fit a logistic regression predicting species based on petal length:
 
-```{r m_gentoo}
-m = glm(sex == "male" ~ body_mass_g, data = gentoo, family = binomial)
+```{r m_iris_v}
+m = glm(Species == "virginica" ~ Petal.Length, data = iris_v, family = binomial)
 m
 ```
 
@@ -878,8 +902,8 @@ on top of the mirrored dotplots to create a *logit dotplot*:
 
 ```{r logit_dotplot, fig.width = med_width, fig.height = med_height/1.5}
 # construct a prediction grid for the fit line
-prediction_grid = with(gentoo, 
-  data.frame(body_mass_g = seq(min(body_mass_g), max(body_mass_g), length.out = 100))
+prediction_grid = with(iris_v,
+  data.frame(Petal.Length = seq(min(Petal.Length), max(Petal.Length), length.out = 100))
 )
 
 prediction_grid %>%
@@ -888,27 +912,26 @@ prediction_grid %>%
     # distribution describing uncertainty in log odds
     log_odds = dist_normal(fit, se.fit),
     # inverse-logit transform the log odds to get
-    # distribution describing uncertainty in Pr(sex == "male")
-    p_male = dist_transformed(log_odds, plogis, qlogis)
+    # distribution describing uncertainty in Pr(Species == "virginica")
+    p_virginica = dist_transformed(log_odds, plogis, qlogis)
   ) %>%
-  ggplot(aes(x = body_mass_g)) +
+  ggplot(aes(x = Petal.Length)) +
   geom_dots(
-    aes(y = as.numeric(sex == "male"), side = sex),
+    aes(y = as.numeric(Species == "virginica"), side = Species),
     scale = 0.4,
-    data = gentoo
+    data = iris_v
   ) +
   stat_lineribbon(
-    aes(ydist = p_male), alpha = 1/4, fill = "#08306b"
+    aes(ydist = p_virginica), alpha = 1/4, fill = "#08306b"
   ) +
   scale_side_mirrored(guide = "none") +
   coord_cartesian(ylim = c(0, 1)) +
   labs(
-    title = "logit dotplot: stat_dots() with stat_lineribbon()",
-    subtitle = 'aes(side = sex) + scale_side_mirrored()',
-    x = "Body mass (g) of Gentoo penguins",
-    y = "Pr(sex = male)"
+    title = "logit dotplot: geom_dots() with stat_lineribbon()",
+    subtitle = 'aes(side = Species) + scale_side_mirrored()',
+    x = "Petal Length",
+    y = "Pr(Species = virginica)"
   )
-  
 ```
 
 

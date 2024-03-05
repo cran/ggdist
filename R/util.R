@@ -18,6 +18,33 @@ warning0 = function(...) {
   warning(..., call. = FALSE)
 }
 
+#' Raise an error if packages are not installed
+#' @param packages character vector of packages to check for
+#' @param context beginning of error message giving the context (e.g. a
+#' package name and/or argument combination) that requires the package.
+#' @param ... additional messages placed into the `cli_abort()` message.
+#' @importFrom rlang caller_env
+#' @noRd
+stop_if_not_installed = function(packages, context = "This functionality", ..., call = caller_env()) {
+  for (package in packages) {
+    if (!requireNamespace(package, quietly = TRUE)) {
+      stop_not_installed(package, context = context, ..., call = call)
+    }
+  }
+}
+stop_not_installed = function(package, context = "This functionality", ..., call = caller_env()) {
+  cli_abort(
+    c(
+      paste0(context, ' requires the {.pkg {package}} package.'),
+      ">" = 'Install the {.pkg {package}} package with {.run install.packages("{package}")}',
+      ...
+    ),
+    class = "ggdist_missing_package",
+    ggdist_package = package,
+    call = call
+  )
+}
+
 # get all variable names from an expression
 # based on http://adv-r.had.co.nz/dsl.html
 all_names = function(x) {
@@ -64,6 +91,14 @@ check_na = function(x, na.rm) {
   x
 }
 
+# simple version of destructuring assignment
+`%<-%` = function(vars, values, envir = parent.frame()) {
+  vars = as.character(substitute(vars)[-1])
+  for (i in seq_along(vars)) {
+    assign(vars[[i]], values[[i]], envir = envir)
+  }
+  invisible(NULL)
+}
 
 # deprecations and warnings -----------------------------------------------
 
@@ -99,14 +134,43 @@ check_na = function(x, na.rm) {
 }
 
 
+# data frames -------------------------------------------------------------
+
+#' rename columns using a lookup table
+#' @param data data frame
+#' @param new_names lookup table of new column names, where names are
+#' old column names
+#' @noRd
+rename_cols = function(data, new_names) {
+  to_rename = names(data) %in% names(new_names)
+  names(data)[to_rename] = new_names[names(data)[to_rename]]
+  data
+}
+
+#' makes the specified columns into list columns. All other
+#' columns (except grouping columns) are dropped.
+#' @param data a data frame (possibly grouped)
+#' @param list_cols character vector of names of columns to turn into
+#'   list columns
+#' @noRd
+make_list_cols = function(data, list_cols) {
+  group_cols = group_vars_(data)
+  ddply_(data, group_cols, function(d) {
+    new_data_frame(c(
+      d[1, group_cols, drop = FALSE],
+      lapply(d[, list_cols, drop = FALSE], list)
+    ))
+  })
+}
+
+
 # workarounds -------------------------------------------------------------
 
 # workarounds / replacements for common patterns
 
-#' @importFrom dplyr bind_rows
 map_dfr_ = function(data, fun, ...) {
   # drop-in replacement for purrr::map_dfr
-  bind_rows(lapply(data, fun, ...))
+  vec_rbind(!!!lapply(data, fun, ...))
 }
 
 #' faster version of a map over rows of a data frame, like:
@@ -129,7 +193,7 @@ pmap_ = function(data, fun) {
 }
 
 ddply_ = function(data, groups, fun, ...) {
-  bind_rows(dlply_(data, groups, fun, ...))
+  vec_rbind(!!!dlply_(data, groups, fun, ...))
 }
 
 fct_explicit_na_ = function(x) {
@@ -148,12 +212,12 @@ fct_explicit_na_ = function(x) {
 
 dlply_ = function(data, groups, fun, ...) {
   # must make NAs explicit or they will be dropped by split()
-  group_vars = lapply(data[, groups, drop = FALSE], fct_explicit_na_)
+  group_factors = lapply(data[, groups, drop = FALSE], fct_explicit_na_)
 
-  if (length(group_vars) >= 1) {
+  if (length(group_factors) >= 1) {
     # group_is = a list where each element is a numeric vector of indices
     # corresponding to one group
-    group_is = unname(split(seq_len(nrow(data)), group_vars, drop = TRUE, lex.order = TRUE))
+    group_is = unname(split(seq_len(nrow(data)), group_factors, drop = TRUE, lex.order = TRUE))
 
     lapply(group_is, function(group_i) {
       # faster version of row_df = data[group_i, , drop = FALSE]
@@ -165,21 +229,25 @@ dlply_ = function(data, groups, fun, ...) {
   }
 }
 
-map_dbl_ = function(X, FUN, ...) {
-  vapply(X, FUN, FUN.VALUE = numeric(1), ...)
+split_df = function(data, groups) {
+  dlply_(data, groups, identity)
 }
 
-map_lgl_ = function(X, FUN, ...) {
-  vapply(X, FUN, FUN.VALUE = logical(1), ...)
+map_dbl_ = function(.x, .f, ...) {
+  vapply(.x, .f, FUN.VALUE = numeric(1), ...)
 }
 
-map2_chr_ = function(X, Y, FUN) {
-  as.character(mapply(FUN, X, Y, USE.NAMES = FALSE))
+map_lgl_ = function(.x, .f, ...) {
+  vapply(.x, .f, FUN.VALUE = logical(1), ...)
 }
 
-# map2_dfr_ = function(X, Y, FUN) {
-#   bind_rows(mapply(FUN, X, Y, SIMPLIFY = FALSE, USE.NAMES = FALSE))
-# }
+map2_ = function(.x, .y, .f) {
+  .mapply(.f, list(.x, .y), NULL)
+}
+
+map2_chr_ = function(.x, .y, .f) {
+  vctrs::list_unchop(map2_(.x, .y, .f), ptype = character())
+}
 
 fct_rev_ = function(x) {
   if (is.character(x)) {

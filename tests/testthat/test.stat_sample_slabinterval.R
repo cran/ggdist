@@ -9,6 +9,7 @@ suppressWarnings(suppressPackageStartupMessages({
 }))
 
 
+mapped_discrete = getFromNamespace("mapped_discrete", "ggplot2")
 
 test_that("gradientinterval works", {
   skip_if_no_vdiffr()
@@ -35,7 +36,7 @@ test_that("gradientinterval works", {
 
 test_that("fill_type = 'gradient' works", {
   skip_if_no_vdiffr()
-  skip_if_no_linearGradient()
+  skip_if_no_gradient()
 
 
   set.seed(1234)
@@ -52,8 +53,8 @@ test_that("fill_type = 'gradient' works", {
     p + stat_gradientinterval(aes(x = dist, y = x), n = 15, fill_type = "gradient"),
     writer = write_svg_with_gradient
   )
-  vdiffr::expect_doppelganger("fill_type = gradient with two groups, h",
-    p + stat_gradientinterval(aes(y = dist, x = x), n = 15, fill_type = "gradient"),
+  vdiffr::expect_doppelganger("fill_type = auto with two groups, h",
+    p + stat_gradientinterval(aes(y = dist, x = x), n = 15, fill_type = "auto"),
     writer = write_svg_with_gradient
   )
 
@@ -137,12 +138,22 @@ test_that("scale transformation works on halfeye", {
     scale_x_log10(breaks = 10^seq(-1,1))
 
   vdiffr::expect_doppelganger("halfeyeh log scale tri",
-    p_log + stat_halfeye(point_interval = mode_hdci, n = 20, density = density_unbounded(kernel = "tri"), .width = .5) +
+    p_log +
+      stat_halfeye(
+        point_interval = mode_hdci, n = 20,
+        density = density_unbounded(kernel = "tri"),
+        .width = .5
+      ) +
       geom_point(data = data.frame(x = 10^c(-1, 1)))
   )
 
   vdiffr::expect_doppelganger("halfeyeh log scale tri no trim",
-    p_log + stat_halfeye(point_interval = mode_hdci, n = 20, density = density_unbounded(kernel = "tri"), trim = FALSE, .width = .5) +
+    p_log +
+      stat_halfeye(
+        point_interval = mode_hdci, n = 20,
+        density = density_unbounded(kernel = "tri"), trim = FALSE,
+        .width = .5
+      ) +
       geom_point(data = data.frame(x = 10^c(-1, 1)))
   )
 
@@ -155,7 +166,8 @@ test_that("pdf and cdf aesthetics work", {
 
   p = data.frame(
     x = c("a", "b"),
-    y = qnorm(ppoints(100), c(1, 2), 2)
+    y = qnorm(ppoints(100), c(1, 2), 2),
+    stringsAsFactors = FALSE
   ) %>%
     ggplot(aes(x = x, y = y))
 
@@ -171,7 +183,8 @@ test_that("constant distributions work", {
   # constant dist when n != 1
   p = data.frame(
     x = c("constant = 1", "constant = 2", "constant = 3"),
-    y = rep(c(0,1,2), times = 10)
+    y = rep(c(0, 1, 2), times = 10),
+    stringsAsFactors = FALSE
   ) %>%
     ggplot(aes(x = x, y = y))
 
@@ -188,9 +201,9 @@ test_that("constant distributions work", {
   )
 
   # constant dist when n = 1
-  p = data.frame(
+  p = tibble(
     x = c("constant = 1", "constant = 2", "constant = 3"),
-    y = c(0,1,2)
+    y = c(0, 1, 2)
   ) %>%
     ggplot(aes(x = x, y = y))
 
@@ -222,8 +235,9 @@ test_that("n is calculated correctly", {
 
   set.seed(1234)
   df = data.frame(
-    g = c("a","a","a","b","c"),
-    x = rnorm(15, c(1,1,1,2,3))
+    g = c("a", "a", "a", "b", "c"),
+    x = rnorm(15, c(1, 1, 1, 2, 3)),
+    stringsAsFactors = FALSE
   )
 
   ld = layer_data(
@@ -275,8 +289,9 @@ test_that("trim and expand work", {
 
   set.seed(1234)
   df = data.frame(
-    g = c("a","a","a","b","c"),
-    x = rnorm(120, c(1,1,1,2,3))
+    g = c("a", "a", "a", "b", "c"),
+    x = rnorm(120, c(1, 1, 1, 2, 3)),
+    stringsAsFactors = FALSE
   )
 
   vdiffr::expect_doppelganger("untrimmed and expanded",
@@ -288,9 +303,9 @@ test_that("trim and expand work", {
 
 test_that("expand can take length two vector", {
 
-  df = data.frame(
-    g = c("a","a","b","b"),
-    x = c(1,2,2,3)
+  df = tibble(
+    g = c("a", "a", "b", "b"),
+    x = c(1, 2, 2, 3)
   )
 
   p = df %>%
@@ -342,7 +357,7 @@ test_that("characters work", {
     .width = c(NA,NA, .66,.66,.66,.66,.66,.66,.66,.66, .95,.95,.95,.95, NA,NA,NA,NA),
     stringsAsFactors = FALSE
   )
-  slab_ref$x = ggplot2:::mapped_discrete(c(.5,.5, 1,1, 1.5,1.5,1.5,1.5, 2,2, 2.5,2.5,2.5,2.5, 3,3, 3.5,3.5))
+  slab_ref$x = mapped_discrete(c(.5,.5, 1,1, 1.5,1.5,1.5,1.5, 2,2, 2.5,2.5,2.5,2.5, 3,3, 3.5,3.5))
   expect_equal(p$data[[1]][p$data[[1]]$datatype == "slab", names(slab_ref)], slab_ref)
 
   interval_ref = data.frame(
@@ -350,9 +365,9 @@ test_that("characters work", {
     .width = c(0.66, 0.95),
     stringsAsFactors = FALSE
   )
-  interval_ref$xmin = ggplot2:::mapped_discrete(c(1, 1))
-  interval_ref$xmax = ggplot2:::mapped_discrete(c(2.15, 2.875))
-  interval_ref$x = ggplot2:::mapped_discrete(c(1.5, 1.5))
+  interval_ref$xmin = mapped_discrete(c(1, 1))
+  interval_ref$xmax = mapped_discrete(c(2.15, 2.875))
+  interval_ref$x = mapped_discrete(c(1.5, 1.5))
   attr(interval_ref, "row.names") = c(19L, 20L)
   expect_equal(p$data[[1]][p$data[[1]]$datatype == "interval", names(interval_ref)], interval_ref)
 })
@@ -392,6 +407,33 @@ test_that("logical conditions at bin edges on histograms work", {
     stringsAsFactors = FALSE
   )
   expect_equal(layer_data(p)[,c("x", "fill")], ref)
+})
+
+
+# weights -----------------------------------------------------------------
+
+test_that("sample weights work", {
+  df = data.frame(
+    x = 1:9/10,
+    w = 0:8
+  )
+
+  p = ggplot(df, aes(x, weight = w))
+
+  ld_slab = layer_data(p + stat_slab(n = 9, density = "unbounded", .width = .5))
+  expect_equal(
+    ld_slab$pdf,
+    density(df$x, weights = df$w/36, bw = bandwidth_dpi(df$x), n = 9, cut = 0)$y
+  )
+  expect_equal(ld_slab$cdf, cumsum(df$w/36))
+  expect_equal(ld_slab$.width, c(rep(NA, 5), rep(0.5, 3), NA))
+
+  ld_interval = layer_data(p + stat_pointinterval(.width = .5))
+  expect_equal(ld_interval$x, 0.7)
+  expect_equal(ld_interval$xmin, weighted_quantile(df$x, 0.25, weights = df$w, names = FALSE))
+  expect_equal(ld_interval$xmax, weighted_quantile(df$x, 0.75, weights = df$w, names = FALSE))
+  ld_interval_mean = layer_data(p + stat_pointinterval(.width = .5, point_interval = mean_qi))
+  expect_equal(ld_interval_mean$x, 2/3)
 })
 
 

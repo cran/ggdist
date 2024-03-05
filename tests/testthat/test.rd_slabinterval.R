@@ -26,13 +26,24 @@ test_that("slabinterval parameter documention generator works", {
   expect_match(geom_output, "@param na.rm", fixed = TRUE)
 
   # parameters without documentation raise a warning
-  GeomTest <<- ggproto("GeomTest", GeomSlabinterval,
-    default_params = defaults(list(
-      foo = "bar"
-    ), GeomSlabinterval$default_params)
+  # construct an environment for rd_layer_params where a geom with
+  # undocumented parameters exists
+  old_env = environment(rd_layer_params)
+  on.exit({
+    environment(rd_layer_params) = old_env
+  })
+  environment(rd_layer_params) = new.env(parent = old_env)
+  assign(
+    "GeomTest",
+    ggproto("GeomTest", GeomSlabinterval,
+      default_params = defaults(list(
+        foo = "bar"
+      ), GeomSlabinterval$default_params)
+    ),
+    envir = environment(rd_layer_params)
   )
-  expect_error(rd_layer_params("test"), "Missing docs for params: foo")
 
+  expect_error(rd_layer_params("test"), "Missing docs for params: foo")
 })
 
 test_that("shortcut stat_slabinterval documentation generator works", {
@@ -46,6 +57,14 @@ test_that("shortcut stat_slabinterval documentation generator works", {
   ), collapse = "\n")
   expect_match(stat_output, "`f`: (deprecated) For slabs", fixed = TRUE)
   expect_match(stat_output, "stat_halfeye() +\n  scale_fill_brewer()", fixed = TRUE)
+
+})
+
+test_that("shortcut stat_spike documentation generator works", {
+
+  stat_output = paste0(rd_slabinterval_shortcut_stat("spike", chart_type = "spike"), collapse = "\n")
+  expect_match(stat_output, "@title Spike plot (shortcut stat)", fixed = TRUE)
+  expect_match(stat_output, "- `at`:", fixed = TRUE)
 
 })
 

@@ -51,9 +51,9 @@ to a fixed value, like \code{colour = "red"} or \code{linewidth = 3} (see \stron
 parameters to the paired geom/stat. When paired with the default geom, \code{\link[=geom_pointinterval]{geom_pointinterval()}},
 these include:
 \describe{
-\item{\code{interval_size_domain}}{A length-2 numeric vector giving the minimum and maximum of the values of the \code{size} and \code{linewidth} aesthetics that will be
-translated into actual sizes for intervals drawn according to \code{interval_size_range} (see the documentation
-for that argument.)}
+\item{\code{interval_size_domain}}{A length-2 numeric vector giving the minimum and maximum of the values of the \code{size} and \code{linewidth} aesthetics
+that will be translated into actual sizes for intervals drawn according to \code{interval_size_range} (see the
+documentation for that argument.)}
 \item{\code{interval_size_range}}{A length-2 numeric vector. This geom scales the raw size aesthetic values when drawing interval and point
 sizes, as they tend to be too thick when using the default settings of \code{\link[=scale_size_continuous]{scale_size_continuous()}}, which give
 sizes with a range of \code{c(1, 6)}. The \code{interval_size_domain} value indicates the input domain of raw size
@@ -63,11 +63,12 @@ the actual sizes used to draw intervals). Most of the time it is not recommended
 argument, as it may result in strange scaling of legends; this argument is a holdover from earlier versions
 that did not have size aesthetics targeting the point and interval separately. If you want to adjust the
 size of the interval or points separately, you can also use the \code{linewidth} or \code{point_size}
-aesthetics; see \link{scales}.}
+aesthetics; see \link{sub-geometry-scales}.}
 \item{\code{fatten_point}}{A multiplicative factor used to adjust the size of the point relative to the size of the
 thickest interval line. If you wish to specify point sizes directly, you can also use the \code{point_size}
 aesthetic and \code{\link[=scale_point_size_continuous]{scale_point_size_continuous()}} or \code{\link[=scale_point_size_discrete]{scale_point_size_discrete()}}; sizes
 specified with that aesthetic will not be adjusted using \code{fatten_point}.}
+\item{\code{arrow}}{\code{\link[grid:arrow]{grid::arrow()}} giving the arrow heads to use on the interval, or \code{NULL} for no arrows.}
 }}
 
 \item{point_interval}{A function from the \code{\link[=point_interval]{point_interval()}} family (e.g., \code{median_qi},
@@ -119,13 +120,12 @@ be added to a \code{\link[=ggplot]{ggplot()}} object.
 Shortcut version of \code{\link[=stat_slabinterval]{stat_slabinterval()}} with \code{\link[=geom_pointinterval]{geom_pointinterval()}} for
 creating point + multiple-interval plots.
 
-Roughly equivalent to:
+\strong{Roughly equivalent to:}
 
-\if{html}{\out{<div class="sourceCode">}}\preformatted{stat_slabinterval(
+\preformatted{stat_slabinterval(
   geom = "pointinterval",
   show_slab = FALSE
-)
-}\if{html}{\out{</div>}}
+)}
 }
 \details{
 \strong{To visualize sample data}, such as a data distribution, samples from a
@@ -194,6 +194,8 @@ These \code{stat}s support the following aesthetics:
 (when \code{orientation = "horizontal"} with sample data).}
 \item{\code{y}: y position of the geometry (when orientation = \code{"horizontal"}); or sample data to be summarized
 (when \code{orientation = "vertical"} with sample data).}
+\item{\code{weight}: When using samples (i.e. the \code{x} and \code{y} aesthetics, not \code{xdist} or \code{ydist}), optional
+weights to be applied to each draw.}
 \item{\code{xdist}: When using analytical distributions, distribution to map on the x axis: a \pkg{distributional}
 object (e.g. \code{\link[=dist_normal]{dist_normal()}}) or a \code{\link[posterior:rvar]{posterior::rvar()}} object.}
 \item{\code{ydist}: When using analytical distributions, distribution to map on the y axis: a \pkg{distributional}
@@ -258,7 +260,7 @@ and the outline of the \strong{slab} (if it is visible). Use the \code{slab_line
 \code{interval_linetype} aesthetics (below) to set sub-geometry line types separately.}
 }
 
-\strong{Interval-specific color/line override aesthetics}
+\strong{Interval-specific color and line override aesthetics}
 
 \itemize{
 \item{\code{interval_colour}: (or \code{interval_color}) Override for \code{colour}/\code{color}: the color of the interval.}
@@ -266,7 +268,7 @@ and the outline of the \strong{slab} (if it is visible). Use the \code{slab_line
 \item{\code{interval_linetype}: Override for \code{linetype}: the line type of the interval.}
 }
 
-\strong{Point-specific color/line override aesthetics}
+\strong{Point-specific color and line override aesthetics}
 
 \itemize{
 \item{\code{point_fill}: Override for \code{fill}: the fill color of the point.}

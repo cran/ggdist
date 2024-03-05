@@ -12,10 +12,10 @@ stat_slab(
   ...,
   p_limits = c(NA, NA),
   density = "bounded",
-  adjust = 1,
+  adjust = waiver(),
   trim = TRUE,
   expand = FALSE,
-  breaks = "Sturges",
+  breaks = waiver(),
   align = "none",
   outline_bars = FALSE,
   slab_type = NULL,
@@ -70,7 +70,9 @@ that the maximum height at each value of the opposite axis is \code{1}.
 group so that the maximum height in each group is \code{1}.
 \item \code{"none"}: values are taken as is with no normalization (this should probably
 only be used with functions whose values are in [0,1], such as CDFs).
-}}
+}
+For a comprehensive discussion and examples of slab scaling and normalization, see the
+\href{https://mjskay.github.io/ggdist/articles/thickness.html}{\code{thickness} scale article}.}
 \item{\code{fill_type}}{What type of fill to use when the fill color or alpha varies within a slab. One of:
 \itemize{
 \item \code{"segments"}: breaks up the slab geometry into segments for each unique combination of fill color and
@@ -88,6 +90,17 @@ option will fall back to \code{fill_type = "segments"} (in case of a false negat
 can be set explicitly). On R < 4.2, support for gradients cannot be auto-detected, so this will always
 fall back to \code{fill_type = "segments"}, in which case you can set \code{fill_type = "gradient"} explicitly
 if you are using a graphics device that support gradients.
+}}
+\item{\code{subguide}}{Sub-guide used to annotate the \code{thickness} scale. One of:
+\itemize{
+\item A function that takes a \code{scale} argument giving a \link[ggplot2:ggplot2-ggproto]{ggplot2::Scale}
+object and an \code{orientation} argument giving the orientation of the
+geometry and then returns a \link[grid:grid.grob]{grid::grob} that will draw the axis
+annotation, such as \code{\link[=subguide_axis]{subguide_axis()}} (to draw a traditional axis) or
+\code{\link[=subguide_none]{subguide_none()}} (to draw no annotation). See \code{\link[=subguide_axis]{subguide_axis()}}
+for a list of possibilities and examples.
+\item A string giving the name of such a function when prefixed
+with \code{"subguide"}; e.g. \code{"axis"} or \code{"none"}.
 }}
 }}
 
@@ -116,7 +129,8 @@ the data and then uses a bounded density estimator based on the reflection metho
 }}
 
 \item{adjust}{Passed to \code{density}: the bandwidth for the density estimator for sample data
-is adjusted by multiplying it by this value. See e.g. \code{\link[=density_bounded]{density_bounded()}} for more information.}
+is adjusted by multiplying it by this value. See e.g. \code{\link[=density_bounded]{density_bounded()}} for more information.
+Default (\code{waiver()}) defers to the default of the density estimator, which is usually \code{1}.}
 
 \item{trim}{For sample data, should the density estimate be trimmed to the range of the
 data? Passed on to the density estimator; see the \code{density} parameter. Default \code{TRUE}.}
@@ -124,8 +138,9 @@ data? Passed on to the density estimator; see the \code{density} parameter. Defa
 \item{expand}{For sample data, should the slab be expanded to the limits of the scale? Default \code{FALSE}.
 Can be length two to control expansion to the lower and upper limit respectively.}
 
-\item{breaks}{Determines the breakpoints defining bins. Similar to (but not
-exactly the same as) the \code{breaks} argument to \code{\link[graphics:hist]{graphics::hist()}}. One of:
+\item{breaks}{Determines the breakpoints defining bins. Defaults to \code{"Scott"}.
+Similar to (but not exactly the same as) the \code{breaks} argument to \code{\link[graphics:hist]{graphics::hist()}}.
+One of:
 \itemize{
 \item A scalar (length-1) numeric giving the number of bins
 \item A vector numeric giving the breakpoints between histogram bins
@@ -142,7 +157,8 @@ For example, \code{breaks = "Sturges"} will use the \code{\link[=breaks_Sturges]
 \code{breaks = 9} will create 9 bins, and \code{breaks = breaks_fixed(width = 1)} will
 set the bin width to \code{1}.}
 
-\item{align}{Determines how to align the breakpoints defining bins. One of:
+\item{align}{Determines how to align the breakpoints defining bins. Default
+(\code{"none"}) performs no alignment. One of:
 \itemize{
 \item A scalar (length-1) numeric giving an offset that is subtracted from the breaks.
 The offset must be between \code{0} and the bin width.
@@ -163,10 +179,10 @@ if outlines in between the bars are drawn when the \code{slab_color} aesthetic i
 (the default), the outline is drawn only along the tops of the bars; if \code{TRUE}, outlines in between
 bars are also drawn. See \code{\link[=density_histogram]{density_histogram()}}.}
 
-\item{slab_type}{(deprecated) The type of slab function to calculate: probability density (or mass) function (\code{"pdf"}),
-cumulative distribution function (\code{"cdf"}), or complementary CDF (\code{"ccdf"}). Instead of using \code{slab_type} to
-change \code{f} and then mapping \code{f} onto an aesthetic, it is now recommended to simply map the corresponding
-computed variable (e.g. \code{pdf}, \code{cdf}, or  \code{1 - cdf}) directly onto the desired aesthetic.}
+\item{slab_type}{(deprecated) The type of slab function to calculate: probability density (or mass) function
+(\code{"pdf"}), cumulative distribution function (\code{"cdf"}), or complementary CDF (\code{"ccdf"}). Instead of using
+\code{slab_type} to change \code{f} and then mapping \code{f} onto an aesthetic, it is now recommended to simply map the
+corresponding computed variable (e.g. \code{pdf}, \code{cdf}, or  \code{1 - cdf}) directly onto the desired aesthetic.}
 
 \item{limits}{Manually-specified limits for the slab, as a vector of length two. These limits are combined with those
 computed based on \code{p_limits} as well as the limits defined by the scales of the plot to determine the
@@ -212,15 +228,15 @@ be added to a \code{\link[=ggplot]{ggplot()}} object.
 Shortcut version of \code{\link[=stat_slabinterval]{stat_slabinterval()}} with \code{\link[=geom_slab]{geom_slab()}} for
 creating slab (ridge) plots.
 
-Roughly equivalent to:
+\strong{Roughly equivalent to:}
 
-\if{html}{\out{<div class="sourceCode">}}\preformatted{stat_slabinterval(
+\preformatted{stat_slabinterval(
   aes(size = NULL),
   geom = "slab",
-  show_point = FALSE, show_interval = FALSE,
+  show_point = FALSE,
+  show_interval = FALSE,
   show.legend = NA
-)
-}\if{html}{\out{</div>}}
+)}
 }
 \details{
 \strong{To visualize sample data}, such as a data distribution, samples from a
@@ -295,6 +311,8 @@ These \code{stat}s support the following aesthetics:
 (when \code{orientation = "horizontal"} with sample data).}
 \item{\code{y}: y position of the geometry (when orientation = \code{"horizontal"}); or sample data to be summarized
 (when \code{orientation = "vertical"} with sample data).}
+\item{\code{weight}: When using samples (i.e. the \code{x} and \code{y} aesthetics, not \code{xdist} or \code{ydist}), optional
+weights to be applied to each draw.}
 \item{\code{xdist}: When using analytical distributions, distribution to map on the x axis: a \pkg{distributional}
 object (e.g. \code{\link[=dist_normal]{dist_normal()}}) or a \code{\link[posterior:rvar]{posterior::rvar()}} object.}
 \item{\code{ydist}: When using analytical distributions, distribution to map on the y axis: a \pkg{distributional}
@@ -320,7 +338,9 @@ to be drawn on the bottom or the left depending on if \code{orientation} is \cod
 causes the slab to be drawn on the bottom or the right. \code{"both"} draws the slab mirrored on both
 sides (as in a violin plot).}
 \item{\code{scale}: What proportion of the region allocated to this geom to use to draw the slab. If \code{scale = 1},
-slabs that use the maximum range will just touch each other. Default is \code{0.9} to leave some space.}
+slabs that use the maximum range will just touch each other. Default is \code{0.9} to leave some space
+between adjacent slabs. For a comprehensive discussion and examples of slab scaling and normalization,
+see the \href{https://mjskay.github.io/ggdist/articles/thickness.html}{\code{thickness} scale article}.}
 \item{\code{justification}: Justification of the interval relative to the slab, where \code{0} indicates bottom/left
 justification and \code{1} indicates top/right justification (depending on \code{orientation}). If \code{justification}
 is \code{NULL} (the default), then it is set automatically based on the value of \code{side}: when \code{side} is
@@ -365,7 +385,7 @@ and the outline of the \strong{slab} (if it is visible). Use the \code{slab_line
 \code{interval_linetype} aesthetics (below) to set sub-geometry line types separately.}
 }
 
-\strong{Slab-specific color/line override aesthetics}
+\strong{Slab-specific color and line override aesthetics}
 
 \itemize{
 \item{\code{slab_fill}: Override for \code{fill}: the fill color of the slab.}

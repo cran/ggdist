@@ -61,7 +61,7 @@ globalVariables(c("y", "ymin", "ymax"))
 #' `ll` and `ul` yield lower limits and upper limits, respectively (where the opposite
 #' limit is set to either `Inf` or `-Inf`).
 #'
-#' @param .data Data frame (or grouped data frame as returned by [group_by()])
+#' @param .data Data frame (or grouped data frame as returned by [dplyr::group_by()])
 #' that contains draws to summarize.
 #' @param ... Bare column names or expressions that, when evaluated in the context of
 #' `.data`, represent draws to summarize. If this is empty, then by default all
@@ -100,6 +100,8 @@ globalVariables(c("y", "ymin", "ymax"))
 #' and unbounded data.
 #' @param n For [hdi()] and [Mode()], the number of points to use to estimate highest-density
 #' intervals or modes.
+#' @param weights For [Mode()], an optional vector, which (if not `NULL`) is of the same length
+#' as `x` and provides weights for each element of `x`.
 #' @return A data frame containing point summaries and intervals, with at least one column corresponding
 #' to the point summary, one to the lower end of the interval, one to the upper end of the interval, the
 #' width of the interval (`.width`), the type of point summary (`.point`), and the type of interval (`.interval`).
@@ -145,16 +147,15 @@ globalVariables(c("y", "ymin", "ymax"))
 #'   ggplot(aes(x = x, y = 0)) +
 #'   stat_halfeye(point_interval = mode_hdi, .width = c(.66, .95))
 #'
-#' @importFrom dplyr bind_cols group_vars summarise_at %>%
 #' @importFrom rlang quos quos_auto_name eval_tidy syms
 #' @importFrom stats median
 #' @importFrom tibble as_tibble
 #' @export
 point_interval = function(
-  .data, ..., .width = .95, .point = median, .interval = qi, .simple_names = TRUE,
+  .data, ..., .width = 0.95, .point = median, .interval = qi, .simple_names = TRUE,
   na.rm = FALSE, .exclude = c(".chain", ".iteration", ".draw", ".row"), .prob
 ) {
-  if (missing(.data)) return(partial_self("point_interval"))
+  if (missing(.data)) return(partial_self("point_interval", waivable = FALSE))
 
   UseMethod("point_interval")
 }
@@ -173,12 +174,8 @@ point_interval.default = function(.data, ..., .width = .95, .point = median, .in
   if (length(col_exprs) == 0) {
     # no column expressions provided => summarise all columns that are not groups and which
     # are not in .exclude
-    col_exprs = names(data) %>%
-      #don't aggregate groups because we aggregate within these
-      setdiff(group_vars(data)) %>%
-      setdiff(.exclude) %>%
-      syms() %>%
-      quos_auto_name()
+    col_names = setdiff(names(data), c(group_vars_(data), .exclude))
+    col_exprs = quos_auto_name(syms(col_names))
 
     if (length(col_exprs) == 0) {
       #still nothing to aggregate? not sure what the user wants
@@ -198,7 +195,7 @@ point_interval.default = function(.data, ..., .width = .95, .point = median, .in
     # if the value we are going to summarise is not already a list column, make it into a list column
     # (making it a list column first is faster than anything else I've tried)
     if (!is.list(data[[col_name]])) {
-      data = summarise_at(data, col_name, list)
+      data = make_list_cols(data, col_name)
     }
 
     result = map_dfr_(.width, function(p) {
@@ -216,10 +213,12 @@ point_interval.default = function(.data, ..., .width = .95, .point = median, .in
         if (inherits(draws, "rvar") && length(draws) > 1) {
           flat_draws = flatten_array(draws)
           draws = flat_draws$x
-          row[[col_name]] = NA # the next line will have to recycle row[[col_name]]
-                               # which may be expensive b/c it is an rvar, so just
-                               # skip that since we're overwriting it after anyway
-          row = bind_cols(row, .index = flat_draws$index_names)
+          # the line after this (vec_cbind()) will have to recycle
+          # row[[col_name]], which may be expensive because it is an rvar,
+          # so we assign NA first to skip that since we're overwriting
+          # row[[col_name]] right after anyway
+          row[[col_name]] = NA
+          row = vec_cbind(row, .index = flat_draws$index_names)
           row[[col_name]] = draws
         }
 
@@ -239,7 +238,7 @@ point_interval.default = function(.data, ..., .width = .95, .point = median, .in
             flat_point = flatten_array(point_j)
             point_j = flat_point$x
             row_j[[col_name]] = NA
-            row_j = bind_cols(row_j, .index = flat_point$index_names)
+            row_j = vec_cbind(row_j, .index = flat_point$index_names)
           }
           row_j[[col_name]] = as.vector(point_j)
 
@@ -265,8 +264,8 @@ point_interval.default = function(.data, ..., .width = .95, .point = median, .in
     # if the values we are going to summarise are not already list columns, make them into list columns
     # (making them list columns first is faster than anything else I've tried)
     # this also ensures that rvars and distributional objects are supported (as those act as lists)
-    if (!all(map_lgl_(data[,names(col_exprs)], is.list))) {
-      data = summarise_at(data, names(col_exprs), list)
+    if (!all(map_lgl_(data[, names(col_exprs)], is.list))) {
+      data = make_list_cols(data, names(col_exprs))
     }
 
     result = map_dfr_(.width, function(p) {
@@ -312,7 +311,6 @@ point_interval.default = function(.data, ..., .width = .95, .point = median, .in
 }
 
 #' @rdname point_interval
-#' @importFrom dplyr rename
 #' @export
 point_interval.numeric = function(.data, ..., .width = .95, .point = median, .interval = qi, .simple_names = FALSE,
   na.rm = FALSE, .exclude = c(".chain", ".iteration", ".draw", ".row"), .prob
@@ -336,10 +334,8 @@ point_interval.numeric = function(.data, ..., .width = .95, .point = median, .in
   result[[".interval"]] = interval_name
 
   if (.simple_names) {
-    result %>%
-      rename(.value = y, .lower = ymin, .upper = ymax)
-  }
-  else {
+    rename_cols(result, list(y = ".value", ymin = ".lower", ymax = ".upper"))
+  } else {
     result
   }
 }
@@ -384,7 +380,7 @@ qi_ = function(x, lower_prob, upper_prob, na.rm) {
     #TODO: when #114 / distributional#72 is fixed, pass na.rm to quantile in this call
     do.call(rbind, lapply(quantile(x, c(lower_prob, upper_prob)), t))
   } else {
-    matrix(quantile(x, c(lower_prob, upper_prob), na.rm = na.rm), ncol = 2)
+    matrix(quantile(x, c(lower_prob, upper_prob), na.rm = na.rm, names = FALSE), ncol = 2)
   }
 }
 
@@ -394,7 +390,7 @@ ll = function(x, .width = .95, na.rm = FALSE) {
   lower_prob = 1 - .width
   upper_prob = rep(1, length(.width))
 
-  out = qi_(x, lower_prob, upper_prob, na.rm)
+  qi_(x, lower_prob, upper_prob, na.rm)
 }
 
 #' @export
@@ -403,7 +399,7 @@ ul = function(x, .width = .95, na.rm = FALSE) {
   lower_prob = rep(0, length(.width))
   upper_prob = .width
 
-  out = qi_(x, lower_prob, upper_prob, na.rm)
+  qi_(x, lower_prob, upper_prob, na.rm)
 }
 
 #' @export
@@ -417,7 +413,10 @@ hdi_ = function(x, ...) {
 }
 #' @importFrom stats density
 #' @export
-hdi_.numeric = function(x, .width = .95, na.rm = FALSE, ..., density = density_bounded(trim = TRUE), n = 4096) {
+hdi_.numeric = function(
+  x, .width = .95, na.rm = FALSE, ...,
+  density = density_bounded(trim = TRUE), n = 4096, weights = NULL
+) {
   if (!na.rm && anyNA(x)) {
     return(matrix(c(NA_real_, NA_real_), ncol = 2))
   }
@@ -426,10 +425,10 @@ hdi_.numeric = function(x, .width = .95, na.rm = FALSE, ..., density = density_b
   }
   x = check_na(x, na.rm)
 
-  intervals = .hdi_numeric(x, .width = .width, ..., density = density, n = n)
+  intervals = .hdi_numeric(x, .width = .width, ..., density = density, n = n, weights = weights)
   if (nrow(intervals) == 1) {
     # if the result is unimodal, switch to hdci (which will be more accurate)
-    intervals = hdci_.numeric(x, .width = .width)
+    intervals = hdci_.numeric(x, .width = .width, weights = weights)
   }
   intervals
 }
@@ -437,17 +436,17 @@ hdi_.numeric = function(x, .width = .95, na.rm = FALSE, ..., density = density_b
 # based on hdr.dist_default from {distributional}
 # https://github.com/mitchelloharawild/distributional/blob/50e29554456d99e9b7671ba6110bebe5961683d2/R/default.R#L137
 #' @importFrom stats approx
-.hdi_numeric = function(x, .width = 0.95, ..., density = density_bounded(trim = TRUE), n = 4096) {
+.hdi_numeric = function(x, .width = 0.95, ..., density = density_bounded(trim = TRUE), weights = NULL, n = 4096) {
   density = match_function(density, "density_")
 
-  dist_x = quantile(x, ppoints(n, a = 0.5), names = FALSE)
+  dist_x = weighted_quantile(x, ppoints(n, a = 0.5), weights = weights, names = FALSE)
   # Remove duplicate values of dist_x from less continuous distributions
   dist_x = unique(dist_x)
   if (length(dist_x) == 1) {
     # distribution is a constant => quick exit
     return(matrix(rep(dist_x, 2), ncol = 2))
   }
-  d = density(x, n = n)
+  d = density(x, n = n, weights = weights)
   dist_y = approx(d$x, d$y, dist_x)$y
   alpha = quantile(dist_y, probs = 1 - .width, names = FALSE)
 
@@ -490,7 +489,10 @@ hdi_.distribution = function(x, .width = .95, na.rm = FALSE, ..., density = dens
     return(matrix(quantile(x, c(0, 1))[[1]], ncol = 2))
   }
   if (distr_is_sample(x)) {
-    return(hdi_.numeric(distr_get_sample(x), .width = .width, na.rm = na.rm, ..., density = density, n = n))
+    return(hdi_.numeric(
+      distr_get_sample(x), .width = .width, na.rm = na.rm, ...,
+      density = density, n = n, weights = distr_get_sample_weights(x)
+    ))
   }
 
   hilos = hdr(x, .width * 100, n = n, ...)
@@ -506,31 +508,36 @@ Mode = function(x, na.rm = FALSE, ...) {
 }
 #' @export
 #' @rdname point_interval
-Mode.default = function(x, na.rm = FALSE, ..., density = density_bounded(trim = TRUE), n = 2001) {
+Mode.default = function(x, na.rm = FALSE, ..., density = density_bounded(trim = TRUE), n = 2001, weights = NULL) {
   if (na.rm) {
     x = x[!is.na(x)]
-  }
-  else if (anyNA(x)) {
+  } else if (anyNA(x)) {
     return(NA_real_)
   }
   density = match_function(density, "density_")
 
   if (is_integerish(x)) {
-    # for the discrete case, based on https://stackoverflow.com/a/8189441
-    ux = unique(x)
-    ux[which.max(tabulate(match(x, ux)))]
+    if (is.null(weights)) {
+      # for the discrete case, based on https://stackoverflow.com/a/8189441
+      ux = unique(x)
+      ux[which.max(tabulate(match(x, ux)))]
+    } else {
+      ux = unique(x)
+      ux_weights = vapply(split(weights, factor(x, ux)), sum, numeric(1))
+      ux[which.max(ux_weights)]
+    }
   } else {
     # for the continuous case
-    d = density(x, n = n)
+    d = density(x, n = n, weights = weights)
     d$x[which.max(d$y)]
   }
 }
 #' @export
 #' @rdname point_interval
 Mode.rvar = function(x, na.rm = FALSE, ...) {
-  draws <- posterior::draws_of(x)
-  dim <- dim(draws)
-  apply(draws, seq_along(dim)[-1], Mode, na.rm = na.rm)
+  draws = posterior::draws_of(x)
+  .dim = dim(draws)
+  apply(draws, seq_along(.dim)[-1], Mode, na.rm = na.rm, weights = weights(x))
 }
 #' @importFrom stats optim
 #' @export
@@ -540,7 +547,9 @@ Mode.distribution = function(x, na.rm = FALSE, ...) {
     if (anyNA(x)) {
       NA_real_
     } else if (distr_is_sample(x)) {
-      Mode(distr_get_sample(x), na.rm = na.rm)
+      Mode(distr_get_sample(x), na.rm = na.rm, weights = distr_get_sample_weights(x))
+    } else if (distr_is_constant(x)) {
+      quantile(x, 0.5)[[1]]
     } else if (distr_is_discrete(x)) {
       bounds = quantile(x, c(0, 1))[[1]]
       non_finite_bounds = !is.finite(bounds)
@@ -576,7 +585,7 @@ hdci_ = function(x, ...) {
 }
 #' @importFrom stats density
 #' @export
-hdci_.numeric = function(x, .width = .95, na.rm = FALSE, ...) {
+hdci_.numeric = function(x, .width = .95, na.rm = FALSE, ..., weights = NULL) {
   if (!na.rm && anyNA(x)) {
     return(matrix(c(NA_real_, NA_real_), ncol = 2))
   }
@@ -584,9 +593,7 @@ hdci_.numeric = function(x, .width = .95, na.rm = FALSE, ...) {
     return(matrix(range(x), ncol = 2))
   }
 
-  # d = density_bounded(x, na.rm = na.rm, adjust = 0.1)
-  # .hdci_function(ggdist::weighted_quantile_fun(d$x, weights = d$y, type = 5), .width = .width)
-  .hdci_function(ggdist::weighted_quantile_fun(x, na.rm = na.rm, type = 5), .width = .width)
+  .hdci_function(weighted_quantile_fun(x, na.rm = na.rm, weights = weights, type = 5), .width = .width)
 }
 
 #' find the hdci using a quantile function
@@ -624,81 +631,101 @@ hdci_.distribution = function(x, .width = .95, na.rm = FALSE, ...) {
   if (isTRUE(.width == 1)) {
     return(matrix(quantile(x, c(0, 1))[[1]], ncol = 2))
   }
+  if (distr_is_sample(x)) {
+    return(hdci_.numeric(
+      distr_get_sample(x), .width = .width, na.rm = na.rm, ..., weights = distr_get_sample_weights(x)
+    ))
+  }
 
   .hdci_function(function(p) quantile(x, p)[[1]], .width = .width)
 }
 
 #' @export
 #' @rdname point_interval
-mean_qi = function(.data, ..., .width = .95)
+mean_qi = function(.data, ..., .width = .95) {
   point_interval(.data, ..., .width = .width, .point = mean, .interval = qi)
+}
 
 #' @export
 #' @rdname point_interval
-median_qi = function(.data, ..., .width = .95)
+median_qi = function(.data, ..., .width = .95) {
   point_interval(.data, ..., .width = .width, .point = median, .interval = qi)
+}
 
 #' @export
 #' @rdname point_interval
-mode_qi = function(.data, ..., .width = .95)
+mode_qi = function(.data, ..., .width = .95) {
   point_interval(.data, ..., .width = .width, .point = Mode, .interval = qi)
+}
 
 #' @export
 #' @rdname point_interval
-mean_ll = function(.data, ..., .width = .95)
+mean_ll = function(.data, ..., .width = .95) {
   point_interval(.data, ..., .width = .width, .point = mean, .interval = ll)
+}
 
 #' @export
 #' @rdname point_interval
-median_ll = function(.data, ..., .width = .95)
+median_ll = function(.data, ..., .width = .95) {
   point_interval(.data, ..., .width = .width, .point = median, .interval = ll)
+}
 
 #' @export
 #' @rdname point_interval
-mode_ll = function(.data, ..., .width = .95)
+mode_ll = function(.data, ..., .width = .95) {
   point_interval(.data, ..., .width = .width, .point = Mode, .interval = ll)
+}
 
 #' @export
 #' @rdname point_interval
-mean_ul = function(.data, ..., .width = .95)
+mean_ul = function(.data, ..., .width = .95) {
   point_interval(.data, ..., .width = .width, .point = mean, .interval = ul)
+}
 
 #' @export
 #' @rdname point_interval
-median_ul = function(.data, ..., .width = .95)
+median_ul = function(.data, ..., .width = .95) {
   point_interval(.data, ..., .width = .width, .point = median, .interval = ul)
+}
 
 #' @export
 #' @rdname point_interval
-mode_ul = function(.data, ..., .width = .95)
+mode_ul = function(.data, ..., .width = .95) {
   point_interval(.data, ..., .width = .width, .point = Mode, .interval = ul)
+}
 
 #' @export
 #' @rdname point_interval
-mean_hdi = function(.data, ..., .width = .95)
+mean_hdi = function(.data, ..., .width = .95) {
   point_interval(.data, ..., .width = .width, .point = mean, .interval = hdi)
+}
 
 #' @export
 #' @rdname point_interval
-median_hdi = function(.data, ..., .width = .95)
+median_hdi = function(.data, ..., .width = .95) {
   point_interval(.data, ..., .width = .width, .point = median, .interval = hdi)
+}
 
 #' @export
 #' @rdname point_interval
-mode_hdi = function(.data, ..., .width = .95)
+mode_hdi = function(.data, ..., .width = .95) {
   point_interval(.data, ..., .width = .width, .point = Mode, .interval = hdi)
+}
 
 #' @export
 #' @rdname point_interval
-mean_hdci = function(.data, ..., .width = .95)
+mean_hdci = function(.data, ..., .width = .95) {
   point_interval(.data, ..., .width = .width, .point = mean, .interval = hdci)
+}
 
 #' @export
 #' @rdname point_interval
-median_hdci = function(.data, ..., .width = .95)
+median_hdci = function(.data, ..., .width = .95) {
   point_interval(.data, ..., .width = .width, .point = median, .interval = hdci)
+}
 
 #' @export
 #' @rdname point_interval
-mode_hdci = function(.data, ..., .width = .95)
+mode_hdci = function(.data, ..., .width = .95) {
   point_interval(.data, ..., .width = .width, .point = Mode, .interval = hdci)
+}

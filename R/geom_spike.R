@@ -84,9 +84,11 @@ draw_slabs_spike = function(self, s_data, panel_params, coord,
   # remove missing values - unlike slabinterval, thickness NAs not allowed here
   s_data = ggplot2::remove_missing(s_data, na.rm, "thickness", name = "geom_spike")
 
-  s_data = self$override_slab_aesthetics(rescale_slab_thickness(
+  subguide_params = NULL
+  c(s_data, subguide_params) %<-% rescale_slab_thickness(
     s_data, orientation, normalize, na.rm, name = "geom_spike"
-  ))
+  )
+  s_data = self$override_slab_aesthetics(s_data)
 
   s_data[[xend]] = s_data[[x]]
   s_data[[y]] = case_when_side(s_data$side, orientation,
@@ -152,8 +154,8 @@ GeomSpike = ggproto("GeomSpike", GeomSlab,
   ), GeomSlab$hidden_aes),
 
   override_slab_aesthetics = function(self, s_data) {
-    s_data$colour = apply_colour_ramp(s_data[["colour"]], s_data[["colour_ramp"]])
-    s_data$fill = apply_colour_ramp(s_data[["fill"]], s_data[["fill_ramp"]])
+    s_data$colour = ramp_colours(s_data[["colour"]], s_data[["colour_ramp"]])
+    s_data$fill = ramp_colours(s_data[["fill"]], s_data[["fill_ramp"]])
     s_data
   },
 
@@ -167,13 +169,10 @@ GeomSpike = ggproto("GeomSpike", GeomSlab,
     arrow = '[grid::arrow()] giving the arrow heads to use on the spike, or `NULL` for no arrows.'
   ), GeomSlab$param_docs),
 
-  default_params = defaults(list(
-    arrow = NULL
-  ), GeomSlab$default_params),
-
-  hidden_params = union(c(
-    "fill_type"
-  ), GeomSlab$hidden_params),
+  hidden_params = setdiff(
+    union("fill_type", GeomSlab$hidden_params),
+    "arrow"
+  ),
 
 
   ## other methods -----------------------------------------------------------
@@ -181,8 +180,9 @@ GeomSpike = ggproto("GeomSpike", GeomSlab,
   draw_key_slab = function(self, data, key_data, params, size) {
     s_key_data = self$override_slab_aesthetics(key_data)
 
-    spike_key = if (any(!is.na(data[c("colour","colour_ramp","alpha","linewidth","linetype")]))) {
-      line_key = if(params$orientation %in% c("y", "horizontal")) {
+    show_spike_when_present = c("colour", "colour_ramp", "alpha", "linewidth", "linetype")
+    spike_key = if (!all(is.na(data[show_spike_when_present]))) {
+      line_key = if (params$orientation %in% c("y", "horizontal")) {
         draw_key_vpath
       } else {
         draw_key_path
@@ -191,12 +191,12 @@ GeomSpike = ggproto("GeomSpike", GeomSlab,
     }
 
     point_key = if (
-      !all(is.na(s_key_data$size) | s_key_data$size == 0) && (
-        any(!is.na(data[c("size","stroke","shape","alpha")])) ||
-        # only draw point for `fill` aesthetic if a shape that has a fill colour is used
-        (any(!is.na(data[c("fill","fill_ramp")])) && length(intersect(data$shape, c(21:25))) > 0) ||
-        (any(!is.na(data[c("fill","fill_ramp")])) && length(intersect(data$shape, c(21:25))) > 0)
-      )
+      !all(is.na(s_key_data$size) | s_key_data$size == 0) &&
+        (
+          !all(is.na(data[c("size", "stroke", "shape", "alpha")])) ||
+            # only draw point for `fill` aesthetic if a shape that has a fill colour is used
+            (!all(is.na(data[c("fill", "fill_ramp")])) && length(intersect(data$shape, 21:25)) > 0)
+        )
     ) {
       draw_key_point(s_key_data, params, size)
     }

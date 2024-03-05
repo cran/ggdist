@@ -60,10 +60,11 @@ the actual sizes used to draw intervals). Most of the time it is not recommended
 argument, as it may result in strange scaling of legends; this argument is a holdover from earlier versions
 that did not have size aesthetics targeting the point and interval separately. If you want to adjust the
 size of the interval or points separately, you can also use the \code{linewidth} or \code{point_size}
-aesthetics; see \link{scales}.}
-\item{\code{interval_size_domain}}{A length-2 numeric vector giving the minimum and maximum of the values of the \code{size} and \code{linewidth} aesthetics that will be
-translated into actual sizes for intervals drawn according to \code{interval_size_range} (see the documentation
-for that argument.)}
+aesthetics; see \link{sub-geometry-scales}.}
+\item{\code{interval_size_domain}}{A length-2 numeric vector giving the minimum and maximum of the values of the \code{size} and \code{linewidth} aesthetics
+that will be translated into actual sizes for intervals drawn according to \code{interval_size_range} (see the
+documentation for that argument.)}
+\item{\code{arrow}}{\code{\link[grid:arrow]{grid::arrow()}} giving the arrow heads to use on the interval, or \code{NULL} for no arrows.}
 }}
 
 \item{.width}{The \code{.width} argument passed to \code{point_interval}: a vector of probabilities to use
@@ -115,15 +116,19 @@ be added to a \code{\link[=ggplot]{ggplot()}} object.
 Shortcut version of \code{\link[=stat_slabinterval]{stat_slabinterval()}} with \code{\link[=geom_interval]{geom_interval()}} for
 creating multiple-interval plots.
 
-Roughly equivalent to:
+\strong{Roughly equivalent to:}
 
-\if{html}{\out{<div class="sourceCode">}}\preformatted{stat_slabinterval(
-  aes(colour = after_stat(level), size = NULL),
+\preformatted{stat_slabinterval(
+  aes(
+    colour = after_stat(level),
+    size = NULL
+  ),
   geom = "interval",
-  show_point = FALSE, .width = c(0.5, 0.8, 0.95), show_slab = FALSE,
+  show_point = FALSE,
+  .width = c(0.5, 0.8, 0.95),
+  show_slab = FALSE,
   show.legend = NA
-)
-}\if{html}{\out{</div>}}
+)}
 }
 \details{
 \strong{To visualize sample data}, such as a data distribution, samples from a
@@ -192,6 +197,8 @@ These \code{stat}s support the following aesthetics:
 (when \code{orientation = "horizontal"} with sample data).}
 \item{\code{y}: y position of the geometry (when orientation = \code{"horizontal"}); or sample data to be summarized
 (when \code{orientation = "vertical"} with sample data).}
+\item{\code{weight}: When using samples (i.e. the \code{x} and \code{y} aesthetics, not \code{xdist} or \code{ydist}), optional
+weights to be applied to each draw.}
 \item{\code{xdist}: When using analytical distributions, distribution to map on the x axis: a \pkg{distributional}
 object (e.g. \code{\link[=dist_normal]{dist_normal()}}) or a \code{\link[posterior:rvar]{posterior::rvar()}} object.}
 \item{\code{ydist}: When using analytical distributions, distribution to map on the y axis: a \pkg{distributional}
@@ -250,7 +257,7 @@ and the outline of the \strong{slab} (if it is visible). Use the \code{slab_line
 \code{interval_linetype} aesthetics (below) to set sub-geometry line types separately.}
 }
 
-\strong{Interval-specific color/line override aesthetics}
+\strong{Interval-specific color and line override aesthetics}
 
 \itemize{
 \item{\code{interval_colour}: (or \code{interval_color}) Override for \code{colour}/\code{color}: the color of the interval.}

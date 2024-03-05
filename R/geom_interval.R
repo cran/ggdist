@@ -6,7 +6,7 @@
 
 # Names that should be suppressed from global variable check by codetools
 # Names used broadly should be put in _global_variables.R
-globalVariables(c(".width"))
+globalVariables(".width")
 
 
 #' @eval rd_slabinterval_shortcut_geom("interval", "multiple-interval")
@@ -77,6 +77,7 @@ GeomInterval = ggproto("GeomInterval", GeomSlabinterval,
   hidden_params = union(c(
     "show_slab", "show_point", "show_interval",
     "normalize", "fill_type",
+    "subguide",
     "fatten_point"
   ), GeomSlabinterval$hidden_params)
 )

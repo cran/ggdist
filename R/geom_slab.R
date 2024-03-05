@@ -68,11 +68,13 @@ GeomSlab = ggproto("GeomSlab", GeomSlabinterval,
   override_slab_aesthetics = function(self, s_data) {
     # we define these differently from geom_slabinterval to make this easier to use on its own
     s_data$colour = s_data[["slab_colour"]] %||% s_data[["colour"]]
-    s_data$colour = apply_colour_ramp(s_data[["colour"]], s_data[["colour_ramp"]])
+    s_data$colour = ramp_colours(s_data[["colour"]], s_data[["colour_ramp"]])
     s_data$fill = s_data[["slab_fill"]] %||% s_data[["fill"]]
-    s_data$fill = apply_colour_ramp(s_data[["fill"]], s_data[["fill_ramp"]])
+    s_data$fill = ramp_colours(s_data[["fill"]], s_data[["fill_ramp"]])
     s_data$alpha = s_data[["slab_alpha"]] %||% s_data[["alpha"]]
-    s_data$linewidth = s_data[["slab_linewidth"]] %||% s_data[["slab_size"]] %||% s_data[["linewidth"]] %||% s_data[["size"]]
+    s_data$linewidth =
+      s_data[["slab_linewidth"]] %||% s_data[["slab_size"]] %||%
+      s_data[["linewidth"]] %||% s_data[["size"]]
     s_data$linetype = s_data[["slab_linetype"]] %||% s_data[["linetype"]]
     s_data
   },
@@ -84,7 +86,7 @@ GeomSlab = ggproto("GeomSlab", GeomSlabinterval,
 
   hidden_params = union(c(
     "show_slab", "show_point", "show_interval",
-    "interval_size_domain", "interval_size_range", "fatten_point"
+    "interval_size_domain", "interval_size_range", "fatten_point", "arrow"
   ), GeomSlabinterval$hidden_params),
 
   draw_key_slab = function(self, data, key_data, params, size) {

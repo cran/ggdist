@@ -9,7 +9,7 @@
 #' Smooths `x` values using a density estimator, returning new `x` of the same
 #' length. Can be used with a dotplot (e.g. [`geom_dots`]`(smooth = ...)`) to create
 #' "density dotplots".
-#' Supports [automatic partial function application][automatic-partial-functions].
+#' @template description-auto-partial
 #'
 #' @param x a numeric vector
 #' @param density Density estimator to use for smoothing. One of:
@@ -101,7 +101,7 @@ NULL
   a = if (trim) 1 else 0.5
 
   # take quantiles from the KDE
-  x_dens = weighted_quantile(d$x, ppoints(n, a = a), d$y, type = 5)
+  x_dens = weighted_quantile(d$x, ppoints(n, a = a), d$y, type = 5, names = FALSE)
 
   # match up each smoothed value to a close value from `x` using the order of x
   x_dens[rank(x, ties.method = "first")]
@@ -139,7 +139,7 @@ smooth_unbounded = auto_partial(name = "smooth_unbounded", function(
 #' dataset; `smooth_discrete()` uses a kernel density estimator and `smooth_bar()`
 #' places values in an evenly-spaced grid. Can be used with a dotplot
 #' (e.g. [`geom_dots`]`(smooth = ...)`) to create "bar dotplots".
-#' Supports [automatic partial function application][automatic-partial-functions].
+#' @template description-auto-partial
 #'
 #' @param x a numeric vector
 #' @param width approximate width of the bars as a fraction of data [resolution()].
@@ -219,7 +219,8 @@ smooth_discrete = auto_partial(name = "smooth_discrete", function(
     cosine = 0.18,
     optcosine = 0.20
   )
-  bandwidth = resolution(x, zero = FALSE) * bw_mult * width
+  # TODO: can drop as.numeric here if https://github.com/tidyverse/ggplot2/issues/5709 is fixed
+  bandwidth = resolution(as.numeric(x), zero = FALSE) * bw_mult * width
   smooth_unbounded(x, kernel = kernel, bandwidth = bandwidth, ...)
 })
 
@@ -228,7 +229,8 @@ smooth_discrete = auto_partial(name = "smooth_discrete", function(
 smooth_bar = auto_partial(name = "smooth_bar", function(x, width = 0.7, ...) {
   if (length(x) < 2) return(x)
 
-  x_width = resolution(x, zero = FALSE) * width
+  # TODO: can drop as.numeric here if https://github.com/tidyverse/ggplot2/issues/5709 is fixed
+  x_width = resolution(as.numeric(x), zero = FALSE) * width
   split(x, x) = lapply(split(x, x), function(x) {
     (ppoints(length(x), 0.5) - 0.5) * x_width + x[[1]]
   })
@@ -238,7 +240,7 @@ smooth_bar = auto_partial(name = "smooth_bar", function(x, width = 0.7, ...) {
 #' Apply no smooth to a dotplot
 #'
 #' Default smooth for dotplots: no smooth. Simply returns the input values.
-#' Supports [automatic partial function application][automatic-partial-functions].
+#' @template description-auto-partial
 #'
 #' @param x a numeric vector
 #' @param ... ignored

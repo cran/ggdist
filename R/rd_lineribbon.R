@@ -12,8 +12,8 @@ rd_lineribbon_shortcut_stat = function(
   geom_name = stat_name,
   from_name = "lineribbon"
 ) {
-  stat = get(paste0("Stat", title_case(stat_name)))
-  geom = get(paste0("Geom", title_case(geom_name)))
+  stat = get(paste0("Stat", camel_case(stat_name)))
+  geom = get(paste0("Geom", camel_case(geom_name)))
 
   c(
     glue_doc('@title <<title_case(chart_type)>> plot (shortcut stat)'),
@@ -26,7 +26,7 @@ rd_lineribbon_shortcut_stat = function(
       analytical distributions, and will perform the summarization using a [point_interval()]
       function.
       '),
-    '@description\n Roughly equivalent to:',
+    '@description\n **Roughly equivalent to:**',
     rd_shortcut_stat(stat_name, geom_name, from_name = from_name),
     '@inheritParams stat_pointinterval',
     '@inheritParams geom_lineribbon',
@@ -58,9 +58,11 @@ rd_lineribbon_shortcut_stat = function(
       theme_set(theme_ggdist())
 
       # ON SAMPLE DATA
-      tibble(x = 1:10) %>%
-        group_by_all() %>%
-        do(tibble(y = rnorm(100, .$x))) %>%
+      set.seed(12345)
+      tibble(
+        x = rep(1:10, 100),
+        y = rnorm(1000, x)
+      ) %>%
         ggplot(aes(x = x, y = y)) +
         stat_<<stat_name>>() +
         scale_fill_brewer()

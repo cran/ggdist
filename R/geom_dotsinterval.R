@@ -8,29 +8,37 @@
 # dots_grob ---------------------------------------------------------------
 
 #' @importFrom ggplot2 .stroke .pt
-#' @importFrom dplyr %>% arrange_at group_by_at group_split
 dots_grob = function(data, x, y, xscale = 1,
   name = NULL, gp = gpar(), vp = NULL,
   dotsize = 1.07, stackratio = 1, binwidth = NA, layout = "bin",
-  overlaps = "nudge", overflow = "keep",
+  overlaps = "nudge", overflow = "warn",
+  subguide = "none",
   verbose = FALSE,
-  orientation = "vertical"
+  orientation = "vertical",
+  make_points_grob = make_points_grob
 ) {
-  datas = data %>%
-    group_by_at(c("group", y)) %>%
-    group_split()
+  # drop the dist columns because they can be expensive and we don't need them
+  # after this point
+  keep_cols = !(names(data) %in% c("xdist", "ydist", "dist"))
+  data = data[, keep_cols, drop = FALSE]
+  datas = split_df(data, c("group", y))
 
   gTree(
     datas = datas,
     xscale = xscale,
     dotsize = dotsize, stackratio = stackratio, binwidth = binwidth, layout = layout,
     overlaps = overlaps, overflow = overflow,
+    subguide = subguide,
     verbose = verbose,
     orientation = orientation,
+    make_points_grob = make_points_grob,
     name = name, gp = gp, vp = vp, cl = "dots_grob"
   )
 }
 
+
+dot_size_ratio = 1.07                  # historical fudge factor based on old stackratio
+font_size_ratio = 1.43/dot_size_ratio  # manual fudge factor for point size in ggplot
 
 #' @export
 makeContent.dots_grob = function(x) {
@@ -44,19 +52,20 @@ makeContent.dots_grob = function(x) {
   layout = grob_$layout
   overlaps = grob_$overlaps
   overflow = grob_$overflow
+  subguide = grob_$subguide
+  stackratio = grob_$stackratio
+  make_points_grob = grob_$make_points_grob
 
   define_orientation_variables(orientation)
-
-  dot_size_ratio = 1.07                  # historical fudge factor based on old stackratio
-  font_size_ratio = 1.43/dot_size_ratio  # manual fudge factor for point size in ggplot
-  stackratio = grob_$stackratio
 
   # ratio between width of the bins (binwidth)
   # and the vertical spacing of dots (y_spacing)
   # this is a bit different from a raw stackratio since we want to account
   # for the dotsize
-  heightratio = convertUnit(unit(dotsize * stackratio, "native"),
-    "native", axisFrom = x, axisTo = y, typeFrom = "dimension", valueOnly = TRUE)
+  heightratio = convertUnit(
+    unit(dotsize * stackratio, "native"), "native",
+    axisFrom = x, axisTo = y, typeFrom = "dimension", valueOnly = TRUE
+  )
 
   # if bin width was specified as a grid::unit, convert it to native units
   if (is.unit(binwidth)) {
@@ -78,7 +87,7 @@ makeContent.dots_grob = function(x) {
     user_max_binwidth = binwidth
   }
 
-  if (isTRUE(is.na(binwidth)) || overflow == "compress") {
+  if (isTRUE(is.na(binwidth)) || overflow != "keep") {
     # find the best bin widths across all the dotplots we are going to draw
     binwidths = map_dbl_(datas, function(d) {
       maxheight = max(d[[ymax]] - d[[ymin]])
@@ -92,6 +101,25 @@ makeContent.dots_grob = function(x) {
           s = user_min_binwidth / binwidth
           dotsize = dotsize * s
           stackratio = stackratio / s
+        },
+        warn = {
+          cli_warn(
+            c(
+              "The provided binwidth will cause dots to overflow the boundaries of the geometry.",
+              ">" = 'Set `binwidth = NA` to automatically determine a binwidth that ensures
+                     dots fit within the bounds,',
+              ">" = 'OR set `overflow = "compress"` to automatically reduce the spacing between
+                     dots to ensure the dots fit within the bounds,',
+              ">" = 'OR set `overflow = "keep"` to allow dots to overflow the bounds of the
+                     geometry without producing a warning.',
+              "i" = 'For more information, see the documentation of the {.arg binwidth} and
+                     {.arg overflow} arguments of {.help ggdist::geom_dots} or the section
+                     on constraining dot sizes in
+                     {.vignette [vignette("dotsinterval")](ggdist::dotsinterval)}.'
+            ),
+            class = "ggdist_dots_overflow_warning"
+          )
+          binwidth = user_min_binwidth
         },
         keep = {
           binwidth = user_min_binwidth
@@ -109,7 +137,7 @@ makeContent.dots_grob = function(x) {
   }
 
   # now, draw all the dotplots using the same bin width
-  children = do.call(gList, lapply(datas, function(d) {
+  dot_grobs = lapply(datas, function(d) {
     # bin the dots
     dot_positions = bin_dots(
       d$x, d$y,
@@ -131,30 +159,105 @@ makeContent.dots_grob = function(x) {
     # (font_size_ratio) plus need to account for stroke width
     lwd = d$linewidth * .stroke/2
     lwd[is.na(lwd) | is.na(d$colour)] = 0
-    dot_pointsize = convertUnit(unit(binwidth * dotsize, "native"),
-      "points", axisFrom = x, axisTo = "y", typeFrom = "dimension", valueOnly = TRUE)
+    dot_pointsize = convertUnit(
+      unit(binwidth * dotsize, "native"), "points",
+      axisFrom = x, axisTo = "y", typeFrom = "dimension", valueOnly = TRUE
+    )
     dot_fontsize = max(
       dot_pointsize * font_size_ratio - lwd,
       0.5
     )
 
     # generate grob for this dotplot
-    pointsGrob(
-      dot_positions$x, dot_positions$y, pch = d$shape,
-      gp = gpar(
-        col = alpha(d$colour, d$alpha),
-        fill = alpha(d$fill, d$alpha),
-        fontfamily = d$family,
-        fontsize = dot_fontsize,
-        lwd = lwd,
-        lty = d$linetype
-      )
+    make_points_grob(
+      dot_positions$x,
+      dot_positions$y,
+      pch = d$shape,
+      col = alpha(d$colour, d$alpha),
+      fill = alpha(d$fill, d$alpha),
+      fontfamily = d$family,
+      fontsize = dot_fontsize,
+      lwd = lwd,
+      lty = d$linetype,
+      sd = d[["sd"]],
+      axis = x
     )
-  }))
+  })
 
-  setChildren(grob_, children)
+  # generate subguide if requested
+  subguide_grobs = if (identical(subguide, "none")) {
+    # quick exit, also avoid errors for multiple non-equal axes when not drawing them
+    list()
+  } else {
+    subguide_fun = match_function(subguide, "subguide_")
+    subguide_params = map_dfr_(datas, `[`, i = 1, j = , drop = FALSE)
+    dlply_(
+      subguide_params[, c(y, ymin, ymax, "side", "justification", "scale")],
+      c(y, "side", "justification", "scale"),
+      function(d) {
+        if (nrow(unique(d)) > 1) {                                 # nocov start
+          # this should not be possible
+          cli_abort(
+            "Cannot draw a subguide for the dot count axis when multiple dots
+             geometries with different parameters are drawn on the same axis.",
+            class = "ggdist_incompatible_subguides"
+          )
+        }                                                          # nocov end
+        d = d[1, ]
+
+        dot_height = binwidth * heightratio / stackratio
+        guide_height = max(d[[ymax]] - d[[y]], d[[y]] - d[[ymin]])
+        direction = switch_side(d$side, orientation, topright = 1, bottomleft = -1, both = 1)
+        both_adjust = if (d$side == "both") 2 else 1
+        not_both = if (d$side == "both") 0 else 1
+        max_count = guide_height / binwidth / heightratio * both_adjust + 1 - 1/stackratio
+
+        # construct a viewport such that the guide drawn in this viewport
+        # will have its data values at the correct locations
+        vp = viewport(just = c(0, 0))
+        vp[[x]] = unit(0, "native")
+        vp[[y]] = unit(d[[y]] + dot_height / 2 * not_both * direction, "native")
+        vp[[width.]] = unit(1, "npc")
+        vp[[height]] = unit(guide_height - dot_height / both_adjust, "native") * direction
+
+
+        grobTree(
+          subguide_fun(c(1, max_count), orientation = orientation),
+          vp = vp
+        )
+      }
+    )
+  }
+
+  setChildren(grob_, do.call(gList, c(dot_grobs, subguide_grobs)))
 }
 
+make_points_grob = function(
+  x,
+  y,
+  pch,
+  col,
+  fill,
+  fontfamily,
+  fontsize,
+  lwd,
+  lty,
+  ...  # ignored
+) {
+  pointsGrob(
+    x = x,
+    y = y,
+    pch = pch,
+    gp = gpar(
+      col = col,
+      fill = fill,
+      fontfamily = fontfamily,
+      fontsize = fontsize,
+      lwd = lwd,
+      lty = lty
+    )
+  )
+}
 
 # panel drawing function -------------------------------------------------------
 
@@ -162,6 +265,7 @@ draw_slabs_dots = function(self, s_data, panel_params, coord,
   orientation, normalize, fill_type, na.rm,
   dotsize, stackratio, binwidth, layout,
   overlaps, overflow,
+  subguide,
   verbose,
   ...
 ) {
@@ -169,9 +273,11 @@ draw_slabs_dots = function(self, s_data, panel_params, coord,
 
   # slab thickness is fixed to 1 for dotplots
   s_data$thickness = 1
-  s_data = self$override_slab_aesthetics(rescale_slab_thickness(
+  subguide_params = NULL
+  c(s_data, subguide_params) %<-% rescale_slab_thickness(
     s_data, orientation, normalize, na.rm, name = "geom_dotsinterval"
-  ))
+  )
+  s_data = self$override_slab_aesthetics(s_data)
   if (nrow(s_data) == 0) return(list())
 
   # in order for the dots grob to respect the `justification` aesthetic, we
@@ -213,7 +319,7 @@ draw_slabs_dots = function(self, s_data, panel_params, coord,
   s_data = s_data[order(s_data[["order"]] %||% s_data[[x]]), ]
 
   # draw the dots grob (which will draw dotplots for all the slabs)
-  slab_grobs = list(dots_grob(
+  list(dots_grob(
     s_data,
     x, y,
     xscale = xscale,
@@ -223,8 +329,10 @@ draw_slabs_dots = function(self, s_data, panel_params, coord,
     layout = layout,
     overlaps = overlaps,
     overflow = overflow,
+    subguide = subguide,
     verbose = verbose,
-    orientation = orientation
+    orientation = orientation,
+    make_points_grob = self$points_grob_factory(...)
   ))
 }
 
@@ -255,24 +363,33 @@ draw_slabs_dots = function(self, s_data, panel_params, coord,
 #' See `vignette("dotsinterval")` for a variety of examples of use.
 #' @family dotsinterval geoms
 #' @examples
-#'
 #' library(dplyr)
 #' library(ggplot2)
 #'
-#' data(RankCorr_u_tau, package = "ggdist")
+#' theme_set(theme_ggdist())
+#'
+#' set.seed(12345)
+#' df = tibble(
+#'   g = rep(c("a", "b"), 200),
+#'   value = rnorm(400, c(0, 3), c(0.75, 1))
+#' )
+#'
 #'
 #' # orientation is detected automatically based on
 #' # which axis is discrete
 #'
-#' RankCorr_u_tau %>%
-#'   ggplot(aes(x = u_tau)) +
-#'   geom_dots()
+#' df %>%
+#'   ggplot(aes(x = value, y = g)) +
+#'   geom_dotsinterval()
 #'
-#' RankCorr_u_tau %>%
-#'   ggplot(aes(y = u_tau)) +
-#'   geom_dots()
+#' df %>%
+#'   ggplot(aes(y = value, x = g)) +
+#'   geom_dotsinterval()
+#'
 #'
 #' # stat_dots can summarize quantiles, creating quantile dotplots
+#'
+#' data(RankCorr_u_tau, package = "ggdist")
 #'
 #' RankCorr_u_tau %>%
 #'   ggplot(aes(x = u_tau, y = factor(i))) +
@@ -316,9 +433,7 @@ GeomDotsinterval = ggproto("GeomDotsinterval", GeomSlabinterval,
     aes_docs
   },
 
-  hidden_aes = union(c(
-    "thickness"
-  ), GeomSlabinterval$hidden_aes),
+  hidden_aes = union("thickness", GeomSlabinterval$hidden_aes),
 
   default_aes = defaults(aes(
     family = "",
@@ -392,6 +507,8 @@ GeomDotsinterval = ggproto("GeomDotsinterval", GeomSlabinterval,
       when a minimum `binwidth` (or an exact `binwidth`) is supplied.
       One of:
         - `"keep"`: Keep the overflow, drawing dots outside the geom bounds.
+        - `"warn"`: Keep the overflow, but produce a warning suggesting solutions,
+          such as setting `binwidth = NA` or `overflow = "compress"`.
         - `"compress"`: Compress the layout. Reduces the `binwidth` to the size necessary
           to keep the dots within bounds, then adjusts `stackratio` and `dotsize` so that
           the apparent dot size is the user-specified minimum `binwidth` times the
@@ -403,20 +520,28 @@ GeomDotsinterval = ggproto("GeomDotsinterval", GeomSlabinterval,
       '),
     layout = glue_doc('The layout method used
       for the dots: \\itemize{
-        \\item `"bin"` (default): places dots on the off-axis at the midpoint of their bins as in the classic Wilkinson dotplot.
-          This maintains the alignment of rows and columns in the dotplot. This layout is slightly different from the
-          classic Wilkinson algorithm in that: (1) it nudges bins slightly to avoid overlapping bins and (2) if
-          the input data are symmetrical it will return a symmetrical layout.
-        \\item `"weave"`: uses the same basic binning approach of `"bin"`, but places dots in the off-axis at their actual
-          positions (unless `overlaps = "nudge"`, in which case overlaps may be nudged out of the way). This maintains
-          the alignment of rows but does not align dots within columns.
-        \\item `"hex"`: uses the same basic binning approach of `"bin"`, but alternates placing dots `+ binwidth/4` or
-          `- binwidth/4` in the off-axis from the bin center. This allows hexagonal packing by setting a `stackratio`
-          less than 1 (something like `0.9` tends to work).
-        \\item `"swarm"`: uses the `"compactswarm"` layout from [beeswarm::beeswarm()]. Does not maintain alignment of rows or
-          columns, but can be more compact and neat looking, especially for sample data (as opposed to quantile
-          dotplots of theoretical distributions, which may look better with `"bin"`, `"weave"`, or `"hex"`).
-        \\item `"bar"`: for discrete distributions, lays out duplicate values in rectangular bars.
+        \\item `"bin"` (default): places dots on the off-axis at the midpoint of
+          their bins as in the classic Wilkinson dotplot. This maintains the
+          alignment of rows and columns in the dotplot. This layout is slightly
+          different from the classic Wilkinson algorithm in that: (1) it nudges
+          bins slightly to avoid overlapping bins and (2) if the input data are
+          symmetrical it will return a symmetrical layout.
+        \\item `"weave"`: uses the same basic binning approach of `"bin"`, but
+          places dots in the off-axis at their actual positions (unless
+          `overlaps = "nudge"`, in which case overlaps may be nudged out of the
+          way). This maintains the alignment of rows but does not align dots
+          within columns.
+        \\item `"hex"`: uses the same basic binning approach of `"bin"`, but
+          alternates placing dots `+ binwidth/4` or `- binwidth/4` in the
+          off-axis from the bin center. This allows hexagonal packing by setting
+          a `stackratio` less than 1 (something like `0.9` tends to work).
+        \\item `"swarm"`: uses the `"compactswarm"` layout from
+          [beeswarm::beeswarm()]. Does not maintain alignment of rows or columns,
+          but can be more compact and neat looking, especially for sample data
+          (as opposed to quantile dotplots of theoretical distributions, which
+          may look better with `"bin"`, `"weave"`, or `"hex"`).
+        \\item `"bar"`: for discrete distributions, lays out duplicate values in
+          rectangular bars.
       }'),
     overlaps = glue_doc('How to handle overlapping dots or bins in the `"bin"`,
       `"weave"`, and `"hex"` layouts (dots never overlap in the `"swarm"` or `"bar"` layouts).
@@ -450,7 +575,7 @@ GeomDotsinterval = ggproto("GeomDotsinterval", GeomSlabinterval,
     layout = "bin",
     overlaps = "nudge",
     smooth = "none",
-    overflow = "keep",
+    overflow = "warn",
     verbose = FALSE
   ), GeomSlabinterval$default_params),
 
@@ -472,8 +597,9 @@ GeomDotsinterval = ggproto("GeomDotsinterval", GeomSlabinterval,
     # apply smooths --- must do this here in case resulting data exceeds boundaries of
     # original data, meaning scales must be adjusted
     smooth = match_function(params$smooth %||% "none", prefix = "smooth_")
-    s_data = data[data$datatype == "slab", c("group", x, y)]
-    data[data$datatype == "slab", x] = ave(s_data[[x]], s_data[, c("group", y)], FUN = smooth)
+    slab_i = which(data$datatype == "slab")
+    s_data = data[slab_i, c("group", x, y)]
+    data[slab_i, x] = ave(s_data[[x]], s_data[, c("group", y)], FUN = smooth)
 
     data
   },
@@ -485,13 +611,11 @@ GeomDotsinterval = ggproto("GeomDotsinterval", GeomSlabinterval,
     # slab key is different from usual - it's actually a point!
     # size is not in this list because if size it set but colour is not then there's nothing to draw,
     # so size can only occur in cases where colour is also set (so we can just check colour)
-    if (
-      params$show_slab &&
-      any(!is.na(data[,c(
-        "fill","alpha","slab_fill","slab_colour","slab_linewidth","slab_size",
-        "slab_linetype","slab_alpha","slab_shape"
-      )]))
-    ) {
+    show_point_if_present = c(
+      "fill", "alpha", "slab_fill", "slab_colour", "slab_linewidth", "slab_size",
+      "slab_linetype", "slab_alpha", "slab_shape"
+    )
+    if (params$show_slab && !all(is.na(data[, show_point_if_present]))) {
       s_key_data = self$override_slab_aesthetics(key_data)
 
       # what point calls "stroke" is what we call "linewidth", since "linewidth" is determined automatically
@@ -502,7 +626,9 @@ GeomDotsinterval = ggproto("GeomDotsinterval", GeomSlabinterval,
       s_key_data$size = 2
       draw_key_point(s_key_data, params, size)
     }
-  }
+  },
+
+  points_grob_factory = function(...) make_points_grob
 )
 
 #' @rdname geom_dotsinterval
@@ -533,11 +659,12 @@ GeomDots = ggproto("GeomDots", GeomDotsinterval,
   override_slab_aesthetics = function(self, s_data) {
     # we define these differently from geom_dotsinterval to make this easier to use on its own
     s_data$colour = s_data[["slab_colour"]] %||% s_data[["colour"]]
-    s_data$colour = apply_colour_ramp(s_data[["colour"]], s_data[["colour_ramp"]])
+    s_data$colour = ramp_colours(s_data[["colour"]], s_data[["colour_ramp"]])
     s_data$fill = s_data[["slab_fill"]] %||% s_data[["fill"]]
-    s_data$fill = apply_colour_ramp(s_data[["fill"]], s_data[["fill_ramp"]])
+    s_data$fill = ramp_colours(s_data[["fill"]], s_data[["fill_ramp"]])
     s_data$alpha = s_data[["slab_alpha"]] %||% s_data[["alpha"]]
-    s_data$linewidth = s_data[["slab_linewidth"]] %||% s_data[["slab_size"]] %||% s_data[["linewidth"]] %||% s_data[["size"]]
+    s_data$linewidth = s_data[["slab_linewidth"]] %||% s_data[["slab_size"]] %||%
+      s_data[["linewidth"]] %||% s_data[["size"]]
     s_data$shape = s_data[["slab_shape"]] %||% s_data[["shape"]]
     s_data
   },
@@ -549,7 +676,7 @@ GeomDots = ggproto("GeomDots", GeomDotsinterval,
 
   hidden_params = union(c(
     "show_slab", "show_point", "show_interval",
-    "interval_size_domain", "interval_size_range", "fatten_point"
+    "interval_size_domain", "interval_size_range", "fatten_point", "arrow"
   ), GeomDotsinterval$hidden_params),
 
   draw_key_slab = function(self, data, key_data, params, size) {

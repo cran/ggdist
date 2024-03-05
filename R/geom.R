@@ -20,8 +20,6 @@ add_default_computed_aesthetics = function(l, default_mapping) {
     setup_layer = function(self, data, plot) {
       data = ggproto_parent(l, self)$setup_layer(data, plot)
 
-      mapping = computed_mapping(self)
-
       for (aesthetic in names(default_mapping)) {
         # we don't use exact matching here because if someone is using ggnewscale
         # then aesthetic "x" will be replaced with "x_new" and we don't want to
@@ -31,51 +29,28 @@ add_default_computed_aesthetics = function(l, default_mapping) {
         if (
           # only add the aesthetic if it isn't already set and if the variables it uses
           # are in the provided data and none of them are NA
-          is.null(mapping[[aesthetic, exact = FALSE]]) &&
-          (!isTRUE(self$inherit.aes) || is.null(computed_mapping(plot)[[aesthetic, exact = FALSE]])) &&
-          all(vars_in_mapping %in% names(data)) &&
-          !anyNA(data[,vars_in_mapping])
+          is.null(self$computed_mapping[[aesthetic, exact = FALSE]]) &&
+            (!isTRUE(self$inherit.aes) || is.null(plot$computed_mapping[[aesthetic, exact = FALSE]])) &&
+            all(vars_in_mapping %in% names(data)) &&
+            !anyNA(data[, vars_in_mapping])
         ) {
           # We reconstruct the quosure here instead of using default_mapping[[aesthetic]]
           # as a hack because for some reason when this is run inside {covr} it
           # gets mangled. So we need to recreate it from the underlying expression
           # and the environment (which in this case should be the package
           # environment, which is the same as environment(add_default_computed_aesthetics))
-          mapping[[aesthetic]] = as_quosure(
+          self$computed_mapping[[aesthetic]] = as_quosure(
             default_aes_mapping,
             env = environment(add_default_computed_aesthetics)
           )
         }
       }
 
-      computed_mapping(self) = mapping
-
       data
     }
   )
 }
 
-#' the mapping property of layers changed to computed_mapping in ggplot 3.3.4
-#' to avoid statefulness; this function encapsulates that change
-#' see https://github.com/tidyverse/ggplot2/pull/4475
-#' @importFrom utils packageVersion
-#' @noRd
-computed_mapping = function(x) {
-  mapping = if (packageVersion("ggplot2") >= "3.3.3.9000") {
-    x$computed_mapping
-  } else {
-    x$mapping     # nocov
-  }
-  mapping %||% list()
-}
-`computed_mapping<-` = function(x, value) {
-  if (packageVersion("ggplot2") >= "3.3.3.9000") {
-    x$computed_mapping = value
-  } else {
-    x$mapping = value     # nocov
-  }
-  x
-}
 
 # orientation detection ---------------------------------------------------
 
@@ -115,12 +90,17 @@ get_orientation = function(flipped_aes) {
 # function (for convenience): these are variables (typically aesthetics)
 # that differ depending on whether the geom's orientation is horizontal
 # or vertical. They are named assuming a horizontal orientation.
-globalVariables(c("height", "y", "ymin", "ymax", "yend", "x", "xmin", "xmax", "xend","x.range","y.range"))
+globalVariables(c(
+  "width.", "height",
+  "y", "ymin", "ymax", "yend", "y.range",
+  "x", "xmin", "xmax", "xend", "x.range"
+))
 define_orientation_variables = function(orientation) {
   f = parent.frame()
 
   if (orientation == "horizontal" || orientation == "y") {
     f$height = "height"
+    f$width. = "width"
 
     f$y = "y"
     f$ymin = "ymin"
@@ -137,6 +117,7 @@ define_orientation_variables = function(orientation) {
     f$xdist = "xdist"
   } else if (orientation == "vertical" || orientation == "x") {
     f$height = "width"
+    f$width. = "height"
 
     f$y = "x"
     f$ymin = "xmin"

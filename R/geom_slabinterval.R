@@ -11,30 +11,41 @@
 normalize_thickness = function(x) UseMethod("normalize_thickness")
 
 #' @export
+normalize_thickness.NULL = function(x) {
+  NULL
+}
+
+#' @export
 normalize_thickness.default = function(x) {
+  lower = NA_real_
+  upper = NA_real_
+
   finite_thickness = x[is.finite(x)]
   if (length(finite_thickness) > 0) {
     max_finite_thickness = max(finite_thickness)
     min_finite_thickness = min(finite_thickness, 0)
     if (max_finite_thickness > min_finite_thickness) {
-      x = (x - min_finite_thickness) / (max_finite_thickness - min_finite_thickness)
+      lower = min_finite_thickness
+      upper = max_finite_thickness
+      x = (x - lower) / (upper - lower)
     }
   }
   # infinite values get plotted at the max height (e.g. for point masses)
   if (length(x) > 0) {
     x[x == Inf] = 1
   }
-  x
+
+  thickness(x, lower, upper)
 }
 
 #' @export
 normalize_thickness.ggdist_thickness = function(x) {
   # thickness values passed directly into the geom (e.g. by
   # scale_thickness_shared()) are not normalized again.
-  x = as.double(x)
+
   # infinite values get plotted at the max height (e.g. for point masses)
   if (length(x) > 0) {
-    x[x == Inf] = 1
+    field(x, "x")[field(x, "x") == Inf] = 1
   }
   x
 }
@@ -53,6 +64,10 @@ normalize_thickness.data.frame = function(x) {
 #' all the same, and we want to preserve our normalization settings.
 #' so we scale things based on the min height to ensure everything
 #' is the same height
+#' @returns a list of two elements:
+#'   - data: a data frame containing the transformed version of `s_data`
+#'   - subguide_params: a data frame with one row per transformed group
+#'     in the output giving the parameters of the transformation
 #' @noRd
 rescale_slab_thickness = function(
   s_data, orientation, normalize, na.rm,
@@ -66,12 +81,12 @@ rescale_slab_thickness = function(
   s_data = ggplot2::remove_missing(s_data, na.rm, c(height, "justification", "scale"), name = name, finite = TRUE)
   # side is a character vector, thus need finite = FALSE for it; x/y can be Inf here
   s_data = ggplot2::remove_missing(s_data, na.rm, c(x, y, "side"), name = name)
-  if (nrow(s_data) == 0) return(s_data)
+  if (nrow(s_data) == 0) return(list(data = s_data, subguide_params = data.frame()))
 
   min_height = min(s_data[[height]])
 
   # must do this within groups so that `side` can vary by slab
-  ddply_(s_data, c("group", y), function(d) {
+  data__params = dlply_(s_data, c("group", y), function(d) {
     scaling_aes = c("side", "justification", "scale")
     for (a in scaling_aes) {
       # use %in% here so that `NA`s are treated as equal
@@ -83,39 +98,62 @@ rescale_slab_thickness = function(
       }
     }
 
-    thickness_scale = d$scale * min_height
+    thickness_scale = d$scale[[1]] * min_height
 
+    subguide_params = data.frame(
+      group = d$group[[1]],
+      side = d$size[[1]],
+      justification = d$justification[[1]],
+      scale = d$scale[[1]],
+      thickness_lower = thickness_lower(d$thickness),
+      thickness_upper = thickness_upper(d$thickness)
+    )
+    subguide_params[[y]] = d[[y]][[1]]
+
+    thickness = as.numeric(d$thickness)
     switch_side(d$side[[1]], orientation,
       topright = {
+        subguide_params[[ymin]] = d[[y]][[1]] - d$justification[[1]] * thickness_scale
+        subguide_params[[ymax]] = d[[y]][[1]] + (1 - d$justification[[1]]) * thickness_scale
         d[[ymin]] = d[[y]] - d$justification * thickness_scale
-        d[[ymax]] = d[[y]] + (d$thickness - d$justification) * thickness_scale
+        d[[ymax]] = d[[y]] + (thickness - d$justification) * thickness_scale
       },
       bottomleft = {
-        d[[ymin]] = d[[y]] - (d$thickness - 1 + d$justification) * thickness_scale
+        subguide_params[[ymin]] = d[[y]][[1]] + (1 - d$justification[[1]]) * thickness_scale
+        subguide_params[[ymax]] = d[[y]][[1]] - d$justification[[1]] * thickness_scale
+        d[[ymin]] = d[[y]] - (thickness - 1 + d$justification) * thickness_scale
         d[[ymax]] = d[[y]] + (1 - d$justification) * thickness_scale
       },
       both = {
-        d[[ymin]] = d[[y]] - d$thickness * thickness_scale/2 + (0.5 - d$justification) * thickness_scale
-        d[[ymax]] = d[[y]] + d$thickness * thickness_scale/2 + (0.5 - d$justification) * thickness_scale
+        subguide_params[[ymin]] = d[[y]][[1]] + (0.5 - d$justification[[1]]) * thickness_scale
+        subguide_params[[ymax]] = d[[y]][[1]] + (1 - d$justification[[1]]) * thickness_scale
+        d[[ymin]] = d[[y]] - thickness * thickness_scale/2 + (0.5 - d$justification) * thickness_scale
+        d[[ymax]] = d[[y]] + thickness * thickness_scale/2 + (0.5 - d$justification) * thickness_scale
       }
     )
 
-    d
+    list(data = d, subguide_params = subguide_params)
   })
+
+  list(
+    data = map_dfr_(data__params, `[[`, "data"),
+    subguide_params = map_dfr_(data__params, `[[`, "subguide_params")
+  )
 }
 
 
 # drawing functions -------------------------------------------------------
 
 draw_slabs = function(self, s_data, panel_params, coord,
-  orientation, normalize, fill_type, na.rm,
+  orientation, normalize, fill_type, na.rm, subguide,
   ...
 ) {
   define_orientation_variables(orientation)
 
-  s_data = self$override_slab_aesthetics(rescale_slab_thickness(
+  c(s_data, subguide_params) %<-% rescale_slab_thickness(
     s_data, orientation, normalize, na.rm, name = "geom_slabinterval"
-  ))
+  )
+  s_data = self$override_slab_aesthetics(s_data)
 
   # avoid giving fill type warnings multiple times
   fill_type = switch_fill_type(fill_type, segments = "segments", gradient = "gradient")
@@ -160,31 +198,78 @@ draw_slabs = function(self, s_data, panel_params, coord,
       # the definition of "outside" depends on the value of `side`:
       side = d$side[[1]]
       if (side == "both") {
-        outline_data_top = group_slab_data_by(d, c("colour", "alpha", "linewidth", "linetype"), orientation, "top")
-        outline_data_bottom = group_slab_data_by(d, c("colour", "alpha", "linewidth", "linetype"), orientation, "bottom")
-        gList(slab_grob, draw_path(outline_data_top, panel_params, coord), draw_path(outline_data_bottom, panel_params, coord))
+        outline_data_top = group_slab_data_by(
+          d, c("colour", "alpha", "linewidth", "linetype"), orientation, "top"
+        )
+        outline_data_bottom = group_slab_data_by(
+          d, c("colour", "alpha", "linewidth", "linetype"), orientation, "bottom"
+        )
+        gList(
+          slab_grob,
+          draw_path(outline_data_top, panel_params, coord),
+          draw_path(outline_data_bottom, panel_params, coord)
+        )
       } else {
-        outline_data = group_slab_data_by(d, c("colour", "alpha", "linewidth", "linetype"), orientation, side)
-        gList(slab_grob, draw_path(outline_data, panel_params, coord))
+        outline_data = group_slab_data_by(
+          d, c("colour", "alpha", "linewidth", "linetype"), orientation, side
+        )
+        gList(
+          slab_grob,
+          draw_path(outline_data, panel_params, coord)
+        )
       }
     } else {
       slab_grob
     }
   })
 
+  subguide_grobs = if (identical(subguide, "none")) {
+    # quick exit, also avoid errors for multiple non-equal axes when not drawing them
+    list()
+  } else {
+    subguide_fun = match_function(subguide, "subguide_")
+    subguide_params = coord$transform(subguide_params, panel_params)
+    dlply_(subguide_params, c(y, "side", "justification", "scale"), function(d) {
+      d$group = NULL
+      if (nrow(unique(d)) > 1) {
+        cli_abort(
+          "Cannot draw a subguide for the thickness axis when multiple slabs
+          with different normalizations are drawn on the same axis.",
+          class = "ggdist_incompatible_subguides"
+        )
+      }
+
+      # construct a viewport such that the guide drawn in this viewport
+      # will have its data values at the correct locations
+      vp = viewport(just = c(0, 0))
+      vp[[x]] = unit(0, "native")
+      vp[[y]] = unit(d[[ymin]], "native")
+      vp[[width.]] = unit(1, "npc")
+      vp[[height]] = unit(d[[ymax]] - d[[ymin]], "native")
+
+      grobTree(
+        subguide_fun(c(d$thickness_lower, d$thickness_upper), orientation = orientation),
+        vp = vp
+      )
+    })
+  }
+
   # when side = "top" or "right", need to invert draw order so that overlaps happen in a sensible way
   # unfortunately we can only do this by checking the first value of `side`, which
   # means this may be incorrect if `side` varies across slabs
-  switch_side(s_data$side[[1]], orientation,
+  slab_grobs = switch_side(s_data$side[[1]], orientation,
     topright = rev(slab_grobs),
     bottomleft = slab_grobs,
     both = slab_grobs
   )
+
+  c(slab_grobs, subguide_grobs)
 }
 
 
 draw_pointintervals = function(self, i_data, panel_params, coord,
   orientation, interval_size_domain, interval_size_range, fatten_point, show_point, na.rm,
+  arrow,
   ...
 ) {
   if (nrow(i_data) == 0) return(list())
@@ -216,7 +301,9 @@ draw_pointintervals = function(self, i_data, panel_params, coord,
   i_data[[xend]] = i_data[[xmax]]
   i_data[[yend]] = i_data[[y]]
   i_data = self$override_interval_aesthetics(i_data, interval_size_domain, interval_size_range)
-  interval_grobs = list(GeomSegment$draw_panel(i_data, panel_params, coord, lineend = "butt", na.rm = na.rm))
+  interval_grobs = list(
+    GeomSegment$draw_panel(i_data, panel_params, coord, lineend = "butt", na.rm = na.rm, arrow = arrow)
+  )
 
   c(interval_grobs, point_grobs)
 }
@@ -247,7 +334,7 @@ draw_path = function(data, panel_params, coord) {
 override_slab_aesthetics = function(self, s_data) {
   s_data$colour = s_data[["slab_colour"]]
   s_data$fill = s_data[["slab_fill"]] %||% s_data[["fill"]]
-  s_data$fill = apply_colour_ramp(s_data[["fill"]], s_data[["fill_ramp"]])
+  s_data$fill = ramp_colours(s_data[["fill"]], s_data[["fill_ramp"]])
   s_data$alpha = s_data[["slab_alpha"]] %||% s_data[["alpha"]]
   #TODO: insert slab_size deprecation warning?
   s_data$linewidth = s_data[["slab_linewidth"]] %||% s_data[["slab_size"]]
@@ -257,29 +344,35 @@ override_slab_aesthetics = function(self, s_data) {
 
 override_point_aesthetics = function(self, p_data, size_domain, size_range, fatten_point) {
   p_data$colour = p_data[["point_colour"]] %||% p_data[["colour"]]
-  p_data$colour = apply_colour_ramp(p_data[["colour"]], p_data[["colour_ramp"]])
+  p_data$colour = ramp_colours(p_data[["colour"]], p_data[["colour_ramp"]])
   p_data$fill = p_data[["point_fill"]] %||% p_data[["fill"]]
   p_data$alpha = p_data[["point_alpha"]] %||% p_data[["alpha"]]
   # TODO: insert fatten_point deprecation warning
-  p_data$size = p_data[["point_size"]] %||% (fatten_point * transform_size(p_data[["interval_size"]] %||% p_data[["size"]], size_domain, size_range))
+  p_data$size = p_data[["point_size"]] %||%
+    (fatten_point * transform_size(p_data[["interval_size"]] %||% p_data[["size"]], size_domain, size_range))
   p_data
 }
 
 override_interval_aesthetics = function(self, i_data, size_domain, size_range) {
   i_data$colour = i_data[["interval_colour"]] %||% i_data[["colour"]]
-  i_data$colour = apply_colour_ramp(i_data[["colour"]], i_data[["colour_ramp"]])
+  i_data$colour = ramp_colours(i_data[["colour"]], i_data[["colour_ramp"]])
   i_data$alpha = i_data[["interval_alpha"]] %||% i_data[["alpha"]]
   # TODO: insert interval_size deprecation warning
-  i_data$linewidth = transform_size(i_data[["linewidth"]] %||% i_data[["interval_size"]] %||% i_data[["size"]], size_domain, size_range)
+  i_data$linewidth = transform_size(
+    i_data[["linewidth"]] %||% i_data[["interval_size"]] %||% i_data[["size"]], size_domain, size_range
+  )
   i_data$linetype = i_data[["interval_linetype"]] %||% i_data[["linetype"]]
   i_data
 }
 
 transform_size = function(size, size_domain, size_range) {
   pmax(
-    (size - size_domain[[1]]) / (size_domain[[2]] - size_domain[[1]]) *
-      (size_range[[2]] - size_range[[1]]) + size_range[[1]],
-    0)
+    (size - size_domain[[1]]) /
+      (size_domain[[2]] - size_domain[[1]]) *
+      (size_range[[2]] - size_range[[1]]) +
+      size_range[[1]],
+    0
+  )
 }
 
 
@@ -382,7 +475,9 @@ GeomSlabinterval = ggproto("GeomSlabinterval", AbstractGeom,
       sides (as in a violin plot).',
       scale =
         'What proportion of the region allocated to this geom to use to draw the slab. If `scale = 1`,
-      slabs that use the maximum range will just touch each other. Default is `0.9` to leave some space.',
+      slabs that use the maximum range will just touch each other. Default is `0.9` to leave some space
+      between adjacent slabs. For a comprehensive discussion and examples of slab scaling and normalization,
+      see the [`thickness` scale article](https://mjskay.github.io/ggdist/articles/thickness.html).',
       justification =
         'Justification of the interval relative to the slab, where `0` indicates bottom/left
       justification and `1` indicates top/right justification (depending on `orientation`). If `justification`
@@ -440,7 +535,7 @@ GeomSlabinterval = ggproto("GeomSlabinterval", AbstractGeom,
      `interval_linetype` aesthetics (below) to set sub-geometry line types separately.'
     ),
 
-    "Slab-specific color/line override aesthetics" = list(
+    "Slab-specific color and line override aesthetics" = list(
       slab_fill = 'Override for `fill`: the fill color of the slab.',
       slab_colour = '(or `slab_color`) Override for `colour`/`color`: the outline color of the slab.',
       slab_alpha = 'Override for `alpha`: the opacity of the slab.',
@@ -449,13 +544,13 @@ GeomSlabinterval = ggproto("GeomSlabinterval", AbstractGeom,
       slab_shape = 'Override for `shape`: the shape of the dots used to draw the dotplot slab.'
     ),
 
-    "Interval-specific color/line override aesthetics" = list(
+    "Interval-specific color and line override aesthetics" = list(
       interval_colour = '(or `interval_color`) Override for `colour`/`color`: the color of the interval.',
       interval_alpha = 'Override for `alpha`: the opacity of the interval.',
       interval_linetype = 'Override for `linetype`: the line type of the interval.'
     ),
 
-    "Point-specific color/line override aesthetics" = list(
+    "Point-specific color and line override aesthetics" = list(
       point_fill = 'Override for `fill`: the fill color of the point.',
       point_colour = '(or `point_color`) Override for `colour`/`color`: the outline color of the point.',
       point_alpha = 'Override for `alpha`: the opacity of the point.',
@@ -531,7 +626,7 @@ GeomSlabinterval = ggproto("GeomSlabinterval", AbstractGeom,
     slab_colour = NA
   ),
 
-  required_aes = c("x|y"),
+  required_aes = "x|y",
 
   optional_aes = c(
     "ymin", "ymax", "xmin", "xmax", "width", "height", "thickness"
@@ -560,6 +655,8 @@ GeomSlabinterval = ggproto("GeomSlabinterval", AbstractGeom,
         \\item `"none"`: values are taken as is with no normalization (this should probably
           only be used with functions whose values are in \\[0,1\\], such as CDFs).
       }
+      For a comprehensive discussion and examples of slab scaling and normalization, see the
+      [`thickness` scale article](https://mjskay.github.io/ggdist/articles/thickness.html).
       '),
     fill_type = glue_doc('
       What type of fill to use when the fill color or alpha varies within a slab. One of:
@@ -584,9 +681,9 @@ GeomSlabinterval = ggproto("GeomSlabinterval", AbstractGeom,
 
     # INTERVAL PARAMS
     interval_size_domain = glue_doc('
-      A length-2 numeric vector giving the minimum and maximum of the values of the `size` and `linewidth` aesthetics that will be
-      translated into actual sizes for intervals drawn according to `interval_size_range` (see the documentation
-      for that argument.)
+      A length-2 numeric vector giving the minimum and maximum of the values of the `size` and `linewidth` aesthetics
+      that will be translated into actual sizes for intervals drawn according to `interval_size_range` (see the
+      documentation for that argument.)
       '),
     interval_size_range = glue_doc('
       A length-2 numeric vector. This geom scales the raw size aesthetic values when drawing interval and point
@@ -598,7 +695,7 @@ GeomSlabinterval = ggproto("GeomSlabinterval", AbstractGeom,
       argument, as it may result in strange scaling of legends; this argument is a holdover from earlier versions
       that did not have size aesthetics targeting the point and interval separately. If you want to adjust the
       size of the interval or points separately, you can also use the `linewidth` or `point_size`
-      aesthetics; see [scales].
+      aesthetics; see [sub-geometry-scales].
       '),
     fatten_point = glue_doc('
       A multiplicative factor used to adjust the size of the point relative to the size of the
@@ -606,11 +703,27 @@ GeomSlabinterval = ggproto("GeomSlabinterval", AbstractGeom,
       aesthetic and [scale_point_size_continuous()] or [scale_point_size_discrete()]; sizes
       specified with that aesthetic will not be adjusted using `fatten_point`.
       '),
+    arrow = '[grid::arrow()] giving the arrow heads to use on the interval, or `NULL` for no arrows.',
 
     # SUB_GEOMETRY FLAGS
     show_slab = 'Should the slab portion of the geom be drawn?',
     show_point = 'Should the point portion of the geom be drawn?',
-    show_interval = 'Should the interval portion of the geom be drawn?'
+    show_interval = 'Should the interval portion of the geom be drawn?',
+
+    # GUIDES
+    subguide = glue_doc('
+      Sub-guide used to annotate the `thickness` scale. One of:
+      \\itemize{
+        \\item A function that takes a `scale` argument giving a [ggplot2::Scale]
+          object and an `orientation` argument giving the orientation of the
+          geometry and then returns a [grid::grob] that will draw the axis
+          annotation, such as [subguide_axis()] (to draw a traditional axis) or
+          [subguide_none()] (to draw no annotation). See [subguide_axis()]
+          for a list of possibilities and examples.
+        \\item A string giving the name of such a function when prefixed
+          with `"subguide"`; e.g. `"axis"` or `"none"`.
+      }
+      ')
   ), AbstractGeom$param_docs),
 
   default_params = list(
@@ -620,9 +733,11 @@ GeomSlabinterval = ggproto("GeomSlabinterval", AbstractGeom,
     interval_size_domain = c(1, 6),
     interval_size_range = c(0.6, 1.4),
     fatten_point = 1.8,
+    arrow = NULL,
     show_slab = TRUE,
     show_point = TRUE,
     show_interval = TRUE,
+    subguide = "none",
     na.rm = FALSE
   ),
 
@@ -651,7 +766,8 @@ GeomSlabinterval = ggproto("GeomSlabinterval", AbstractGeom,
     # this is necessary so that the bounding box is correct for
     # positions to work (e.g. position_dodge, etc)
     data[[height]] = params[[height]] %||% data[[height]] %||%
-      resolution(data[[y]], FALSE)
+      # TODO: can drop as.numeric here if https://github.com/tidyverse/ggplot2/issues/5709 is fixed
+      resolution(as.numeric(data[[y]]), FALSE)
 
     # determine bounding boxes based on justification: position
     # the min/max bounds around y such that y is at the correct
@@ -705,20 +821,21 @@ GeomSlabinterval = ggproto("GeomSlabinterval", AbstractGeom,
         # ensure thickness is a thickness-type vector so it is not normalized again
         data$thickness = normalize_thickness(as_thickness(data$thickness))
       },
-      stop('`normalize` must be "all", "panels", "xy", groups", or "none", not "', params$normalize, '"')
+      stop0('`normalize` must be "all", "panels", "xy", groups", or "none", not "', params$normalize, '"')
     )
 
     ggproto_parent(AbstractGeom, self)$draw_layer(data, params, layout, coord)
   },
 
-  draw_panel = function(self, data, panel_params, coord,
-      orientation = self$default_params$orientation,
-      show_slab = self$default_params$show_slab,
-      show_point = self$default_params$show_point,
-      show_interval = self$default_params$show_interval,
-      na.rm = self$default_params$na.rm,
-      ...
-    ) {
+  draw_panel = function(
+    self, data, panel_params, coord,
+    orientation = self$default_params$orientation,
+    show_slab = self$default_params$show_slab,
+    show_point = self$default_params$show_point,
+    show_interval = self$default_params$show_interval,
+    na.rm = self$default_params$na.rm,
+    ...
+  ) {
 
     define_orientation_variables(orientation)
 
@@ -819,16 +936,24 @@ case_when_side = function(side, orientation, topright, bottomleft, both) {
   ifelse(
     orientation %in% c("y", "horizontal"),
     ifelse(
-      side %in% c("top", "topright", "topleft", "right"), topright, ifelse(
-      side %in% c("bottom", "bottomleft", "bottomright", "left"), bottomleft,
-      both
-    )),
+      side %in% c("top", "topright", "topleft", "right"),
+      topright,
+      ifelse(
+        side %in% c("bottom", "bottomleft", "bottomright", "left"),
+        bottomleft,
+        both
+      )
+    ),
     # orientation is "vertical" or "x"
     ifelse(
-      side %in% c("right", "topright", "bottomright", "top"), topright, ifelse(
-      side %in% c("left", "topleft", "bottomleft", "bottom"), bottomleft,
-      both
-    ))
+      side %in% c("right", "topright", "bottomright", "top"),
+      topright,
+      ifelse(
+        side %in% c("left", "topleft", "bottomleft", "bottom"),
+        bottomleft,
+        both
+      )
+    )
   )
 }
 
@@ -860,7 +985,6 @@ get_justification = function(justification, side, orientation) {
 #' @param orientation orientation of the slab
 #' @param side side of the slab
 #' @noRd
-#' @importFrom dplyr lag lead
 group_slab_data_by = function(
   slab_data,
   aesthetics = c("fill", "colour", "alpha"),
@@ -870,13 +994,15 @@ group_slab_data_by = function(
   define_orientation_variables(orientation)
 
   aesthetics = intersect(aesthetics, names(slab_data))
-  groups = factor(do.call(paste, slab_data[,aesthetics]))
+  groups_factor = factor(do.call(paste, slab_data[, aesthetics]))
 
-  if (nlevels(groups) > 1) {
+  if (nlevels(groups_factor) > 1) {
     # need to split into groups based on varying aesthetics
 
-    last_in_group = groups != lead(groups, default = groups[[length(groups)]])
-    first_in_group = groups != lag(groups, default = groups[[1]])
+    groups = as.integer(groups_factor)
+    n = length(groups)
+    last_in_group = groups != c(groups[-1], groups[[n]])
+    first_in_group = groups != c(groups[[1]], groups[-n])
     slab_data$group = cumsum(first_in_group)
 
     # we want the two rows on each side of every cutpoint, row i and row j = i + 1
@@ -895,7 +1021,7 @@ group_slab_data_by = function(
     # now we bind things with the new j rows at the beginning (they were first in each
     # group) and the new i rows at the end (they were last). This ensures that when the rows
     # are pulled out to draw a given group, they are in order within that group
-    slab_data = bind_rows(
+    slab_data = vec_rbind(
       new_row__j,
       slab_data,
       new_row__i
@@ -908,14 +1034,14 @@ group_slab_data_by = function(
     slab_data
   }
   bottomleft = function() {
-    slab_data = slab_data[nrow(slab_data):1,]
+    slab_data = slab_data[rev(seq_len(nrow(slab_data))), ]
     slab_data[[y]] = slab_data[[ymin]]
     slab_data
   }
   switch_side(side, orientation,
     topright = topright(),
     bottomleft = bottomleft(),
-    both = bind_rows(topright(), bottomleft())
+    both = vec_rbind(topright(), bottomleft())
   )
 }
 
@@ -988,8 +1114,8 @@ draw_polygon = function(data, panel_params, coord, fill = NULL) {
 }
 
 #'@importFrom cli cli_warn cli_abort
-switch_fill_type = function(fill_type, segments, gradient) {
-  if (getRversion() < "4.1.0" && fill_type == "gradient") {             # nocov start
+switch_fill_type = function(fill_type, segments, gradient, call = caller_env()) {
+  if (getRversion() < "4.1.0" && fill_type == "gradient") {           # nocov start
     cli_warn(c(
       '{.code fill_type = "gradient"} is not supported in R < 4.1.0.',
       'i' = 'Falling back to {.code fill_type = "segments"}.',
@@ -997,44 +1123,71 @@ switch_fill_type = function(fill_type, segments, gradient) {
              {.fun ggdist::geom_slabinterval} for more information.'
     ))
     fill_type = "segments"
-  } else if (getRversion() < "4.2.0" && fill_type == "auto") {
-    cli_warn(c(
-      '{.arg fill_type} cannot be auto-detected in R < 4.2.0.',
-      'i' = 'Falling back to {.code fill_type = "segments"}.',
-      'i' = 'For best results, if you are using a graphics device that
-             supports gradients, set {.code fill_type = "gradient"}.',
-      'i' = 'See the documentation for {.arg fill_type} in
-             {.fun ggdist::geom_slabinterval} for more information.'
-    ))
+  } else if (getRversion() < "4.1.0" && fill_type == "auto") {
     fill_type = "segments"
-  } else if (fill_type == "auto") {
-    if ("LinearGradient" %in% grDevices::dev.capabilities()$patterns) {
-      fill_type = "gradient"
-    } else {
-      cli_warn(c(
-        '{.code fill_type = "gradient"} is not supported by the current graphics device,
-         which is {.code {deparse0(names(dev.cur()))}}.',
-        'i' = 'Falling back to {.code fill_type = "segments"}.',
-        'i' = 'If you believe your current graphics device {.emph does} support
-           {.code fill_type = "gradient"} but auto-detection failed, try setting
-           {.code fill_type = "gradient"} explicitly. If this causes the gradient to display
-           correctly, then this warning is likely a false positive caused by
-           the graphics device failing to properly report its support for the
-           {.code "LinearGradient"} pattern via {.fun grDevices::dev.capabilities}.
-           Consider reporting a bug to the author of the graphics device.',
-        'i' = 'See the documentation for {.arg fill_type} in
-             {.fun ggdist::geom_slabinterval} for more information.'
-      ))
-      fill_type = "segments"
-    }
-  }                                                                     # nocov end
+  }                                                                   # nocov end
 
   switch(fill_type,
     segments = segments,
-    gradient = gradient,
+    gradient = {
+      tryCatch({
+        check_device("gradients", maybe = TRUE, call = call)
+      }, warning = function(e) {                                      # nocov start
+        cli_warn(
+          c(
+            '{.code fill_type = "gradient"} does not appear to be supported by the
+              current graphics device.',
+            'i' = 'Attempting to use gradient fill type anyway.',
+            '>' = 'If the gradient is displayed correctly, then this warning is
+              likely a false positive caused by the graphics device failing to
+              properly report its support for the {.code "LinearGradient"} pattern
+              via {.fun grDevices::dev.capabilities}. Consider reporting a bug to
+              the author of the graphics device.',
+            '>' = 'If the gradient is not displayed correctly, consider switching
+              to a graphics device that supports gradients, or use
+              {.code fill_type = "segments"} instead.',
+            'i' = 'For more information, see the documentation for {.arg fill_type} in
+              {.fun ggdist::geom_slabinterval} or the documentation for
+              {.fun ggplot2::check_device}.'
+          ),
+          call = call,
+          class = "ggdist_gradients_not_supported",
+          parent = e
+        )
+      })                                                              # nocov end
+      gradient
+    },
+    auto = {
+      tryCatch({
+        check_device("gradients", maybe = FALSE, call = call)
+        gradient
+      }, warning = function(e) {                                      # nocov start
+        cli_warn(
+          c(
+            '{.code fill_type = "gradient"} is not supported by the current graphics device.',
+            'i' = 'Falling back to {.code fill_type = "segments"}.',
+            '>' = 'If you believe your current graphics device {.emph does} support
+              {.code fill_type = "gradient"} but auto-detection failed, try setting
+              {.code fill_type = "gradient"} explicitly. If this causes the gradient to display
+              correctly, then this warning is likely a false positive caused by
+              the graphics device failing to properly report its support for the
+              {.code "LinearGradient"} pattern via {.fun grDevices::dev.capabilities}.
+              Consider reporting a bug to the author of the graphics device.',
+            'i' = 'For more information, see the documentation for {.arg fill_type} in
+              {.fun ggdist::geom_slabinterval} or the documentation for
+              {.fun ggplot2::check_device}.'
+          ),
+          call = call,
+          class = "ggdist_gradients_not_supported",
+          parent = e
+        )
+        segments
+      })                                                              # nocov end
+    },
     cli_abort(c(
       'Unknown {.arg fill_type}: {.code {deparse0(fill_type)}}',
-      'i' = '{.arg fill_type} should be {.code "segments"} or {.code "gradient"}.'
+      'i' = '{.arg fill_type} should be {.code "segments"}, {.code "gradient"}, or
+        {.code "auto"}.'
     ))
   )
 }

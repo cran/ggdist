@@ -10,7 +10,7 @@
 rd_slabinterval_shortcut_geom = function(
   geom_name, chart_type
 ) {
-  geom = get(paste0("Geom", title_case(geom_name)))
+  geom = get(paste0("Geom", camel_case(geom_name)))
 
   default_aes = lapply(geom$default_computed_aes, function(x) deparse0(get_expr(x)))
   default_aes = if (length(default_aes)) paste(names(default_aes), "=", default_aes, collapse = ", ")
@@ -22,7 +22,7 @@ rd_slabinterval_shortcut_geom = function(
       @description
       Shortcut version of [geom_slabinterval()] for creating <<chart_type>> plots.
 
-      Roughly equivalent to:
+      **Roughly equivalent to:**
       '),
     rd_shortcut_geom(geom_name),
     if (length(default_aes)) glue_doc('
@@ -37,6 +37,7 @@ rd_slabinterval_shortcut_geom = function(
       as if its default aesthetics are `aes(<<default_aes>>)`
       '),
     '@inheritParams geom_slabinterval',
+    rd_layer_params(geom_name, as_dots = FALSE),
     glue_doc('
       @return A [ggplot2::Geom] representing a <<chart_type>> geometry which can
       be added to a [ggplot()] object.'),
@@ -57,12 +58,14 @@ rd_slabinterval_shortcut_stat = function(
   example_layers = NULL,
   describe = TRUE
 ) {
-  stat = get(paste0("Stat", title_case(stat_name)))
-  geom = get(paste0("Geom", title_case(geom_name)))
+  stat = get(paste0("Stat", camel_case(stat_name)))
+  geom = get(paste0("Geom", camel_case(geom_name)))
 
   example_layers = if (length(example_layers) > 0) {
     paste0(" +\n  ", example_layers, collapse = "")
-  } else ""
+  } else {
+    ""
+  }
 
   c(
     glue_doc('@title <<title_case(chart_type)>> plot (shortcut stat)'),
@@ -71,9 +74,9 @@ rd_slabinterval_shortcut_stat = function(
       Shortcut version of [stat_slabinterval()] with [geom_<<geom_name>>()] for
       creating <<chart_type>> plots.
 
-      Roughly equivalent to:
+      **Roughly equivalent to:**
       '),
-    rd_shortcut_stat(stat_name, geom_name),
+    if (describe) rd_shortcut_stat(stat_name, geom_name),
     '@inheritParams stat_slabinterval',
     '@inheritParams geom_slabinterval',
     rd_layer_params(geom_name, stat, as_dots = TRUE),
@@ -151,15 +154,22 @@ rd_slabinterval_computed_variables = function(stat = StatSlabinterval) {
         If `options("ggdist.experimental.slab_data_in_intervals")` is `TRUE`:
         For intervals, the CDF at the point summary; intervals also have `cdf_min` and `cdf_max`
         for the CDF at the lower and upper ends of the interval.',
-    if (isTRUE(stat$default_params$show_slab)) {'
+    if (isTRUE(stat$default_params$show_slab)) '
       - `n`: For slabs, the number of data points summarized into that slab. If the slab was created from
         an analytical distribution via the `xdist`, `ydist`, or `dist` aesthetic, `n` will be `Inf`.
       -  `f`: (deprecated) For slabs, the output values from the slab function (such as the PDF, CDF, or CCDF),
         determined by `slab_type`. Instead of using `slab_type` to change `f` and then mapping `f` onto an
         aesthetic, it is now recommended to simply map the corresponding computed variable (e.g. `pdf`, `cdf`, or
         `1 - cdf`) directly onto the desired aesthetic.
+      ',
+    if ("at" %in% names(stat$default_params)) '
+      - `at`: For spikes, a character vector of names of the functions or expressions used to determine
+        the points at which the slab functions were evaluated to create spikes. Values of this computed
+        variable are determined by the `at` parameter; see its description above.
+      ',
+    if (inherits(stat, "StatMcseDots")) '
+      - `se`: For dots, the Monte Carlo Standard Error of the quantile corresponding to each dot.
       '
-    }
   )
 
   out

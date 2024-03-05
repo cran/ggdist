@@ -27,13 +27,14 @@ compute_limits_slabinterval = function(
   }
 
   if (distr_is_constant(dist)) {
-    median = distr_quantile(dist)(0.5)
-    return(data.frame(.lower = median, .upper = median))
+    .median = distr_quantile(dist)(0.5)
+    return(data.frame(.lower = .median, .upper = .median))
   }
 
   if (distr_is_sample(dist)) {
-    sample = distr_get_sample(dist)
-    return(compute_limits_sample(sample, trans, trim, adjust, ...))
+    .sample = distr_get_sample(dist)
+    .weights = distr_get_sample_weights(dist)
+    return(compute_limits_sample(.sample, trans, trim, adjust, ..., weights = .weights))
   }
 
   quantile_fun = distr_quantile(dist)
@@ -67,12 +68,12 @@ compute_limits_slabinterval = function(
 #' @param trans scale transformation
 #' @param trim/adjust see stat_slabinterval
 #' @noRd
-compute_limits_sample = function(x, trans, trim, adjust, ..., density = "bounded") {
+compute_limits_sample = function(x, trans, trim, adjust, ..., density = "bounded", weights = NULL) {
   density = match_function(density, "density_")
 
   # determine limits of data based on the density estimator
   x = trans$transform(x)
-  x_range = range(density(x, n = 2, range_only = TRUE, trim = trim, adjust = adjust)$x)
+  x_range = range(density(x, n = 2, range_only = TRUE, trim = trim, adjust = adjust, weights = weights)$x)
   data.frame(
     .lower = trans$inverse(x_range[[1]]),
     .upper = trans$inverse(x_range[[2]])
@@ -109,9 +110,9 @@ compute_slab_slabinterval = function(
     pdf = c(0, 0, Inf, 0, 0)
     cdf = c(0, 0, 1, 1, 1)
     if (!expand) {
-      input = input[-c(1,5)]
-      pdf = pdf[-c(1,5)]
-      cdf = cdf[-c(1,5)]
+      input = input[-c(1, 5)]
+      pdf = pdf[-c(1, 5)]
+      cdf = cdf[-c(1, 5)]
     }
   } else if (!distr_is_factor_like(dist) && distr_is_sample(dist)) {
     return(compute_slab_sample(
@@ -119,7 +120,8 @@ compute_slab_slabinterval = function(
       slab_type = slab_type, limits = limits, n = n,
       adjust = adjust, trim = trim, expand = expand,
       breaks = breaks, align = align, outline_bars = outline_bars,
-      ...
+      ...,
+      weights = distr_get_sample_weights(dist)
     ))
   } else if (trans$name == "identity") {
     pdf_fun = distr_pdf(dist)
@@ -140,7 +142,12 @@ compute_slab_slabinterval = function(
       # work as expected if 1 is a bin edge.
       eps = 2*.Machine$double.eps
 
-      if (!outline_bars) {
+      if (outline_bars) {
+        # have to return to 0 in between each bar so that bar outlines are drawn
+        input = as.vector(rbind(input_1, input_1, input_1 + eps, input_, input_, input_2 - eps, input_2, input_2))
+        pdf = as.vector(rbind(0, pdf, pdf, pdf, pdf, pdf, pdf, 0))
+        cdf = as.vector(rbind(lag_cdf, lag_cdf, lag_cdf, lag_cdf, cdf, cdf, cdf, cdf))
+      } else {
         # as.vector(rbind(x, y, z, ...)) interleaves vectors x, y, z, ..., giving
         # us the bin endpoints and midpoints --- then just need to repeat the same
         # value of density for both endpoints of the same bin and to make sure the
@@ -148,11 +155,6 @@ compute_slab_slabinterval = function(
         input = as.vector(rbind(input_1, input_1 + eps, input_, input_, input_2 - eps, input_2))
         pdf = rep(pdf, each = 6)
         cdf = as.vector(rbind(lag_cdf, lag_cdf, lag_cdf, cdf, cdf, cdf))
-      } else {
-        # have to return to 0 in between each bar so that bar outlines are drawn
-        input = as.vector(rbind(input_1, input_1, input_1 + eps, input_, input_, input_2 - eps, input_2, input_2))
-        pdf = as.vector(rbind(0, pdf, pdf, pdf, pdf, pdf, pdf, 0))
-        cdf = as.vector(rbind(lag_cdf, lag_cdf, lag_cdf, lag_cdf, cdf, cdf, cdf, cdf))
       }
     } else {
       pdf = pdf_fun(input)
@@ -186,7 +188,8 @@ compute_slab_sample = function(
   slab_type, limits, n,
   adjust, trim, expand, breaks, align, outline_bars,
   density,
-  ...
+  ...,
+  weights = NULL
 ) {
 
   if (is.integer(x) || inherits(x, "mapped_discrete")) {
@@ -199,16 +202,15 @@ compute_slab_sample = function(
   density = match_function(density, prefix = "density_")
 
   # calculate pdf and cdf
-  # TODO: pass weights here
   d = density(
     x, n = n, adjust = adjust, trim = trim,
-    breaks = breaks, align = align, outline_bars = outline_bars
+    breaks = breaks, align = align, outline_bars = outline_bars,
+    weights = weights
   )
   slab_df = data.frame(
     .input = trans$inverse(d$x),
     pdf = d$y,
-    # TODO: pass weights here
-    cdf = d$cdf %||% weighted_ecdf(x)(d$x)
+    cdf = d$cdf %||% weighted_ecdf(x, weights = weights)(d$x)
   )
 
   # extend x values to the range of the plot. To do that we have to include
@@ -303,10 +305,10 @@ compute_interval_slabinterval = function(
 #' @inheritParams density_histogram
 #' @param geom Use to override the default connection between
 #' [stat_slabinterval()] and [geom_slabinterval()]
-#' @param slab_type (deprecated) The type of slab function to calculate: probability density (or mass) function (`"pdf"`),
-#' cumulative distribution function (`"cdf"`), or complementary CDF (`"ccdf"`). Instead of using `slab_type` to
-#' change `f` and then mapping `f` onto an aesthetic, it is now recommended to simply map the corresponding
-#' computed variable (e.g. `pdf`, `cdf`, or  `1 - cdf`) directly onto the desired aesthetic.
+#' @param slab_type (deprecated) The type of slab function to calculate: probability density (or mass) function
+#' (`"pdf"`), cumulative distribution function (`"cdf"`), or complementary CDF (`"ccdf"`). Instead of using
+#' `slab_type` to change `f` and then mapping `f` onto an aesthetic, it is now recommended to simply map the
+#' corresponding computed variable (e.g. `pdf`, `cdf`, or  `1 - cdf`) directly onto the desired aesthetic.
 #' @param p_limits Probability limits (as a vector of size 2) used to determine the lower and upper
 #' limits of *theoretical* distributions (distributions from *samples* ignore this parameter and determine
 #' their limits based on the limits of the sample). E.g., if this is `c(.001, .999)`, then a slab is drawn
@@ -334,6 +336,7 @@ compute_interval_slabinterval = function(
 #'    the data and then uses a bounded density estimator based on the reflection method.
 #' @param adjust Passed to `density`: the bandwidth for the density estimator for sample data
 #' is adjusted by multiplying it by this value. See e.g. [density_bounded()] for more information.
+#' Default (`waiver()`) defers to the default of the density estimator, which is usually `1`.
 #' @param trim For sample data, should the density estimate be trimmed to the range of the
 #' data? Passed on to the density estimator; see the `density` parameter. Default `TRUE`.
 #' @param expand For sample data, should the slab be expanded to the limits of the scale? Default `FALSE`.
@@ -452,6 +455,8 @@ StatSlabinterval = ggproto("StatSlabinterval", AbstractStatSlabinterval,
     (when `orientation = "horizontal"` with sample data).',
     y = 'y position of the geometry (when orientation = `"horizontal"`); or sample data to be summarized
     (when `orientation = "vertical"` with sample data).',
+    weight = 'When using samples (i.e. the `x` and `y` aesthetics, not `xdist` or `ydist`), optional
+    weights to be applied to each draw.',
     xdist = 'When using analytical distributions, distribution to map on the x axis: a \\pkg{distributional}
     object (e.g. [dist_normal()]) or a [posterior::rvar()] object.',
     ydist = 'When using analytical distributions, distribution to map on the y axis: a \\pkg{distributional}
@@ -474,7 +479,8 @@ StatSlabinterval = ggproto("StatSlabinterval", AbstractStatSlabinterval,
     arg6 = NULL,
     arg7 = NULL,
     arg8 = NULL,
-    arg9 = NULL
+    arg9 = NULL,
+    weight = NULL
   ), AbstractStatSlabinterval$default_aes),
 
   # interval parameter used to determine if the stat re-groups
@@ -487,10 +493,10 @@ StatSlabinterval = ggproto("StatSlabinterval", AbstractStatSlabinterval,
   default_params = defaults(list(
     p_limits = c(NA, NA),
     density = "bounded",
-    adjust = 1,
+    adjust = waiver(),
     trim = TRUE,
     expand = FALSE,
-    breaks = "Sturges",
+    breaks = waiver(),
     align = "none",
     outline_bars = FALSE,
 
@@ -519,7 +525,7 @@ StatSlabinterval = ggproto("StatSlabinterval", AbstractStatSlabinterval,
 
     # check for dist-like objects in x / y axis: these are likely user errors
     # caused by assigning a distribution to x / y instead of xdist / ydist
-    dist_like_cols = c("x","y")[map_lgl_(c("x", "y"), function(col) is_dist_like(data[[col]]))]
+    dist_like_cols = c("x", "y")[map_lgl_(c("x", "y"), function(col) is_dist_like(data[[col]]))]
     if (length(dist_like_cols) > 0) {
       s = if (length(dist_like_cols) > 1) "s"
       stop0(
@@ -545,8 +551,8 @@ StatSlabinterval = ggproto("StatSlabinterval", AbstractStatSlabinterval,
         if (is.na(dist)) {
           dist_missing()
         } else {
-          args = args_from_aes(...)
-          do.call(dist_wrap, c(list(dist), args))
+          .args = args_from_aes(...)
+          do.call(dist_wrap, c(list(dist), .args))
         }
       })
     }
@@ -555,7 +561,7 @@ StatSlabinterval = ggproto("StatSlabinterval", AbstractStatSlabinterval,
       # Need to group by rows in the data frame to draw correctly, as
       # each output slab will need to be in its own group.
       # First check if we are grouped by rows already (in which case leave it)
-      if (length(unique(data$group)) != nrow(data)) {
+      if (anyDuplicated(data$group)) {
         # need to make new groups that ensure every row is unique but which
         # preserve old group order at the top level
         data$group = as.numeric(interaction(
@@ -616,9 +622,9 @@ StatSlabinterval = ggproto("StatSlabinterval", AbstractStatSlabinterval,
       }
 
       # dist aesthetic is not provided but x aesthetic is, and x is not a dist
-      # this means we need to wrap it as a dist_sample
+      # this means we need to wrap it as a weighted dist_sample
       data = summarise_by(data, c("PANEL", y, "group"), function(d) {
-        data.frame(dist = dist_sample(list(trans$inverse(d[[x]]))))
+        data.frame(dist = .dist_weighted_sample(list(trans$inverse(d[[x]])), list(d[["weight"]])))
       })
       data[[x]] = median(data$dist)
     }
@@ -707,7 +713,9 @@ layer_slabinterval = function(...) {
 # shortcut stats ----------------------------------------------------------
 
 StatHalfeye = StatSlabinterval
-#' @eval rd_slabinterval_shortcut_stat("halfeye", "half-eye (density + interval)", geom_name = "slabinterval", describe = FALSE)
+#' @eval rd_slabinterval_shortcut_stat(
+#'   "halfeye", "half-eye (density + interval)", geom_name = "slabinterval", describe = FALSE
+#' )
 #' @description
 #' Equivalent to [stat_slabinterval()], whose default settings create half-eye (density + interval) plots.
 #' @export
@@ -715,7 +723,7 @@ stat_halfeye = stat_slabinterval
 
 StatEye = ggproto("StatEye", StatSlabinterval,
   default_aes = defaults(aes(
-    side = after_stat("both"),
+    side = after_stat("both")
   ), StatSlabinterval$default_aes)
 )
 #' @eval rd_slabinterval_shortcut_stat("eye", "eye (violin + interval)", geom_name = "slabinterval")
@@ -724,9 +732,9 @@ stat_eye = make_stat(StatEye, geom = "slabinterval")
 
 StatCcdfinterval = ggproto("StatCcdfinterval", StatSlabinterval,
   default_aes = defaults(aes(
-    thickness = after_stat(thickness(1 - cdf)),
+    thickness = after_stat(thickness(1 - cdf, 0, 1)),
     justification = after_stat(0.5),
-    side = after_stat("topleft"),
+    side = after_stat("topleft")
   ), StatSlabinterval$default_aes),
 
   default_params = defaults(list(
@@ -736,13 +744,15 @@ StatCcdfinterval = ggproto("StatCcdfinterval", StatSlabinterval,
 
   default_slab_type = "ccdf"
 )
-#' @eval rd_slabinterval_shortcut_stat("ccdfinterval", "CCDF bar", geom_name = "slabinterval", example_layers = "expand_limits(x = 0)")
+#' @eval rd_slabinterval_shortcut_stat(
+#'   "ccdfinterval", "CCDF bar", geom_name = "slabinterval", example_layers = "expand_limits(x = 0)"
+#' )
 #' @export
 stat_ccdfinterval = make_stat(StatCcdfinterval, geom = "slabinterval")
 
 StatCdfinterval = ggproto("StatCdfinterval", StatCcdfinterval,
   default_aes = defaults(aes(
-    thickness = after_stat(thickness(cdf)),
+    thickness = after_stat(thickness(cdf, 0, 1))
   ), StatCcdfinterval$default_aes),
 
   default_slab_type = "cdf"
@@ -828,7 +838,7 @@ stat_slab = make_stat(StatSlab, geom = "slab")
 #' @noRd
 args_from_aes = function(args = list(), ...) {
   args_names = names(args)
-  if (length(args_names > 0)) {
+  if (length(args_names) > 0) {
     named_args_i = nzchar(args_names)
     named_args = args[named_args_i]
     unnamed_args = args[!named_args_i]

@@ -8,7 +8,7 @@
 #' Unbounded density estimator
 #'
 #' Unbounded density estimator using [stats::density()].
-#' Supports [automatic partial function application][automatic-partial-functions].
+#' @template description-auto-partial
 #'
 #' @param x numeric vector containing a sample to compute a density estimate for.
 #' @param weights optional numeric vector of weights to apply to `x`.
@@ -119,7 +119,7 @@ density_unbounded = auto_partial(name = "density_unbounded", function(
 #' Bounded density estimator using the reflection method
 #'
 #' Bounded density estimator using the reflection method.
-#' Supports [automatic partial function application][automatic-partial-functions].
+#' @template description-auto-partial
 #'
 #' @inheritParams density_unbounded
 #' @param bounds length-2 vector of min and max bounds. If a bound is `NA`, then
@@ -203,30 +203,10 @@ density_bounded = auto_partial(name = "density_bounded", function(
     return(list(x = range(x), y = c(NA_real_, NA_real_)))
   }
 
-  # determine bandwidth
+  # determine bandwidth and bounds
   bw = get_bandwidth(x, bandwidth) * adjust
-
-  # determine bounds
-  bounds_to_find = is.na(bounds)
-  if (any(bounds_to_find)) {
-    bounder = match_function(bounder, "bounder_")
-    bounds[bounds_to_find] = bounder(x)[bounds_to_find]
-  }
-
-  min_x = min(x)
-  max_x = max(x)
-  if (min_x < bounds[[1]] || max_x > bounds[[2]]) {
-    stop0("All `x` must be inside `bounds` in density_bounded()")
-  }
-
-  # cap bounds at 3*bw beyond the range (and consider them unbounded beyond
-  # that, since past that the density essentially goes to 0)
-  min_bound = min_x - 3 * bw
-  max_bound = max_x + 3 * bw
-  left_bounded = min_bound <= bounds[[1]]
-  right_bounded = bounds[[2]] <= max_bound
-  if (!left_bounded) bounds[[1]] = min_bound
-  if (!right_bounded) bounds[[2]] = max_bound
+  left_bounded = right_bounded = NULL
+  c(bounds, left_bounded, right_bounded) %<-% get_bounds(x, bw, bounds, bounder)
 
   if (isTRUE(range_only)) {
     return(list(x = bounds, y = c(NA_real_, NA_real_)))
@@ -259,8 +239,9 @@ density_bounded = auto_partial(name = "density_bounded", function(
   if (right_bounded) f = f + d$y[seq(length(d$y), by = -1, length.out = n)]
 
   # trim to data range, if needed
-  if (isTRUE(trim) && (bounds[[1]] < min_x || bounds[[2]] > max_x)) {
-    x_trimmed = seq.int(min_x, max_x, length.out = n)
+  range_x = range(x)
+  if (isTRUE(trim) && (bounds[[1]] < range_x[[1]] || bounds[[2]] > range_x[[2]])) {
+    x_trimmed = seq.int(range_x[[1]], range_x[[2]], length.out = n)
     f = approx(d$x, f, x_trimmed)$y
     d$x = x_trimmed
   }
@@ -276,12 +257,13 @@ density_bounded = auto_partial(name = "density_bounded", function(
 #' Histogram density estimator
 #'
 #' Histogram density estimator.
-#' Supports [automatic partial function application][automatic-partial-functions].
+#' @template description-auto-partial
 #'
 #' @param x numeric vector containing a sample to compute a density estimate for.
 #' @param weights optional numeric vector of weights to apply to `x`.
-#' @param breaks Determines the breakpoints defining bins. Similar to (but not
-#' exactly the same as) the `breaks` argument to [graphics::hist()]. One of:
+#' @param breaks Determines the breakpoints defining bins. Defaults to `"Scott"`.
+#' Similar to (but not exactly the same as) the `breaks` argument to [graphics::hist()].
+#' One of:
 #'   - A scalar (length-1) numeric giving the number of bins
 #'   - A vector numeric giving the breakpoints between histogram bins
 #'   - A function taking `x` and `weights` and returning either the
@@ -295,7 +277,8 @@ density_bounded = auto_partial(name = "density_bounded", function(
 #' For example, `breaks = "Sturges"` will use the [breaks_Sturges()] algorithm,
 #' `breaks = 9` will create 9 bins, and `breaks = breaks_fixed(width = 1)` will
 #' set the bin width to `1`.
-#' @param align Determines how to align the breakpoints defining bins. One of:
+#' @param align Determines how to align the breakpoints defining bins. Default
+#' (`"none"`) performs no alignment. One of:
 #'   - A scalar (length-1) numeric giving an offset that is subtracted from the breaks.
 #'     The offset must be between `0` and the bin width.
 #'   - A function taking a sorted vector of `breaks` (bin edges) and returning
@@ -348,7 +331,7 @@ density_bounded = auto_partial(name = "density_bounded", function(
 #' @export
 density_histogram = auto_partial(name = "density_histogram", function(
   x, weights = NULL,
-  breaks = "Sturges",
+  breaks = "Scott",
   align = "none",
   outline_bars = FALSE,
   na.rm = FALSE,
@@ -358,7 +341,7 @@ density_histogram = auto_partial(name = "density_histogram", function(
   x_label = as_label(enexpr(x))
   x = check_na(x, na.rm)
 
-  h = weighted_hist(x, breaks = breaks, align = align)
+  h = weighted_hist(x, weights = weights, breaks = breaks, align = align)
   input_1 = h$breaks[-length(h$breaks)]  # first edge of bin
   input_2 = h$breaks[-1]                 # second edge of bin
   input_ = (input_1 + input_2)/2   # center of bin
@@ -373,18 +356,18 @@ density_histogram = auto_partial(name = "density_histogram", function(
   # work as expected if 1 is a bin edge.
   eps = min(diff(h$breaks)/4, 2*.Machine$double.eps)
 
-  if (!outline_bars) {
+  if (outline_bars) {
+    # have to return to 0 in between each bar so that bar outlines are drawn
+    input = as.vector(rbind(input_1, input_1, input_1 + eps, input_, input_, input_2 - eps, input_2, input_2))
+    pdf = as.vector(rbind(0, h$density, h$density, h$density, h$density, h$density, h$density, 0))
+    cdf = as.vector(rbind(cdf_1, cdf_1, cdf_1, cdf_1, cdf_, cdf_2, cdf_2, cdf_2))
+  } else {
     # as.vector(rbind(x, y)) interleaves vectors x and y, giving
     # us the bin endpoints --- then just need to repeat the same value of density
     # for both endpoints of the same bin
     input = as.vector(rbind(input_1, input_1 + eps, input_, input_, input_2 - eps, input_2))
     pdf = rep(h$density, each = 6)
     cdf = as.vector(rbind(cdf_1, cdf_1, cdf_1, cdf_, cdf_2, cdf_2))
-  } else {
-    # have to return to 0 in between each bar so that bar outlines are drawn
-    input = as.vector(rbind(input_1, input_1, input_1 + eps, input_, input_, input_2 - eps, input_2, input_2))
-    pdf = as.vector(rbind(0, h$density, h$density, h$density, h$density, h$density, h$density, 0))
-    cdf = as.vector(rbind(cdf_1, cdf_1, cdf_1, cdf_1, cdf_, cdf_2, cdf_2, cdf_2))
   }
 
   structure(list(
@@ -408,7 +391,7 @@ density_histogram = auto_partial(name = "density_histogram", function(
 #'
 #' Bandwidth estimators for densities, used in the `bandwidth` argument
 #' to density functions (e.g. [density_bounded()], [density_unbounded()]).
-#' Supports [automatic partial function application][automatic-partial-functions].
+#' @template description-auto-partial
 #'
 #' @inheritDotParams stats::bw.SJ
 #' @param x A numeric vector giving a sample.
@@ -479,6 +462,10 @@ bandwidth_dpi = auto_partial(name = "bandwidth_dpi", function(x, ...) {
   from = min(x) - cut*bw,
   to = max(x) + cut*bw
 ) {
+  if (!is.null(weights)) {
+    weights = weights / sum(weights)
+  }
+
   if (adapt == 1) {
     # quick exit: just return the non-adaptive density
     return(density(
@@ -502,9 +489,9 @@ bandwidth_dpi = auto_partial(name = "bandwidth_dpi", function(x, ...) {
 
     ### one possibility:
     # # use k-means clustering to create bandwidth groups
-    # bw_clusters = Ckmeans.1d.dp::Ckmeans.1d.dp(bw_local, adapt)
-    # bw_group = bw_clusters$cluster
-    # bws = bw_clusters$centers
+    # > bw_clusters = Ckmeans.1d.dp::Ckmeans.1d.dp(bw_local, adapt)
+    # > bw_group = bw_clusters$cluster
+    # > bws = bw_clusters$centers
 
     ### simpler, cut the range of local bandwidths into equally-sized pieces
     ### doesn't work as well though...
@@ -562,6 +549,41 @@ get_bandwidth = function(x, bandwidth) {
   bandwidth
 }
 
+#' Get the bounds for a bounded density estimator
+#' @param x data
+#' @param bw bandwidth
+#' @param bounds user-specified 2-vector of bounds
+#' @param bounder bounder function as passed to density_bounded (e.g. function or name)
+#' @returns list with:
+#'   - `bounds`: 2-vector of bounds (guaranteed finite and non-`NA`)
+#'   - `left_bounded`: `TRUE` if bounded below
+#'   - `right_bounded`: `TRUE` if bounded above
+#' @noRd
+get_bounds = function(x, bw, bounds, bounder, call = caller_env()) {
+  stopifnot(length(bounds) == 2, is.numeric(bounds) || is.logical(bounds))
+  bounds_to_find = is.na(bounds)
+  if (any(bounds_to_find)) {
+    bounder = match_function(bounder, "bounder_")
+    bounds[bounds_to_find] = bounder(x)[bounds_to_find]
+  }
+
+  range_x = range(x)
+  if (range_x[[1]] < bounds[[1]] || range_x[[2]] > bounds[[2]]) {
+    cli_abort("All {.arg x} must be inside {.arg bounds}", call = call)
+  }
+
+  # cap bounds at 3*bw beyond the range (and consider them unbounded beyond
+  # that, since past that the density essentially goes to 0)
+  min_bound = range_x[[1]] - 3 * bw
+  max_bound = range_x[[2]] + 3 * bw
+  left_bounded = min_bound <= bounds[[1]]
+  right_bounded = bounds[[2]] <= max_bound
+  if (!left_bounded) bounds[[1]] = min_bound
+  if (!right_bounded) bounds[[2]] = max_bound
+
+  list(bounds = bounds, left_bounded = left_bounded, right_bounded = right_bounded)
+}
+
 #' run a bandwidth calculation, catching errors and providing a fallback
 #' @param bw a function used to calculate bandwidth
 #' @param x data to calculate bandwidth of
@@ -584,7 +606,7 @@ bw_fallback = function(f, x, ..., call = caller_env()) {
                (e.g., {.fun density_histogram}, {.code stat_slab(density = 'histogram')},
                or {.fun stat_histinterval}) may better represent the data."
       ),
-      class = "ggdist_warn_bandwidth_fallback",
+      class = "ggdist_bandwidth_fallback_warning",
       call = call,
       parent = e
     )

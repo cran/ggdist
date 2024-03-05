@@ -7,65 +7,83 @@
 
 # shortcut stats/geoms ----------------------------------------------------
 
-rd_dotsinterval_shortcut_geom = function(geom_name, chart_type, from_name = "dotsinterval") {
-  geom = get(paste0("Geom", title_case(geom_name)))
+rd_dotsinterval_shortcut_geom = function(
+  geom_name,
+  chart_type,
+  from_name = "dotsinterval",
+  title = TRUE,
+  describe = TRUE,
+  examples = TRUE
+) {
+  geom = get(paste0("Geom", camel_case(geom_name)))
 
   c(
-    glue_doc('@title <<title_case(chart_type)>> plot (shortcut geom)'),
-    glue_doc('
+    if (title) glue_doc('@title <<title_case(chart_type)>> plot (shortcut geom)'),
+    if (describe) glue_doc('
       @description
       Shortcut version of [geom_dotsinterval()] for creating <<chart_type>> plots.
       Geoms based on [geom_dotsinterval()] create dotplots that automatically
       ensure the plot fits within the available space.
 
-      Roughly equivalent to:
+      **Roughly equivalent to:**
       '),
-    rd_shortcut_geom(geom_name, from_name),
+    if (describe) rd_shortcut_geom(geom_name, from_name),
     '@inheritParams geom_dotsinterval',
+    rd_layer_params(geom_name, as_dots = FALSE),
     glue_doc('
       @return A [ggplot2::Geom] representing a <<chart_type>> geometry which can
-      be added to a [ggplot()] object.'),
+      be added to a [ggplot()] object.
+      '),
     '@template details-dotsinterval-family',
     '@template references-quantile-dotplots',
     rd_dotsinterval_aesthetics(geom_name),
-    glue_doc('
-      @seealso ',
-      if (exists(paste0("stat_", geom_name))) 'See [stat_<<geom_name>>()] for the stat version, intended for
-      use on sample data or analytical distributions. ',
-      'See [geom_dotsinterval()] for the geometry this shortcut is based on.
-      See `vignette("dotsinterval")` for a variety of examples of use.
+    if (exists(paste0("stat_", geom_name))) glue_doc('
+      @seealso See [stat_<<geom_name>>()] for the stat version, intended for
+      use on sample data or analytical distributions.
       '),
+    '@seealso See [geom_dotsinterval()] for the geometry this shortcut is based on.',
+    '@seealso See `vignette("dotsinterval")` for a variety of examples of use.',
     '@family dotsinterval geoms',
-    glue_doc('@examples
+    if (examples) glue_doc('@examples
       library(dplyr)
       library(ggplot2)
 
-      data(RankCorr_u_tau, package = "ggdist")
+      theme_set(theme_ggdist())
+
+      set.seed(12345)
+      df = tibble(
+        g = rep(c("a", "b"), 200),
+        value = rnorm(400, c(0, 3), c(0.75, 1))
+      )
 
       # orientation is detected automatically based on
       # which axis is discrete
 
-      RankCorr_u_tau %>%
-        ggplot(aes(x = u_tau)) +
+      df %>%
+        ggplot(aes(x = value, y = g)) +
         geom_<<geom_name>>()
 
-      RankCorr_u_tau %>%
-        ggplot(aes(y = u_tau)) +
+      df %>%
+        ggplot(aes(y = value, x = g)) +
         geom_<<geom_name>>()
       ')
   )
 }
 
 rd_dotsinterval_shortcut_stat = function(
-  stat_name, chart_type,
-  geom_name = stat_name
+  stat_name,
+  chart_type,
+  geom_name = stat_name,
+  title = TRUE,
+  describe = TRUE,
+  examples = TRUE
 ) {
-  stat = get(paste0("Stat", title_case(stat_name)))
-  geom = get(paste0("Geom", title_case(geom_name)))
+  stat = get(paste0("Stat", camel_case(stat_name)))
+  geom = get(paste0("Geom", camel_case(geom_name)))
 
   c(
-    glue_doc('@title <<title_case(chart_type)>> plot (shortcut stat)'),
-    glue_doc('
+    if (title) glue_doc('@title <<title_case(chart_type)>> plot (shortcut stat)'),
+    if (describe) glue_doc('
       @description
       A combination of [stat_slabinterval()] and [geom_dotsinterval()] with sensible defaults
       for making <<chart_type>> plots. While [geom_dotsinterval()] is intended for use on data
@@ -75,8 +93,8 @@ rd_dotsinterval_shortcut_stat = function(
       function. Geoms based on [geom_dotsinterval()] create dotplots that automatically determine a bin width that
       ensures the plot fits within the available space. They can also ensure dots do not overlap.
       '),
-    if (stat_name != "dotsinterval") c(
-      '@description\n Roughly equivalent to:',
+    if (stat_name != "dotsinterval" && describe) c(
+      '@description\n **Roughly equivalent to:**',
       rd_shortcut_stat(stat_name, geom_name, from_name = "dotsinterval")
     ),
     if (stat_name != "dotsinterval") '@inheritParams stat_dotsinterval',
@@ -99,7 +117,7 @@ rd_dotsinterval_shortcut_stat = function(
       See `vignette("dotsinterval")` for a variety of examples of use.
       '),
     '@family dotsinterval stats',
-    glue_doc('
+    if (examples) glue_doc('
       @examples
       library(dplyr)
       library(ggplot2)
@@ -108,9 +126,11 @@ rd_dotsinterval_shortcut_stat = function(
       theme_set(theme_ggdist())
 
       # ON SAMPLE DATA
-      tibble(x = 1:10) %>%
-        group_by_all() %>%
-        do(tibble(y = rnorm(100, .$x))) %>%
+      set.seed(12345)
+      tibble(
+        x = rep(1:10, 100),
+        y = rnorm(1000, x)
+      ) %>%
         ggplot(aes(x = x, y = y)) +
         stat_<<stat_name>>()
 

@@ -1,3 +1,62 @@
+# ggdist 3.3.2
+
+Major changes:
+
+* The `geom_slabinterval()` and `geom_dotsinterval()` families gain "sub-guides",
+  which can be passed to the `subguide` parameter to create axis annotations for
+  the `thickness` aesthetic (for slabs) and the dot count (for dots) (#183).
+* The `weight` aesthetic is now supported in `stat_slabinterval()`, including
+  weighted calculations for densities, CDFs, all interval types (quantile
+  intervals, highest density intervals, and highest density continuous intervals),
+  and all point summaries (mean, median, and mode) (#41). This includes support
+  for the upcoming weighted random variable type in the *posterior* package.
+* Blurry dotplots are now supported using `geom_blur_dots()`, which accepts an
+  `sd` aesthetic to set the standard deviation of the blur on each dot.
+  Intervals can also be used in place of blur by passing `blur = "interval"`.
+  This geom is used by the new `stat_mcse_dots()` to show quantiles along with
+  their error using blur (#63).
+* The new `breaks_quantiles()` histogram breaks function allows the construction
+  of quantile histograms with `density_histogram()`, `stat_histinterval()`, etc.
+* The color ramp scales (e.g. `scale_colour_ramp_continuous()`, ...) now use
+  an explicit data type, `partial_colour_ramp()`, to encode color ramps and 
+  their origin colors, and provide the `ramp_colours()` function for applying
+  colour ramps. This should make it easier to pass explicit color ramps
+  without using scale functions, and for packages building on {ggdist} to
+  use the colour ramp scales (#209).
+  
+Minor changes:
+  
+* The default histogram bin selection algorithm is now `"Scott"` instead of
+  `"Sturges"`, as `"Sturges"` tends to be too conservative (#214).
+* The `at` parameter to `stat_spike()` (or its names) now determines values of
+  an `at` computed variable, which can be mapped onto aesthetics via `after_stat()`
+  to more easily label spikes. (#203; thanks @mattansb for the suggestion).
+* The `arrow` parameter is now supported for intervals in `geom_slabinterval()`
+  (#206; thanks to @ASKurz for the suggestion).
+* The default value of `overflow` in `geom_dotsinterval()` is now the new
+  `"warn"` mode, which works the same as `"keep"` except that it warns users
+  if the dots will overflow the geometry bounds and suggests solutions (#213).
+* Optional arguments to automatically partially-applied functions can now be 
+  passed a `waiver()` to use their default value (see `auto_partial()`).
+* Several dependency reductions: removed {cowplot}, {purrr}, {forcats}, 
+  {palmerpenguins}, and {modelr} from *Suggests*; moved {tidyselect} and {dplyr}
+  from *Imports* to *Suggests*. The latter two are only strictly necessary for 
+  `curve_interval()` due to its use of grouped data frames and tidy selection to 
+  specify which columns are conditional and which are joint (the use of grouped
+  data frames with `point_interval()` is less strictly necessary, and not used 
+  by stats, so is easier to avoid as an absolute dependency).
+
+Documentation:
+
+* The pkgdown documentation now includes an online article on the `thickness`
+  aesthetic with comprehensive examples of how slab scaling works (#205).
+
+Bug fixes:
+
+* Ensure `Mode()` works on analytical constant distributions.
+* Various fixes to ensure compatibility with {ggplot2} 3.5.0.
+
+
 # ggdist 3.3.1
 
 New features and enhancements:

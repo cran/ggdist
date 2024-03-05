@@ -31,7 +31,6 @@
 #'
 #' library(dplyr)
 #' library(ggplot2)
-#' library(forcats)
 #'
 #' expand.grid(
 #'   df = c(3,5,10,30),
@@ -56,8 +55,7 @@
 dstudent_t = function(x, df, mu = 0, sigma = 1, log = FALSE) {
   if (log) {
     dt((x - mu)/sigma, df = df, log = TRUE) - log(sigma)
-  }
-  else {
+  } else {
     dt((x - mu)/sigma, df = df) / sigma
   }
 }

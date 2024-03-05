@@ -137,18 +137,16 @@ make_stat = function(stat, geom,
   names(args_to_syms) = names(args_to_defaults)
 
   new_f = new_function(
-    c(
-      pairlist2(
-        mapping = mapping,
-        data = data,
-        geom = geom,
-        position = position,
-        ... =,
-      ),
-      params_to_defaults,
-      args_to_defaults
+    pairlist2(
+      mapping = mapping,
+      data = data,
+      geom = geom,
+      position = position,
+      ... = ,
+      !!!params_to_defaults,
+      !!!args_to_defaults
     ),
-    expr({
+    expr({                                                   # nocov start
       .Deprecated_arguments(!!stat$deprecated_params, ...)
 
       (!!layer_function)(
@@ -165,7 +163,7 @@ make_stat = function(stat, geom,
           ...
         )
       )
-    }),
+    }),                                                      # nocov end
     env = parent.frame()
   )
   attr(body(new_f), "srcref") = NULL

@@ -6,7 +6,7 @@
 
 #' @importFrom rlang as_label enexpr get_expr
 weighted_hist = function(
-  x, weights = NULL, breaks = "Sturges", align = "none"
+  x, weights = NULL, breaks = "Scott", align = "none"
 ) {
   x_label = as_label(enexpr(x))
   weights_label = as_label(enexpr(weights))
@@ -15,65 +15,13 @@ weighted_hist = function(
   } else {
     paste0("[", x_label, ", ", weights_label, "]")
   }
-
   if (length(x) < 1) cli_abort("{.fun ggdist::density_histogram} requires {.code length(x) >= 1}.")
 
-  weights = weights %||% rep(1, length(x))
-
   # figure out breaks
-  if (is.character(breaks)) {
-    breaks = match_function(breaks, prefix = "breaks_")
-  }
-  if (is.function(breaks)) {
-    breaks = breaks(x, weights = weights)
-  }
-  if (length(breaks) == 1) {
-    if (length(x) == 1) {
-      breaks = c(x - 0.5, x + 0.5)
-    } else {
-      breaks = seq.int(min(x), max(x), length.out = breaks)
-    }
-    bin_width = diff(breaks)
-    equidist = TRUE
-  } else {
-    breaks = sort(unique(breaks))
-    bin_width = diff(breaks)
-    equidist = diff(range(bin_width)) < 1e-7 * mean(bin_width)
-  }
-
-  # apply alignment if bins are equidistant
-  if (equidist) {
-    if (is.character(align)) {
-      align = match_function(align, prefix = "align_")
-    }
-    if (is.function(align)) {
-      align = align(breaks)
-    }
-    if (align < 0 || align > bin_width[[1]]) {
-      cli_abort(c(
-        "{.arg align} must be between 0 and the bin width",
-        "i" = "See the {.arg align} argument to {.fun ggdist::density_histogram}."
-      ))
-    }
-
-    # we check for align != 0 even though in theory we could apply a 0 alignment
-    # below and the result would be correct. We do this because then if someone
-    # manually specifies the breaks and no alignment, exactly those breaks are used.
-    if (align != 0) {
-      breaks = breaks - align
-      max_break = breaks[length(breaks)]
-
-      if (max_break < max(x)) {
-        breaks = c(breaks, max_break + bin_width[[1]])
-        bin_width = c(bin_width, bin_width[[1]])
-      }
-      if (length(breaks) > 2 && breaks[[2]] <= min(x)) {
-        breaks = breaks[-1]
-        bin_width = bin_width[-1]
-      }
-    }
-  }
-
+  binwidths = equidist = NULL
+  c(breaks, binwidths, equidist) %<-% get_breaks(x, weights, breaks)
+  # only apply bin alignment if bins are equidistant
+  if (equidist) c(breaks, binwidths) %<-% align_breaks(x, breaks, binwidths, align)
   # check for invalid binning
   if (min(x) < breaks[1] || max(x) > breaks[length(breaks)]) {
     cli_abort("The {.arg breaks} argument to {.fun ggdist::density_histogram} must cover all values of {.arg x}")
@@ -83,6 +31,7 @@ weighted_hist = function(
   bin = findInterval(x, breaks, rightmost.closed = TRUE, left.open = TRUE)
 
   # sum up weights in each bin
+  weights = weights %||% rep(1, length(x))
   counts = rep(0, length(breaks) - 1)
   used_bins = unique(bin)
   counts[used_bins] = tapply(weights, factor(bin, used_bins), sum)
@@ -91,7 +40,7 @@ weighted_hist = function(
     list(
       breaks = breaks,
       counts = counts,
-      density = counts / bin_width / sum(weights),
+      density = counts / binwidths / sum(weights),
       mids = (breaks[-length(breaks)] + breaks[-1])/2,
       xname = label,
       equidist = equidist
@@ -107,24 +56,26 @@ weighted_hist = function(
 #'
 #' Methods for determining breaks (bins) in histograms, as used in the `breaks`
 #' argument to [density_histogram()].
-#' Supports [automatic partial function application][automatic-partial-functions].
+#' @template description-auto-partial
 #'
 #' @param x A numeric vector giving a sample.
 #' @param weights A numeric vector of `length(x)` giving sample weights.
-#' @param width For [breaks_fixed()], the desired bin width.
-#' @param digits Number of significant digits to keep when rounding in the Freedman-Diaconis
-#'   algorithm ([breaks_FD()]). For an explanation of this parameter, see the documentation
-#'   of the corresponding parameter in [grDevices::nclass.FD()].
 #'
 #' @details
-#' These functions take a sample and its weights and return a valuable suitable for
+#' These functions take a sample and its weights and return a value suitable for
 #' the `breaks` argument to [density_histogram()] that will determine the histogram
 #' breaks.
 #'
 #'  - [breaks_fixed()] allows you to manually specify a fixed bin width.
 #'  - [breaks_Sturges()], [breaks_Scott()], and [breaks_FD()] implement weighted
-#'    versions of the corresponding base functions. See [nclass.Sturges()],
-#'    [nclass.scott()], and [nclass.FD()].
+#'    versions of their corresponding base functions. They return a scalar
+#'    numeric giving the number of bins. See [nclass.Sturges()], [nclass.scott()],
+#'    and [nclass.FD()].
+#'  - [breaks_quantiles()] constructs irregularly-sized bins using `max_n + 1`
+#'    (possibly weighted) quantiles of `x`. The final number of bins is
+#'    *at most* `max_n`, as small bins (ones whose bin width is less than half
+#'    the range of the data divided by `max_n` times `min_width`) will be merged
+#'    into adjacent bins.
 #' @returns Either a single number (giving the number of bins) or a vector
 #' giving the edges between bins.
 #' @seealso [density_histogram()], [align]
@@ -171,6 +122,11 @@ weighted_hist = function(
 #'     x = NULL
 #'   )
 #' @name breaks
+NULL
+
+## breaks_fixed ---------------------------------------------------------------
+#' @rdname breaks
+#' @param width For [breaks_fixed()], the desired bin width.
 #' @export
 breaks_fixed = auto_partial(name = "breaks_fixed", function(
   x, weights = NULL, width = 1
@@ -184,6 +140,7 @@ breaks_fixed = auto_partial(name = "breaks_fixed", function(
   seq.int(x_range[[1]] - expand, x_range[[2]] + expand, by = width)
 })
 
+## breaks_Sturges ---------------------------------------------------------------
 #' @rdname breaks
 #' @export
 breaks_Sturges = auto_partial(name = "breaks_Sturges", function(
@@ -194,6 +151,7 @@ breaks_Sturges = auto_partial(name = "breaks_Sturges", function(
   ceiling(log2(n) + 1)
 })
 
+## breaks_Scott ---------------------------------------------------------------
 #' @rdname breaks
 #' @export
 breaks_Scott = auto_partial(name = "breaks_Scott", function(
@@ -209,24 +167,29 @@ breaks_Scott = auto_partial(name = "breaks_Scott", function(
   }
 })
 
+## breaks_FD ---------------------------------------------------------------
 #' @rdname breaks
+#' @param digits For [breaks_FD()], the number of significant digits to keep when
+#'   rounding in the Freedman-Diaconis algorithm. For an explanation of this
+#'   parameter, see the documentation of the corresponding parameter in
+#'   [grDevices::nclass.FD()].
 #' @export
 breaks_FD = auto_partial(name = "breaks_FD", function(
   x, weights = NULL, digits = 5
 ) {
+  .x = signif(x, digits = digits)
   weights = weights %||% rep(1, length(x))
-  h = 2 * weighted_iqr(.x <- signif(x, digits = digits), weights)
+  h = 2 * weighted_iqr(.x, weights)
 
   if (h == 0) {
     .x_order = order(.x)
     .x = .x[.x_order]
     .weights = weights[.x_order]
-    al = 1/4
-    al_min = 1/512
 
     quantile_fun = weighted_quantile_fun(.x, weights = .weights, n = "sum")
-    while (h == 0 && (al <- al/2) >= al_min) {
+    for (al in 2^(-3:-9)) {
       h = diff(quantile_fun(c(al, 1 - al))) / (1 - 2 * al)
+      if (h != 0) break
     }
   }
 
@@ -242,6 +205,42 @@ breaks_FD = auto_partial(name = "breaks_FD", function(
   }
 })
 
+## breaks_quantiles --------------------------------------------------------
+#' @rdname breaks
+#' @param max_n For [breaks_quantiles()], either a scalar numeric giving the
+#'   maximum number of bins, or another breaks function (or string giving the
+#'   suffix of the name of a function prefixed with `"breaks_"`) that will
+#'   return the maximum number of bins. [breaks_quantiles()] will construct
+#'   *at most* `max_n` bins.
+#' @param min_width For [breaks_quantiles()], a scalar numeric between `0` and
+#'   `1` giving the minimum bin width as a proportion of `diff(range(x)) / max_n`.
+#' @export
+breaks_quantiles = auto_partial(name = "breaks_quantiles", function(
+  x, weights = NULL, max_n = "Scott", min_width = 0.5
+) {
+  max_n = get_raw_breaks(x, weights, max_n)
+  stopifnot(is.numeric(max_n), length(max_n) == 1, max_n >= 1)
+
+  breaks = weighted_quantile(x, ppoints(max_n + 1, a = 1), weights = weights, names = FALSE)
+
+  # remove bins that are very small (less than half the bin width of the
+  # bins that would be used in a regular bin spacing with `n` bins).
+  min_binwidth = diff(range(x)) / max_n * min_width
+  next_break = -Inf
+  for (i in seq_len(max_n)) {
+    if (breaks[[i]] >= next_break) {
+      current_break = breaks[[i]]
+      next_break = current_break + min_binwidth
+    } else {
+      breaks[[i]] = current_break
+    }
+  }
+  breaks = vec_unrep(breaks)$key
+
+  if (length(breaks) == 1) breaks = 1L
+  breaks
+})
+
 
 # alignment algorithms ----------------------------------------------------
 
@@ -249,7 +248,7 @@ breaks_FD = auto_partial(name = "breaks_FD", function(
 #'
 #' Methods for aligning breaks (bins) in histograms, as used in the `align`
 #' argument to [density_histogram()].
-#' Supports [automatic partial function application][automatic-partial-functions].
+#' @template description-auto-partial
 #'
 #' @param breaks A sorted vector of breaks (bin edges).
 #' @param at A scalar numeric giving an alignment point.
@@ -318,12 +317,14 @@ align_none = auto_partial(name = "align_none", function(breaks) {
   0
 })
 
+## align_boundary ----------------------------------------------------------
 #' @rdname align
 #' @export
 align_boundary = auto_partial(name = "align_boundary", function(breaks, at = 0) {
   (breaks[[1]] - at) %% diff(breaks[1:2])
 })
 
+## align_center ------------------------------------------------------------
 #' @rdname align
 #' @export
 align_center = auto_partial(name = "align_center", function(breaks, at = 0) {
@@ -334,11 +335,105 @@ align_center = auto_partial(name = "align_center", function(breaks, at = 0) {
 
 # helpers -----------------------------------------------------------------
 
+#' Given a dataset, weights, and breaks as passed to weighted_hist, return
+#' a named list of breaks and whether or not the breaks are equidistant
+#' @param x data
+#' @param weights weights. vector same length as `x`, or `NULL`.
+#' @param breaks breaks as passed to weighted_hist (e.g. function or name)
+#' @returns list with these elements:
+#'   - `breaks`: vector of breakpoints covering `x`
+#'   - `binwidths`: vector of bin widths of length `length(breaks) - 1`
+#'   - `equidist`: logical: are the breaks equidistant from each other?
+#' @noRd
+get_breaks = function(x, weights, breaks) {
+  breaks = get_raw_breaks(x, weights, breaks)
+  if (length(breaks) == 1) {
+    unique_x = unique(x)
+    if (length(unique_x) == 1) {
+      breaks = c(unique_x - 0.5, unique_x + 0.5)
+    } else {
+      breaks = seq.int(min(x), max(x), length.out = max(breaks + 1, 2))
+    }
+    binwidths = diff(breaks)
+    equidist = TRUE
+  } else {
+    breaks = sort(unique(breaks))
+    binwidths = diff(breaks)
+    equidist = diff(range(binwidths)) < 1e-7 * mean(binwidths)
+  }
+
+  list(breaks = breaks, binwidths = binwidths, equidist = equidist)
+}
+
+get_raw_breaks = function(x, weights, breaks) {
+  if (is.character(breaks)) {
+    breaks = match_function(breaks, prefix = "breaks_")
+  }
+  if (is.function(breaks)) {
+    # don't pass NULL weights to breaks function for compatibility with breaks
+    # functions from other packages that don't support weights; e.g. {scales}
+    if (is.null(weights)) {
+      breaks = breaks(x)
+    } else {
+      breaks = breaks(x, weights = weights)
+    }
+  }
+  breaks
+}
+
+#' Given a dataset, breaks / binwidths, and an alignment function, returned
+#' the modified breaks / binwidths
+#' @param x data
+#' @param breaks vector of breakpoints
+#' @param binwidths widths of bins; i.e. `diff(breaks)`
+#' @param align alignment function as passed to `weighted_hist` (e.g. function or name)
+#' @returns list with modified breakpoints:
+#'   - `breaks`: vector of breakpoints covering `x`
+#'   - `binwidths`: vector of bin widths of length `length(breaks) - 1`
+#' @noRd
+align_breaks = function(x, breaks, binwidths, align, call = caller_env()) {
+  if (is.character(align)) {
+    align = match_function(align, prefix = "align_")
+  }
+  if (is.function(align)) {
+    align = align(breaks)
+  }
+  if (align < 0 || align > binwidths[[1]]) {
+    cli_abort(
+      c(
+        "{.arg align} must be between 0 and the bin width",
+        "i" = "See the {.arg align} argument to {.fun ggdist::density_histogram}."
+      ),
+      call = call
+    )
+  }
+
+  # we check for align != 0 even though in theory we could apply a 0 alignment
+  # below and the result would be correct. We do this because then if someone
+  # manually specifies the breaks and no alignment, exactly those breaks are used.
+  if (align != 0) {
+    breaks = breaks - align
+    max_break = breaks[length(breaks)]
+
+    if (max_break < max(x)) {
+      breaks = c(breaks, max_break + binwidths[[1]])
+      binwidths = c(binwidths, binwidths[[1]])
+    }
+    if (length(breaks) > 2 && breaks[[2]] <= min(x)) {
+      breaks = breaks[-1]
+      binwidths = binwidths[-1]
+    }
+  }
+
+  list(breaks = breaks, binwidths = binwidths)
+}
+
+
 #' @importFrom stats weighted.mean
 weighted_var = function(x, weights) {
   sum(weights * (x - weighted.mean(x, weights))^2) / sum(weights)
 }
 
 weighted_iqr = function(x, weights) {
-  diff(weighted_quantile(as.numeric(x), c(0.25, 0.75), weights = weights, n = "sum"))
+  diff(weighted_quantile(as.numeric(x), c(0.25, 0.75), weights = weights, n = "sum", names = FALSE))
 }

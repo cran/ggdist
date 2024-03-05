@@ -116,12 +116,11 @@ frames that have already been summarized using a \code{\link[=point_interval]{po
 analytical distributions, and will perform the summarization using a \code{\link[=point_interval]{point_interval()}}
 function.
 
-Roughly equivalent to:
+\strong{Roughly equivalent to:}
 
-\if{html}{\out{<div class="sourceCode">}}\preformatted{stat_lineribbon(
+\preformatted{stat_lineribbon(
   show_point = FALSE
-)
-}\if{html}{\out{</div>}}
+)}
 }
 \details{
 \strong{To visualize sample data}, such as a data distribution, samples from a
@@ -189,6 +188,8 @@ These \code{stat}s support the following aesthetics:
 (when \code{orientation = "horizontal"} with sample data).}
 \item{\code{y}: y position of the geometry (when orientation = \code{"horizontal"}); or sample data to be summarized
 (when \code{orientation = "vertical"} with sample data).}
+\item{\code{weight}: When using samples (i.e. the \code{x} and \code{y} aesthetics, not \code{xdist} or \code{ydist}), optional
+weights to be applied to each draw.}
 \item{\code{xdist}: When using analytical distributions, distribution to map on the x axis: a \pkg{distributional}
 object (e.g. \code{\link[=dist_normal]{dist_normal()}}) or a \code{\link[posterior:rvar]{posterior::rvar()}} object.}
 \item{\code{ydist}: When using analytical distributions, distribution to map on the y axis: a \pkg{distributional}
@@ -246,9 +247,11 @@ library(distributional)
 theme_set(theme_ggdist())
 
 # ON SAMPLE DATA
-tibble(x = 1:10) \%>\%
-  group_by_all() \%>\%
-  do(tibble(y = rnorm(100, .$x))) \%>\%
+set.seed(12345)
+tibble(
+  x = rep(1:10, 100),
+  y = rnorm(1000, x)
+) \%>\%
   ggplot(aes(x = x, y = y)) +
   stat_ribbon() +
   scale_fill_brewer()

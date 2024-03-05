@@ -3,10 +3,10 @@
 # Author: mjskay
 ###############################################################################
 
-suppressPackageStartupMessages({
+suppressPackageStartupMessages(suppressWarnings({
   library(dplyr)
   library(tidyr)
-})
+}))
 
 
 test_that("curve_interval works with lineribbon", {
@@ -19,7 +19,7 @@ test_that("curve_interval works with lineribbon", {
   curve_df = tibble(
     .draw = 1:k,
     mean = seq(-5,5, length.out = k),
-    x = list(seq(-15,15,length.out = n)),
+    x = list(seq(-15,15,length.out = n))
   ) %>%
     unnest(x) %>%
     mutate(y = dnorm(x, mean, 3)/max(dnorm(x, mean, 3))) %>%
@@ -86,26 +86,39 @@ test_that("curve_interval works with lineribbon", {
 test_that("basic cases on single interval work", {
   df = data.frame(value = ppoints(1000))
 
-  ref = tibble(
+  ref = data.frame(
     value = 0.4995,
     .lower = NA,
     .upper = NA,
     .actual_width = NA,
     .width = NA,
     .point = "mhd",
-    .interval = "mhd"
+    .interval = "mhd",
+    stringsAsFactors = FALSE
   )
 
-  expect_equal(curve_interval(df, .width = .95), mutate(ref, .lower = .0255, .upper = .9745, .actual_width = .95, .width = .95))
-  expect_equal(curve_interval(df, .width = 0), mutate(ref, .lower = 0.4995, .upper = .5005, .actual_width = 0.002, .width = 0))
-  expect_equal(curve_interval(df, .width = 1), mutate(ref, .lower = 0.0005, .upper = .9995, .actual_width = 1, .width = 1))
-  expect_equal(curve_interval(df, .width = 1.1), mutate(ref, .lower = 0.0005, .upper = .9995, .actual_width = 1, .width = 1.1))
+  expect_equal(
+    curve_interval(df, .width = .95),
+    mutate(ref, .lower = .0255, .upper = .9745, .actual_width = .95, .width = .95)
+  )
+  expect_equal(
+    curve_interval(df, .width = 0),
+    mutate(ref, .lower = 0.4995, .upper = .5005, .actual_width = 0.002, .width = 0)
+  )
+  expect_equal(
+    curve_interval(df, .width = 1),
+    mutate(ref, .lower = 0.0005, .upper = .9995, .actual_width = 1, .width = 1)
+  )
+  expect_equal(
+    curve_interval(df, .width = 1.1),
+    mutate(ref, .lower = 0.0005, .upper = .9995, .actual_width = 1, .width = 1.1)
+  )
 })
 
 test_that("basic cases on single curve work", {
   df = data.frame(x = 1:3, y = rep(ppoints(1000), each = 3) + 1:3)
 
-  ref = tibble(
+  ref = data.frame(
     x = rep(1:3, 3),
     y = rep(0.4995 + 1:3, 3),
     .lower = rep(c(.0255, 0.4995, 0.0005), each = 3) + rep(1:3, 3),
@@ -113,7 +126,8 @@ test_that("basic cases on single curve work", {
     .actual_width = rep(c(.95, 0.002, 1), each = 3),
     .width = rep(c(.95, 0, 1), each = 3),
     .point = "mhd",
-    .interval = "mhd"
+    .interval = "mhd",
+    stringsAsFactors = FALSE
   )
 
   # data frame of draws
@@ -124,8 +138,8 @@ test_that("basic cases on single curve work", {
   # data frame of rvars
   y_rvar = rep(posterior::rvar(ppoints(1000)), 3) + 1:3
   df = data.frame(x = 1:3, y = y_rvar)
-  expect_equal(curve_interval(df, .along = x, .width = c(.95, 0, 1)), ref)
-  expect_equal(curve_interval(group_by(df, x), .width = c(.95, 0, 1)), ref)
+  expect_equal(curve_interval(df, .along = x, .width = c(.95, 0, 1)), as_tibble(ref))
+  expect_equal(curve_interval(group_by(df, x), .width = c(.95, 0, 1)), as_tibble(ref))
 
   # rvar
   expect_equal(curve_interval(y_rvar, .width = c(.95, 0, 1)), select(ref, -x, .value = y))
@@ -141,7 +155,7 @@ test_that("basic cases on multiple variables", {
     y2 = rep(rev(ppoints(1000)), each = 3) + 2:4
   )
 
-  ref = tibble(
+  ref = as.data.frame(tibble(
     x = rep(1:3, 3),
     y1 = rep(0.4995 + 1:3, 3),
     y1.lower = rep(c(.0255, 0.4995, 0.0005), each = 3) + rep(1:3, 3),
@@ -153,10 +167,14 @@ test_that("basic cases on multiple variables", {
     y2.upper = y1.upper + 1,
     .point = "mhd",
     .interval = "mhd"
-  )
+  ))
 
   expect_equal(curve_interval(df, .along = x, .width = c(.95, 0, 1)), ref)
   expect_equal(curve_interval(group_by(df, x), y1, y2, .width = c(.95, 0, 1)), ref)
+  expect_equal(
+    curve_interval(mutate(df, y = x + 1), .along = c(x, y), .width = c(.95, 0, 1)),
+    mutate(ref, y = x + 1, .after = 1)
+  )
 })
 
 
@@ -165,10 +183,20 @@ test_that("basic cases on multiple variables", {
 test_that("error is thrown when no columns found to summarize", {
   df = data.frame(value = ppoints(10))
   expect_error(curve_interval(df, .exclude = "value"), "No columns found to calculate point and interval summaries for")
+  expect_error(curve_interval(df, .along = x))
+})
+
+test_that("error is thrown when along does not match a column", {
+  df = data.frame(value = ppoints(10))
+  expect_error(curve_interval(df, .along = x), class = "ggdist_invalid_column_selection")
 })
 
 test_that("error is thrown with groups of different sizes", {
-  df = data.frame(value = ppoints(9), group = c("a", "a", "b"))
+  df = data.frame(
+    value = ppoints(9),
+    group = c("a", "a", "b"),
+    stringsAsFactors = FALSE
+  )
   expect_error(curve_interval(df, .along = group), "Must have the same number of values in each group")
 })
 

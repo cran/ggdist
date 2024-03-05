@@ -8,6 +8,7 @@ library(tidyr)
 library(distributional)
 
 
+mapped_discrete = getFromNamespace("mapped_discrete", "ggplot2")
 
 test_that("vanilla dots geoms and stats work", {
   skip_if_no_vdiffr()
@@ -168,15 +169,18 @@ test_that("stat_dist_dots works on NA data", {
   skip_if_no_vdiffr()
 
 
-  p = data.frame(
+  p = tibble(
     x = c("norm", NA, "norm"),
     y = c("a","b", NA)
   ) %>%
     ggplot(aes(dist = x, y = y))
 
-  expect_warning(vdiffr::expect_doppelganger("stat_dist_dots with na.rm = FALSE",
-    p + stat_dist_dots(na.rm = FALSE, quantiles = 20)
-  ), "Removed 1 row")
+  expect_warning(
+    vdiffr::expect_doppelganger("stat_dist_dots with na.rm = FALSE",
+      p + stat_dist_dots(na.rm = FALSE, quantiles = 20)
+    ),
+    "Removed 1 row"
+  )
 
   vdiffr::expect_doppelganger("stat_dist_dots with na.rm = TRUE",
     p + stat_dist_dots(na.rm = TRUE, quantiles = 20)
@@ -190,7 +194,8 @@ test_that("stat_dist_dots works on distributional objects", {
 
   p = data.frame(
     x = dist_normal(0:1, 1:2),
-    y = c("a","b")
+    y = c("a","b"),
+    stringsAsFactors = FALSE
   ) %>%
     ggplot(aes(dist = x, y = y))
 
@@ -211,7 +216,7 @@ test_that("geom_dots binwidth can be specified in unit()s", {
   vdiffr::expect_doppelganger("geom_dots with unit() binwidth",
     mtcars %>%
       ggplot(aes(y = mpg)) +
-      geom_dots(binwidth = unit(0.1, "native")) +
+      geom_dots(binwidth = unit(0.1, "native"), overflow = "keep") +
       facet_grid(~ am, scales = "free")
   )
 })
@@ -231,11 +236,15 @@ test_that("geom_dots allows constraints on binwidth", {
 
   # min width of 1/4th of the viewport should give us four giant bins
   # also test that verbose = TRUE outputs the binwidth
-  expect_message(
-    vdiffr::expect_doppelganger("min binwidth",
-      p + geom_dots(binwidth = unit(c(1/4, Inf), "npc"), verbose = TRUE)
+  # and overflow = "warn" gives us a warning
+  expect_warning(
+    expect_message(
+      vdiffr::expect_doppelganger("min binwidth",
+        p + geom_dots(binwidth = unit(c(1/4, Inf), "npc"), verbose = TRUE)
+      ),
+      'binwidth = 0\\.5 data units.*unit\\(0\\.25, "npc"\\)'
     ),
-    'binwidth = 0\\.5 data units.*unit\\(0\\.25, "npc"\\)'
+    class = "ggdist_dots_overflow_warning"
   )
 
 })
@@ -287,7 +296,11 @@ test_that("dotplot layouts work", {
 test_that("dot order is correct", {
   skip_if_no_vdiffr()
 
-  p = data.frame(x = qnorm(ppoints(50)), g = c("a", "b")) %>%
+  p = data.frame(
+    x = qnorm(ppoints(50)),
+    g = c("a", "b"),
+    stringsAsFactors = FALSE
+  ) %>%
     ggplot(aes(x = x, fill = after_stat(x < 0), color = g, group = NA)) +
     scale_fill_brewer(palette = "Set1") +
     scale_color_brewer(palette = "Paired")
@@ -334,7 +347,8 @@ test_that("bar layout works", {
 
   df = data.frame(
     x = factor(c(rep(1:5, times = 5:1 * 11), 6, 6, 7)),
-    g = c("a","b")
+    g = c("a","b"),
+    stringsAsFactors = FALSE
   )
 
   vdiffr::expect_doppelganger("bar layout with order",
@@ -381,7 +395,7 @@ test_that("empty slab from NA removal works", {
 
 
   vdiffr::expect_doppelganger("dots with no slab from NA removal", {
-    data.frame(x = c(1, NA), datatype = c("interval", "slab")) %>%
+    tibble(x = c(1, NA), datatype = c("interval", "slab")) %>%
       ggplot(aes(x = x, xmin = x - 1, xmax = x + 1, datatype = datatype)) +
       geom_dotsinterval(na.rm = TRUE)
   })
@@ -408,7 +422,7 @@ test_that("geom_dots works on discrete distributions", {
   )
 
   vdiffr::expect_doppelganger("one character bin",
-    data.frame(x = rep("a", 10)) %>%
+    tibble(x = rep("a", 10)) %>%
       ggplot(aes(x = x, y = 0)) +
       stat_dots(orientation = "horizontal") +
       geom_hline(yintercept = 0.9)
@@ -440,7 +454,7 @@ test_that("rvar_factor works", {
     .width = NA_real_,
     stringsAsFactors = FALSE
   )
-  slab_ref$x = ggplot2:::mapped_discrete(c(1, 1, 1, 2, 2, 3))
+  slab_ref$x = mapped_discrete(c(1, 1, 1, 2, 2, 3))
   expect_equal(p$data[[1]][p$data[[1]]$datatype == "slab", names(slab_ref)], slab_ref)
 
   interval_ref = data.frame(
@@ -448,9 +462,9 @@ test_that("rvar_factor works", {
     .width = c(0.66, 0.95),
     stringsAsFactors = FALSE
   )
-  interval_ref$xmin = ggplot2:::mapped_discrete(c(NA_real_, NA_real_))
-  interval_ref$xmax = ggplot2:::mapped_discrete(c(NA_real_, NA_real_))
-  interval_ref$x = ggplot2:::mapped_discrete(c(NA_real_, NA_real_))
+  interval_ref$xmin = mapped_discrete(c(NA_real_, NA_real_))
+  interval_ref$xmax = mapped_discrete(c(NA_real_, NA_real_))
+  interval_ref$x = mapped_discrete(c(NA_real_, NA_real_))
   attr(interval_ref, "row.names") = c(7L, 8L)
   expect_equal(p$data[[1]][p$data[[1]]$datatype == "interval", names(interval_ref)], interval_ref)
 
@@ -464,7 +478,7 @@ test_that("rvar_factor works", {
     ggplot() +
       stat_dotsinterval(aes(xdist = posterior::rvar(c("a","a","a","b","b","c"))), quantiles = 12)
   )
-  expect_equal(p$data[[1]]$x, ggplot2:::mapped_discrete(c(1,1,1,1,1,1,2,2,2,2,3,3,NA,NA)))
+  expect_equal(p$data[[1]]$x, mapped_discrete(c(1,1,1,1,1,1,2,2,2,2,3,3,NA,NA)))
 })
 
 test_that("rvar_ordered works and integer dist_sample works", {
@@ -482,7 +496,7 @@ test_that("rvar_ordered works and integer dist_sample works", {
     .width = c(.66, .66, .66, .66, .66, NA),
     stringsAsFactors = FALSE
   )
-  slab_ref$x = ggplot2:::mapped_discrete(c(1, 1, 1, 2, 2, 3))
+  slab_ref$x = mapped_discrete(c(1, 1, 1, 2, 2, 3))
   expect_equal(p$data[[1]][p$data[[1]]$datatype == "slab", names(slab_ref)], slab_ref)
 
   interval_ref = data.frame(
@@ -490,9 +504,9 @@ test_that("rvar_ordered works and integer dist_sample works", {
     .width = c(0.66, 0.95),
     stringsAsFactors = FALSE
   )
-  interval_ref$xmin = ggplot2:::mapped_discrete(c(1, 1))
-  interval_ref$xmax = ggplot2:::mapped_discrete(c(2.15, 2.875))
-  interval_ref$x = ggplot2:::mapped_discrete(c(1.5, 1.5))
+  interval_ref$xmin = mapped_discrete(c(1, 1))
+  interval_ref$xmax = mapped_discrete(c(2.15, 2.875))
+  interval_ref$x = mapped_discrete(c(1.5, 1.5))
   attr(interval_ref, "row.names") = c(7L, 8L)
   expect_equal(p$data[[1]][p$data[[1]]$datatype == "interval", names(interval_ref)], interval_ref)
 
@@ -519,7 +533,7 @@ test_that("rvar_ordered works and integer dist_sample works", {
     ggplot() +
       stat_dotsinterval(aes(xdist = posterior::rvar_ordered(c("a","a","a","b","b","c"))), quantiles = 12)
   )
-  expect_equal(p$data[[1]]$x, ggplot2:::mapped_discrete(c(1,1,1,1,1,1,2,2,2,2,3,3, 1.5,1.5)))
+  expect_equal(p$data[[1]]$x, mapped_discrete(c(1,1,1,1,1,1,2,2,2,2,3,3, 1.5,1.5)))
 
   p = ggplot_build(
     ggplot() +
@@ -533,7 +547,7 @@ test_that("rvar_ordered works and integer dist_sample works", {
     ggplot() +
       stat_dotsinterval(aes(x = ordered(c("a","a","a","b","b","c")), group = NA), quantiles = 12)
   )
-  expect_equal(p$data[[1]]$x, ggplot2:::mapped_discrete(c(1,1,1,1,1,1,2,2,2,2,3,3, 1.5,1.5)))
+  expect_equal(p$data[[1]]$x, mapped_discrete(c(1,1,1,1,1,1,2,2,2,2,3,3, 1.5,1.5)))
 })
 
 test_that("rvar_ordered works with modified scale limits", {
@@ -552,7 +566,7 @@ test_that("rvar_ordered works with modified scale limits", {
     .width = c(.66,.66,.66, NA),
     stringsAsFactors = FALSE
   )
-  slab_ref$x = ggplot2:::mapped_discrete(c(1, 1, 1, 3))
+  slab_ref$x = mapped_discrete(c(1, 1, 1, 3))
   expect_equal(p$data[[1]][, names(slab_ref)], slab_ref)
 })
 
@@ -584,7 +598,7 @@ test_that("dist_bernoulli works", {
   expect_equal(p$data[[1]][p$data[[1]]$datatype == "interval", names(interval_ref)], interval_ref)
 
   x_scale = p$plot$scales$get_scales("x")
-  expect_true(!x_scale$is_discrete())
+  expect_false(x_scale$is_discrete())
   expect_equal(x_scale$get_limits(), c(0, 1))
 })
 
@@ -601,7 +615,7 @@ test_that("dist_categorical works", {
     .width = NA_real_,
     stringsAsFactors = FALSE
   )
-  slab_ref$x = ggplot2:::mapped_discrete(c(1, 1, 1, 2, 2, 3))
+  slab_ref$x = mapped_discrete(c(1, 1, 1, 2, 2, 3))
   expect_equal(p$data[[1]][p$data[[1]]$datatype == "slab", names(slab_ref)], slab_ref)
 
   interval_ref = data.frame(
@@ -609,9 +623,9 @@ test_that("dist_categorical works", {
     .width = c(0.66, 0.95),
     stringsAsFactors = FALSE
   )
-  interval_ref$xmin = ggplot2:::mapped_discrete(c(NA_real_, NA_real_))
-  interval_ref$xmax = ggplot2:::mapped_discrete(c(NA_real_, NA_real_))
-  interval_ref$x = ggplot2:::mapped_discrete(c(NA_real_, NA_real_))
+  interval_ref$xmin = mapped_discrete(c(NA_real_, NA_real_))
+  interval_ref$xmax = mapped_discrete(c(NA_real_, NA_real_))
+  interval_ref$x = mapped_discrete(c(NA_real_, NA_real_))
   attr(interval_ref, "row.names") = c(7L, 8L)
   expect_equal(p$data[[1]][p$data[[1]]$datatype == "interval", names(interval_ref)], interval_ref)
 
@@ -642,7 +656,7 @@ test_that("dist_categorical works with modified scale limits", {
     .width = NA_real_,
     stringsAsFactors = FALSE
   )
-  slab_ref$x = ggplot2:::mapped_discrete(c(1,1,1, 3))
+  slab_ref$x = mapped_discrete(c(1,1,1, 3))
   expect_equal(p$data[[1]][, names(slab_ref)], slab_ref)
 })
 
@@ -659,7 +673,7 @@ test_that("dist_categorical works with explicit integer levels", {
     .width = NA_real_,
     stringsAsFactors = FALSE
   )
-  slab_ref$x = ggplot2:::mapped_discrete(c(1,1,1, 2))
+  slab_ref$x = mapped_discrete(c(1,1,1, 2))
   expect_equal(p$data[[1]][, names(slab_ref)], slab_ref)
 })
 
@@ -688,9 +702,10 @@ test_that("side, justification, and scale can vary", {
 
   vdiffr::expect_doppelganger("varying side",
     mtcars %>%
-      ggplot(aes(x = mpg, y = cyl,
-        side = case_when(cyl == 4 ~ "top", cyl == 6 ~ "both", cyl == 8 ~ "bottom"),
-        )) +
+      ggplot(aes(
+        x = mpg, y = cyl,
+        side = case_when(cyl == 4 ~ "top", cyl == 6 ~ "both", cyl == 8 ~ "bottom")
+      )) +
       stat_dotsinterval(orientation = "horizontal")
   )
 
