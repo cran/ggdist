@@ -21,7 +21,7 @@
 #' thickness function.
 #' @inheritParams geom_slabinterval
 #' @return A [ggplot2::Geom] representing a spike geometry which can
-#' be added to a [ggplot()] object.
+#' be added to a [`ggplot()`][ggplot2::ggplot] object.
 #' rd_slabinterval_aesthetics(geom_name),
 #' @seealso
 #' See [stat_spike()] for the stat version, intended for
@@ -74,10 +74,11 @@ NULL
 
 # drawing functions -------------------------------------------------------
 
-draw_slabs_spike = function(self, s_data, panel_params, coord,
-  orientation, normalize, na.rm,
-  arrow = NULL,
-  ...
+draw_slabs_spike = function(
+  self, s_data, panel_params, coord, orientation,
+  ...,
+  na.rm,
+  arrow = NULL
 ) {
   define_orientation_variables(orientation)
 
@@ -86,7 +87,7 @@ draw_slabs_spike = function(self, s_data, panel_params, coord,
 
   subguide_params = NULL
   c(s_data, subguide_params) %<-% rescale_slab_thickness(
-    s_data, orientation, normalize, na.rm, name = "geom_spike"
+    s_data, orientation, na.rm, name = "geom_spike"
   )
   s_data = self$override_slab_aesthetics(s_data)
 
@@ -166,8 +167,12 @@ GeomSpike = ggproto("GeomSpike", GeomSlab,
 
   param_docs = defaults(list(
     # SLAB PARAMS
-    arrow = '[grid::arrow()] giving the arrow heads to use on the spike, or `NULL` for no arrows.'
+    arrow = '<[arrow] | [NULL]> Type of arrow heads to use on the spike, or `NULL` for no arrows.'
   ), GeomSlab$param_docs),
+
+  default_params = defaults(list(
+    subguide = "spike"
+  ), GeomSlab$default_params),
 
   hidden_params = setdiff(
     union("fill_type", GeomSlab$hidden_params),

@@ -56,7 +56,9 @@ AbstractStat = ggproto("AbstractStat", Stat,
   # arguments passed to the stat_XXX() constructor and the underlying layer() call
   layer_args = list(
     show.legend = NA,
-    inherit.aes = TRUE
+    inherit.aes = TRUE,
+    check.aes = TRUE,
+    check.param = TRUE
   ),
 
 
@@ -166,7 +168,7 @@ make_stat = function(stat, geom,
     }),                                                      # nocov end
     env = parent.frame()
   )
-  attr(body(new_f), "srcref") = NULL
+  new_f = utils::removeSource(new_f)
 
   new_f
 }

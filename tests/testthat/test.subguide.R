@@ -226,9 +226,18 @@ test_that("dots subguide works with side and justification", {
 })
 
 
+# subguide_axis -----------------------------------------------------------
+
+test_that("subguide_axis(numeric()) works but is not zeroGrob()", {
+  expect_false(identical(subguide_axis(numeric()), zeroGrob()))
+})
+
+
 # subguide_integer --------------------------------------------------------
 
 test_that("integer subguide corner cases work", {
+  skip_if_no_vdiffr()
+
   df = data.frame(x = c(1, 2), t = c(0, 0.5))
 
   sg = subguide_integer(theme = theme_test())
@@ -253,7 +262,7 @@ test_that("integer subguide corner cases work", {
 # subguide_none -----------------------------------------------------------
 
 test_that("subguide_none works", {
-  expect_identical(subguide_none(), zeroGrob())
+  expect_identical(subguide_none(numeric()), zeroGrob())
 })
 
 

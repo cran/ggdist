@@ -15,7 +15,9 @@ stat_lineribbon(
   orientation = NA,
   na.rm = FALSE,
   show.legend = NA,
-  inherit.aes = TRUE
+  inherit.aes = TRUE,
+  check.aes = TRUE,
+  check.param = TRUE
 )
 }
 \arguments{
@@ -39,37 +41,40 @@ the plot data. The return value must be a \code{data.frame}, and
 will be used as the layer data. A \code{function} can be created
 from a \code{formula} (e.g. \code{~ head(.x, 10)}).}
 
-\item{geom}{Use to override the default connection between
-\code{\link[=stat_lineribbon]{stat_lineribbon()}} and \code{\link[=geom_lineribbon]{geom_lineribbon()}}}
+\item{geom}{<\link[ggplot2:ggplot2-ggproto]{Geom} | \link[=character]{string}> Use to override
+the default connection between \code{\link[=stat_lineribbon]{stat_lineribbon()}} and \code{\link[=geom_lineribbon]{geom_lineribbon()}}}
 
-\item{position}{Position adjustment, either as a string, or the result of a call to a position adjustment function.
-Setting this equal to \code{"dodge"} (\code{\link[=position_dodge]{position_dodge()}}) or \code{"dodgejust"} (\code{\link[=position_dodgejust]{position_dodgejust()}}) can be useful if
-you have overlapping geometries.}
+\item{position}{<\link[ggplot2:ggplot2-ggproto]{Position} | \link[=character]{string}> Position adjustment,
+either as a string, or the result of a call to a position adjustment function.
+Setting this equal to \code{"dodge"} (\code{\link[ggplot2:position_dodge]{position_dodge()}}) or
+\code{"dodgejust"} (\code{\link[=position_dodgejust]{position_dodgejust()}}) can be useful if you have overlapping geometries.}
 
-\item{...}{Other arguments passed to \code{\link[=layer]{layer()}}. These are often aesthetics, used to set an aesthetic
-to a fixed value, like \code{colour = "red"} or \code{linewidth = 3} (see \strong{Aesthetics}, below). They may also be
-parameters to the paired geom/stat. When paired with the default geom, \code{\link[=geom_lineribbon]{geom_lineribbon()}},
-these include:
+\item{...}{Other arguments passed to \code{\link[ggplot2:layer]{layer()}}. These
+are often aesthetics, used to set an aesthetic to a fixed value, like
+\code{colour = "red"} or \code{linewidth = 3} (see \strong{Aesthetics}, below). They
+may also be parameters to the paired geom/stat. When paired with the
+default geom, \code{\link[=geom_lineribbon]{geom_lineribbon()}}, these include:
 \describe{
-\item{\code{step}}{Should the line/ribbon be drawn as a step function? One of:
+\item{\code{step}}{<scalar \link{logical} | \link[=character]{string}> Should the line/ribbon be drawn
+as a step function? One of:
 \itemize{
 \item \code{FALSE} (default): do not draw as a step function.
 \item \code{"mid"} (or \code{TRUE}): draw steps midway between adjacent x values.
 \item \code{"hv"}: draw horizontal-then-vertical steps.
 \item \code{"vh"}: draw as vertical-then-horizontal steps.
 }
-\code{TRUE} is an alias for \code{"mid"} because for a step function with ribbons, \code{"mid"} is probably what you want
-(for the other two step approaches the ribbons at either the very first or very last x value will not be
-visible).}
+\code{TRUE} is an alias for \code{"mid"}, because for a step function with ribbons
+\code{"mid"} is reasonable default (for the other two step approaches the ribbons
+at either the very first or very last x value will not be visible).}
 }}
 
-\item{.width}{The \code{.width} argument passed to \code{point_interval}: a vector of probabilities to use
-that determine the widths of the resulting intervals. If multiple probabilities are provided,
+\item{.width}{<\link{numeric}> The \code{.width} argument passed to \code{point_interval}: a vector of probabilities
+to use that determine the widths of the resulting intervals. If multiple probabilities are provided,
 multiple intervals per group are generated, each with a different probability interval (and
 value of the corresponding \code{.width} and \code{level} generated variables).}
 
-\item{point_interval}{A function from the \code{\link[=point_interval]{point_interval()}} family (e.g., \code{median_qi},
-\code{mean_qi}, \code{mode_hdi}, etc), or a string giving the name of a function from that family
+\item{point_interval}{<\link{function} | \link[=character]{string}> A function from the \code{\link[=point_interval]{point_interval()}} family
+(e.g., \code{median_qi}, \code{mean_qi}, \code{mode_hdi}, etc), or a string giving the name of a function from that family
 (e.g., \code{"median_qi"}, \code{"mean_qi"}, \code{"mode_hdi"}, etc; if a string, the caller's environment is searched
 for the function, followed by the \pkg{ggdist} environment). This function determines the point summary
 (typically mean, median, or mode) and interval type (quantile interval, \code{qi};
@@ -77,7 +82,7 @@ highest-density interval, \code{hdi}; or highest-density continuous interval, \c
 be converted to the appropriate \code{x}- or \code{y}-based aesthetics depending on the value of \code{orientation}.
 See the \code{\link[=point_interval]{point_interval()}} family of functions for more information.}
 
-\item{orientation}{Whether this geom is drawn horizontally or vertically. One of:
+\item{orientation}{<\link[=character]{string}> Whether this geom is drawn horizontally or vertically. One of:
 \itemize{
 \item \code{NA} (default): automatically detect the orientation based on how the aesthetics
 are assigned. Automatic detection works most of the time.
@@ -92,21 +97,26 @@ For compatibility with the base ggplot naming scheme for \code{orientation}, \co
 for \code{"vertical"} and \code{"y"} as an alias for \code{"horizontal"} (\pkg{ggdist} had an \code{orientation} parameter
 before base ggplot did, hence the discrepancy).}
 
-\item{na.rm}{If \code{FALSE}, the default, missing values are removed with a warning. If \code{TRUE}, missing
-values are silently removed.}
+\item{na.rm}{<scalar \link{logical}> If \code{FALSE}, the default, missing values are removed with a warning. If \code{TRUE},
+missing values are silently removed.}
 
-\item{show.legend}{Should this layer be included in the legends? \code{NA},
-the default, includes if any aesthetics are mapped. \code{FALSE} never includes,
-and \code{TRUE} always includes.}
+\item{show.legend}{<\link{logical}> Should this layer be included in the legends?
+\code{NA}, the default, includes if any aesthetics are mapped. \code{FALSE} never includes,
+and \code{TRUE} always includes. It can also be a named logical vector to finely select
+the aesthetics to display.}
 
 \item{inherit.aes}{If \code{FALSE}, overrides the default aesthetics,
 rather than combining with them. This is most useful for helper functions
 that define both data and aesthetics and shouldn't inherit behaviour from
 the default plot specification, e.g. \code{\link[ggplot2:borders]{borders()}}.}
+
+\item{check.aes, check.param}{If \code{TRUE}, the default, will check that
+supplied parameters and aesthetics are understood by the \code{geom} or
+\code{stat}. Use \code{FALSE} to suppress the checks.}
 }
 \value{
 A \link[ggplot2:ggplot2-ggproto]{ggplot2::Stat} representing a line + multiple-ribbon geometry which can
-be added to a \code{\link[=ggplot]{ggplot()}} object.
+be added to a \code{\link[ggplot2:ggplot]{ggplot()}} object.
 }
 \description{
 A combination of \code{\link[=stat_slabinterval]{stat_slabinterval()}} and \code{\link[=geom_lineribbon]{geom_lineribbon()}} with sensible defaults
@@ -142,9 +152,9 @@ this is not recommended as it does not work as well with orientation detection.
 These aesthetics can be used as follows:
 \itemize{
 \item \code{xdist}, \code{ydist}, and \code{dist} can be any distribution object from the \href{https://pkg.mitchelloharawild.com/distributional/}{distributional}
-package (\code{\link[=dist_normal]{dist_normal()}}, \code{\link[=dist_beta]{dist_beta()}}, etc) or can be a \code{\link[posterior:rvar]{posterior::rvar()}} object.
-Since these functions are vectorized,
-other columns can be passed directly to them in an \code{\link[=aes]{aes()}} specification; e.g.
+package (\code{\link[distributional:dist_normal]{dist_normal()}}, \code{\link[distributional:dist_beta]{dist_beta()}}, etc)
+or can be a \code{\link[posterior:rvar]{posterior::rvar()}} object. Since these functions are vectorized,
+other columns can be passed directly to them in an \code{\link[ggplot2:aes]{aes()}} specification; e.g.
 \code{aes(dist = dist_normal(mu, sigma))} will work if \code{mu} and \code{sigma} are columns in the
 input data frame.
 \item \code{dist} can be a character vector giving the distribution name. Then the  \code{arg1}, ... \code{arg9}
@@ -163,8 +173,8 @@ of those functions.
 \section{Computed Variables}{
 
 The following variables are computed by this stat and made available for
-use in aesthetic specifications (\code{\link[=aes]{aes()}}) using the \code{\link[=after_stat]{after_stat()}}
-function or the \code{after_stat} argument of \code{\link[=stage]{stage()}}:
+use in aesthetic specifications (\code{\link[ggplot2:aes]{aes()}}) using the \code{\link[ggplot2:aes_eval]{after_stat()}}
+function or the \code{after_stat} argument of \code{\link[ggplot2:aes_eval]{stage()}}:
 \itemize{
 \item \code{x} or \code{y}: For slabs, the input values to the slab function.
 For intervals, the point summary from the interval function. Whether it is \code{x} or \code{y} depends on \code{orientation}
@@ -199,12 +209,15 @@ These \code{stat}s support the following aesthetics:
 (when \code{orientation = "vertical"} with sample data).}
 \item{\code{weight}: When using samples (i.e. the \code{x} and \code{y} aesthetics, not \code{xdist} or \code{ydist}), optional
 weights to be applied to each draw.}
-\item{\code{xdist}: When using analytical distributions, distribution to map on the x axis: a \pkg{distributional}
-object (e.g. \code{\link[=dist_normal]{dist_normal()}}) or a \code{\link[posterior:rvar]{posterior::rvar()}} object.}
-\item{\code{ydist}: When using analytical distributions, distribution to map on the y axis: a \pkg{distributional}
-object (e.g. \code{\link[=dist_normal]{dist_normal()}}) or a \code{\link[posterior:rvar]{posterior::rvar()}} object.}
+\item{\code{xdist}: When using analytical distributions, distribution to map on the x axis:
+a \pkg{distributional} object (e.g. \code{\link[distributional:dist_normal]{dist_normal()}})
+or a \code{\link[posterior:rvar]{posterior::rvar()}} object.}
+\item{\code{ydist}: When using analytical distributions, distribution to map on the y axis:
+a \pkg{distributional} object (e.g. \code{\link[distributional:dist_normal]{dist_normal()}})
+or a \code{\link[posterior:rvar]{posterior::rvar()}} object.}
 \item{\code{dist}: When using analytical distributions, a name of a distribution (e.g. \code{"norm"}), a
-\pkg{distributional} object (e.g. \code{\link[=dist_normal]{dist_normal()}}), or a \code{\link[posterior:rvar]{posterior::rvar()}} object. See \strong{Details}.}
+\pkg{distributional} object (e.g. \code{\link[distributional:dist_normal]{dist_normal()}}), or a
+\code{\link[posterior:rvar]{posterior::rvar()}} object. See \strong{Details}.}
 \item{\code{args}: Distribution arguments (\code{args} or \code{arg1}, ... \code{arg9}). See \strong{Details}.}
 }
 

@@ -1,25 +1,25 @@
 #' Axis sub-guide for thickness scales
 #'
-#' This is a sub-guide intended for annotating the [thickness] aesthetic
-#' in \pkg{ggdist}. It can be used with the `subguide` parameter of
-#' [geom_slabinterval()].
-#' @template description-auto-partial
+#' This is a sub-guide intended for annotating the `thickness` and dot-count
+#' subscales in \pkg{ggdist}. It can be used with the `subguide` parameter of
+#' [geom_slabinterval()] and [geom_dotsinterval()].
+#' @template description-auto-partial-waivable
 #'
 #' @inheritParams scale_thickness
-#' @param values Values used to construct the scale used for this guide.
+#' @param values <[numeric]> Values used to construct the scale used for this guide.
 #'    Typically provided automatically by [geom_slabinterval()].
-#' @param title The title of the scale shown on the sub-guide's axis.
-#' @param position Numeric value between `0` and `1` giving the position of the
+#' @param title <[string][character]> The title of the scale shown on the sub-guide's axis.
+#' @param position <scalar [numeric]> Value between `0` and `1` giving the position of the
 #'    guide relative to the axis: `0` causes the sub-guide to be drawn on the
 #'    left or bottom depending on if `orientation` is `"horizontal"` or `"vertical"`,
 #'    and `1` causes the sub-guide to be drawn on the top or right depending on
 #'    if `orientation` is `"horizontal"` or `"vertical"`. May also be a string
 #'    indicating the position: `"top"`, `"right"`, `"bottom"`, `"left"`,
 #'    `"topright"`, `"topleft"`, `"bottomright"`, or `"bottomleft"`.
-#' @param just Numeric value between `0` and `1` giving the justification of the
+#' @param just <scalar [numeric]> Value between `0` and `1` giving the justification of the
 #'    guide relative to its position: 0 means aligned towards the inside of the
 #'    axis edge, 1 means aligned towards the outside of the axis edge.
-#' @param label_side Which side of the axis to draw the ticks and labels on.
+#' @param label_side <[string][character]> Which side of the axis to draw the ticks and labels on.
 #'    `"topright"`, `"top"`, and `"right"` are synonyms which cause the labels
 #'    to be drawn on the top or the right depending on if `orientation` is
 #'    `"horizontal"` or `"vertical"`. `"bottomleft"`, `"bottom"`, and `"left"`
@@ -30,19 +30,24 @@
 #'    `"inside"` causes the labels to be drawn on the side closest to the inside
 #'    of the chart, depending on `position`, and `"outside"` on the side closest
 #'    to the outside of the chart.
-#' @param orientation Orientation of the geometry this sub-guide is for. One
+#' @param orientation <[string][character]> Orientation of the geometry this sub-guide is for. One
 #'    of `"horizontal"` (`"y"`) or `"vertical"` (`"x"`). See the `orientation`
 #'    parameter to [geom_slabinterval()].
-#' @param theme A [ggplot2::theme] object used to determine the style that the
+#' @param theme <[theme][ggplot2::theme]> Theme used to determine the style that the
 #'    sub-guide elements are drawn in. The title label is drawn using the
 #'    `"axis.title.x"` or `"axis.title.y"` theme setting, and the axis line,
-#'    ticks, and tick labels are drawn using [guide_axis()], so the same theme
+#'    ticks, and tick labels are drawn using [`guide_axis()`][ggplot2::guide_axis], so the same theme
 #'    settings that normally apply to axis guides will be followed.
 #' @param ... Arguments passed to other functions, typically back to
 #'    `subguide_axis()` itself.
 #' @family sub-guides
+#' @seealso The [thickness] datatype.
+#' @seealso The `thickness` aesthetic of [geom_slabinterval()].
+#' @seealso [scale_thickness_shared()], for setting a `thickness` scale across
+#' all geometries using the `thickness` aesthetic.
+#' @seealso [subscale_thickness()], for setting a `thickness` sub-scale within
+#' a single [geom_slabinterval()].
 #' @examples
-#' # example code
 #' library(ggplot2)
 #' library(distributional)
 #'
@@ -84,6 +89,8 @@ subguide_axis = auto_partial(name = "subguide_axis", function(
   orientation = "horizontal",
   theme = theme_get()
 ) {
+  if (length(values) == 0) return(gtable::gtable())
+
   define_orientation_variables(orientation)
   grob_width = switch(width., width = grobWidth, height = grobHeight)
   position = get_subguide_position(position, orientation)
@@ -109,7 +116,7 @@ subguide_axis = auto_partial(name = "subguide_axis", function(
   axis_width = grob_width(axis_grob)
 
   title_element = calc_element(paste0("axis.title.", y), theme)
-  title_margin = max(title_element$margin)
+  title_margin = max(title_element$margin %||% unit(0, "points"))
   title_element$margin = margin(0, 0, 0, 0)
   title_grob = element_grob(title_element, label = title)
   title_width = grob_width(title_grob)
@@ -187,16 +194,43 @@ subguide_count = function(..., breaks = scales::breaks_width(1)) {
 
 #' Empty sub-guide for thickness scales
 #'
-#' This is a blank sub-guide that omits annotations for the [thickness] aesthetic
-#' in \pkg{ggdist}. It can be used with the `subguide` parameter of
-#' [geom_slabinterval()].
+#' This is a blank sub-guide that omits annotations for the `thickness` and
+#' dot-count sub-scales in \pkg{ggdist}. It can be used with the `subguide`
+#' parameter of [geom_slabinterval()] and [geom_dotsinterval()].
+#' @template description-auto-partial-waivable
 #'
+#' @inheritParams subguide_axis
 #' @param ... ignored.
 #' @family sub-guides
 #' @export
-subguide_none = function(...) {
+subguide_none = auto_partial(name = "subguide_none", function(values, ...) {
   zeroGrob()
-}
+})
+
+#' @details
+#' [subguide_slab()], [subguide_dots()], and [subguide_spike()] are aliases
+#' for [subguide_none()] that allow you to change the default subguide used
+#' for the [geom_slabinterval()], [geom_dotsinterval()], and [geom_spike()]
+#' families. If you overwrite these in the global environment, you can set
+#' the corresponding default subguide. For example:
+#'
+#' ```r
+#' subguide_slab = ggdist::subguide_inside(position = "right")
+#' ```
+#'
+#' This will cause [geom_slabinterval()]s to default to having a guide on the
+#' right side of the geom.
+#' @rdname subguide_axis
+#' @export
+subguide_slab = subguide_none
+
+#' @rdname subguide_axis
+#' @export
+
+subguide_dots = subguide_none
+#' @rdname subguide_axis
+#' @export
+subguide_spike = subguide_none
 
 
 # helpers -----------------------------------------------------------------
@@ -298,12 +332,12 @@ draw_subguide_axis = function(
     position = axis_position
   )
   params = guide$params
-  params$key = data_frame(
+  params$key = data_frame0(
     !!aes := break_positions,
     .value = break_positions,
     .label = break_labels
   )
-  params$decor = data_frame(
+  params$decor = data_frame0(
     !!aes := c(0, 1),
     !!opp := if (axis_position %in% c("top", "right")) 0 else 1
   )

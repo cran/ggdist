@@ -3,6 +3,9 @@
 # Author: mjskay
 ###############################################################################
 
+
+# skips -------------------------------------------------------------------
+
 #' skip tests if there is no vdiffr setup or if the setup is likely
 #' to produce false positive test failures (e.g. old version of ggplot2)
 #' @noRd
@@ -11,12 +14,23 @@ skip_if_no_vdiffr = function() {
   testthat::skip_if_not_installed("ggplot2", "3.3.3.9000")
 }
 
-#' skip tests senstive to minor changes in density() in R 4.4
-#' For now, these tests will be skipped in R 4.4 (devel).
-#' Once R 4.4 becomes the release version, invert this and update snapshots.
+#' skip tests of plot() on old versions of R (minor changes appear to
+#' make them incompatible)
+#' @noRd
+skip_if_old_plot = function() {
+  testthat::skip_if_not(getRversion() > "4.3", "plot() output changed in R 4.3")
+}
+
+#' skip tests sensitive to minor changes in density() in R 4.4
 #' @noRd
 skip_if_sensitive_to_density = function() {
-  testthat::skip_if(getRversion() >= "4.4", "density() output changed in R 4.4")
+  testthat::skip_if(getRversion() < "4.4", "density() output changed in R 4.4")
+}
+
+#' skip tests with minor numerical variations on Mac OS
+#' @noRd
+skip_if_mac = function() {
+  testthat::skip_on_os("mac")
 }
 
 #' skip tests if gradient support for visual test cases is not available
@@ -24,12 +38,15 @@ skip_if_sensitive_to_density = function() {
 #' gradients would be incorrect)
 #' @noRd
 skip_if_no_gradient = function() {
-  testthat::skip_if_not(getRversion() >= "4.1")
+  testthat::skip_if_not(getRversion() >= "4.2")
   testthat::skip_if_not_installed("svglite", "2.1.0")
   testthat::skip_if_not_installed("fontquiver")
   testthat::skip_if_not_installed("sysfonts")
   testthat::skip_if_not_installed("showtext")
 }
+
+
+# vdiffr writers ----------------------------------------------------------
 
 #' alternative SVG writer that supports gradients
 #' @noRd

@@ -7,7 +7,7 @@
 smooth_none(x, ...)
 }
 \arguments{
-\item{x}{a numeric vector}
+\item{x}{<\link{numeric}> Values to smooth.}
 
 \item{...}{ignored}
 }
@@ -19,7 +19,8 @@ If \code{x} is missing, returns a partial application of itself. See \link{autom
 \description{
 Default smooth for dotplots: no smooth. Simply returns the input values.
 
-Supports \link[=automatic-partial-functions]{automatic partial function application}.
+Supports \link[=auto_partial]{automatic partial function application} with
+\link[=waiver]{waived arguments}.
 }
 \details{
 This is the default value for the \code{smooth} argument of \code{geom_dotsinterval()}.

@@ -55,9 +55,9 @@ multiple guides are displayed, not the contents of the guide itself.
 If 0 (default), the order is determined by a secret algorithm.}
   }}
 
-\item{to}{The color to ramp to in the guide. Corresponds to \code{1} on the scale.}
+\item{to}{<\link[=character]{string}> The color to ramp to in the guide. Corresponds to \code{1} on the scale.}
 
-\item{available_aes}{A vector of character strings listing the aesthetics for which a \code{guide_rampbar()} can be drawn.}
+\item{available_aes}{<\link{character}> Vector listing the aesthetics for which a \code{guide_rampbar()} can be drawn.}
 }
 \value{
 A guide object.
@@ -65,7 +65,7 @@ A guide object.
 \description{
 A colour ramp bar guide that shows continuous colour ramp scales mapped onto
 values as a smooth gradient. Designed for use with \code{\link[=scale_fill_ramp_continuous]{scale_fill_ramp_continuous()}}
-and \code{\link[=scale_colour_ramp_continuous]{scale_colour_ramp_continuous()}}. Based on \code{\link[=guide_colourbar]{guide_colourbar()}}.
+and \code{\link[=scale_colour_ramp_continuous]{scale_colour_ramp_continuous()}}. Based on \code{\link[ggplot2:guide_colourbar]{guide_colourbar()}}.
 }
 \details{
 This guide creates smooth gradient color bars for use with \code{\link[=scale_fill_ramp_continuous]{scale_fill_ramp_continuous()}}

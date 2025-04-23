@@ -16,7 +16,9 @@ geom_interval(
   arrow = NULL,
   na.rm = FALSE,
   show.legend = NA,
-  inherit.aes = TRUE
+  inherit.aes = TRUE,
+  check.aes = TRUE,
+  check.param = TRUE
 )
 }
 \arguments{
@@ -40,20 +42,30 @@ the plot data. The return value must be a \code{data.frame}, and
 will be used as the layer data. A \code{function} can be created
 from a \code{formula} (e.g. \code{~ head(.x, 10)}).}
 
-\item{stat}{The statistical transformation to use on the data for this
-layer, either as a \code{ggproto} \code{Geom} subclass or as a string naming the
-stat stripped of the \code{stat_} prefix (e.g. \code{"count"} rather than
-\code{"stat_count"})}
+\item{stat}{The statistical transformation to use on the data for this layer.
+When using a \verb{geom_*()} function to construct a layer, the \code{stat}
+argument can be used the override the default coupling between geoms and
+stats. The \code{stat} argument accepts the following:
+\itemize{
+\item A \code{Stat} ggproto subclass, for example \code{StatCount}.
+\item A string naming the stat. To give the stat as a string, strip the
+function name of the \code{stat_} prefix. For example, to use \code{stat_count()},
+give the stat as \code{"count"}.
+\item For more information and other ways to specify the stat, see the
+\link[ggplot2:layer_stats]{layer stat} documentation.
+}}
 
-\item{position}{Position adjustment, either as a string, or the result of a call to a position adjustment function.
-Setting this equal to \code{"dodge"} (\code{\link[=position_dodge]{position_dodge()}}) or \code{"dodgejust"} (\code{\link[=position_dodgejust]{position_dodgejust()}}) can be useful if
-you have overlapping geometries.}
+\item{position}{<\link[ggplot2:ggplot2-ggproto]{Position} | \link[=character]{string}> Position adjustment,
+either as a string, or the result of a call to a position adjustment function.
+Setting this equal to \code{"dodge"} (\code{\link[ggplot2:position_dodge]{position_dodge()}}) or
+\code{"dodgejust"} (\code{\link[=position_dodgejust]{position_dodgejust()}}) can be useful if you have overlapping geometries.}
 
-\item{...}{Other arguments passed to \code{\link[=layer]{layer()}}. These are often aesthetics, used to set an aesthetic
-to a fixed value, like \code{colour = "red"} or \code{linewidth = 3} (see \strong{Aesthetics}, below). They may also be
-parameters to the paired geom/stat.}
+\item{...}{Other arguments passed to \code{\link[ggplot2:layer]{layer()}}. These are
+often aesthetics, used to set an aesthetic to a fixed value, like \code{colour = "red"}
+or \code{linewidth = 3} (see \strong{Aesthetics}, below). They may also be parameters
+to the paired geom/stat.}
 
-\item{orientation}{Whether this geom is drawn horizontally or vertically. One of:
+\item{orientation}{<\link[=character]{string}> Whether this geom is drawn horizontally or vertically. One of:
 \itemize{
 \item \code{NA} (default): automatically detect the orientation based on how the aesthetics
 are assigned. Automatic detection works most of the time.
@@ -68,25 +80,27 @@ For compatibility with the base ggplot naming scheme for \code{orientation}, \co
 for \code{"vertical"} and \code{"y"} as an alias for \code{"horizontal"} (\pkg{ggdist} had an \code{orientation} parameter
 before base ggplot did, hence the discrepancy).}
 
-\item{interval_size_range}{A length-2 numeric vector. This geom scales the raw size aesthetic values when drawing interval and point
-sizes, as they tend to be too thick when using the default settings of \code{\link[=scale_size_continuous]{scale_size_continuous()}}, which give
-sizes with a range of \code{c(1, 6)}. The \code{interval_size_domain} value indicates the input domain of raw size
-values (typically this should be equal to the value of the \code{range} argument of the \code{\link[=scale_size_continuous]{scale_size_continuous()}}
-function), and \code{interval_size_range} indicates the desired output range of the size values (the min and max of
-the actual sizes used to draw intervals). Most of the time it is not recommended to change the value of this
-argument, as it may result in strange scaling of legends; this argument is a holdover from earlier versions
-that did not have size aesthetics targeting the point and interval separately. If you want to adjust the
-size of the interval or points separately, you can also use the \code{linewidth} or \code{point_size}
-aesthetics; see \link{sub-geometry-scales}.}
+\item{interval_size_range}{<length-2 \link{numeric}> This geom scales the raw size aesthetic values when
+drawing interval and point sizes, as they tend to be too thick when using
+the default settings of \code{\link[ggplot2:scale_size]{scale_size_continuous()}},
+which give sizes with a range of \code{c(1, 6)}. The \code{interval_size_domain} value indicates the
+input domain of raw size values (typically this should be equal to the value of the \code{range}
+argument of the \code{\link[ggplot2:scale_size]{scale_size_continuous()}} function), and
+\code{interval_size_range} indicates the desired output range of the size values (the min and max
+of the actual sizes used to draw intervals). Most of the time it is not recommended to change
+the value of this argument, as it may result in strange scaling of legends; this argument is
+a holdover from earlier versions that did not have size aesthetics targeting the point and
+interval separately. If you want to adjust the size of the interval or points separately,
+you can also use the \code{linewidth} or \code{point_size} aesthetics; see \link{sub-geometry-scales}.}
 
-\item{interval_size_domain}{A length-2 numeric vector giving the minimum and maximum of the values of the \code{size} and \code{linewidth} aesthetics
+\item{interval_size_domain}{<length-2 \link{numeric}> Minimum and maximum of the values of the \code{size} and \code{linewidth} aesthetics
 that will be translated into actual sizes for intervals drawn according to \code{interval_size_range} (see the
 documentation for that argument.)}
 
-\item{arrow}{\code{\link[grid:arrow]{grid::arrow()}} giving the arrow heads to use on the interval, or \code{NULL} for no arrows.}
+\item{arrow}{<\link{arrow} | \link{NULL}> Type of arrow heads to use on the interval, or \code{NULL} for no arrows.}
 
-\item{na.rm}{If \code{FALSE}, the default, missing values are removed with a warning. If \code{TRUE}, missing
-values are silently removed.}
+\item{na.rm}{<scalar \link{logical}> If \code{FALSE}, the default, missing values are removed with a warning. If \code{TRUE},
+missing values are silently removed.}
 
 \item{show.legend}{logical. Should this layer be included in the legends?
 \code{NA}, the default, includes if any aesthetics are mapped.
@@ -98,10 +112,14 @@ display.}
 rather than combining with them. This is most useful for helper functions
 that define both data and aesthetics and shouldn't inherit behaviour from
 the default plot specification, e.g. \code{\link[ggplot2:borders]{borders()}}.}
+
+\item{check.aes, check.param}{If \code{TRUE}, the default, will check that
+supplied parameters and aesthetics are understood by the \code{geom} or
+\code{stat}. Use \code{FALSE} to suppress the checks.}
 }
 \value{
 A \link[ggplot2:ggplot2-ggproto]{ggplot2::Geom} representing a multiple-interval geometry which can
-be added to a \code{\link[=ggplot]{ggplot()}} object.
+be added to a \code{\link[ggplot2:ggplot]{ggplot()}} object.
 }
 \description{
 Shortcut version of \code{\link[=geom_slabinterval]{geom_slabinterval()}} for creating multiple-interval plots.
@@ -122,7 +140,7 @@ Shortcut version of \code{\link[=geom_slabinterval]{geom_slabinterval()}} for cr
 This geom wraps \code{\link[=geom_slabinterval]{geom_slabinterval()}} with defaults designed to produce
 multiple-interval plots. Default aesthetic mappings are applied if the \code{.width} column
 is present in the input data (e.g., as generated by the \code{\link[=point_interval]{point_interval()}} family of functions),
-making this geom often more convenient than vanilla \link{ggplot2} geometries when used with
+making this geom often more convenient than vanilla \link[ggplot2:ggplot2-package]{ggplot2} geometries when used with
 functions like \code{\link[=median_qi]{median_qi()}}, \code{\link[=mean_qi]{mean_qi()}}, \code{\link[=mode_hdi]{mode_hdi()}}, etc.
 
 Specifically, if \code{.width} is present in the input, \code{\link[=geom_interval]{geom_interval()}} acts

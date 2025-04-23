@@ -12,11 +12,12 @@ dots_grob = function(data, x, y, xscale = 1,
   name = NULL, gp = gpar(), vp = NULL,
   dotsize = 1.07, stackratio = 1, binwidth = NA, layout = "bin",
   overlaps = "nudge", overflow = "warn",
-  subguide = "none",
+  subguide = "dots",
   verbose = FALSE,
   orientation = "vertical",
   make_points_grob = make_points_grob
 ) {
+  data$shape = translate_shape(data$shape)
   # drop the dist columns because they can be expensive and we don't need them
   # after this point
   keep_cols = !(names(data) %in% c("xdist", "ydist", "dist"))
@@ -36,6 +37,13 @@ dots_grob = function(data, x, y, xscale = 1,
   )
 }
 
+translate_shape = function(shape) {
+  if (is.character(shape)) {
+    translate_shape_string(shape)
+  } else {
+    shape
+  }
+}
 
 dot_size_ratio = 1.07                  # historical fudge factor based on old stackratio
 font_size_ratio = 1.43/dot_size_ratio  # manual fudge factor for point size in ggplot
@@ -261,13 +269,14 @@ make_points_grob = function(
 
 # panel drawing function -------------------------------------------------------
 
-draw_slabs_dots = function(self, s_data, panel_params, coord,
-  orientation, normalize, fill_type, na.rm,
+draw_slabs_dots = function(
+  self, s_data, panel_params, coord, orientation,
+  ...,
+  fill_type, na.rm,
   dotsize, stackratio, binwidth, layout,
   overlaps, overflow,
   subguide,
-  verbose,
-  ...
+  verbose
 ) {
   define_orientation_variables(orientation)
 
@@ -275,7 +284,7 @@ draw_slabs_dots = function(self, s_data, panel_params, coord,
   s_data$thickness = 1
   subguide_params = NULL
   c(s_data, subguide_params) %<-% rescale_slab_thickness(
-    s_data, orientation, normalize, na.rm, name = "geom_dotsinterval"
+    s_data, orientation, na.rm, name = "geom_dotsinterval"
   )
   s_data = self$override_slab_aesthetics(s_data)
   if (nrow(s_data) == 0) return(list())
@@ -357,7 +366,7 @@ draw_slabs_dots = function(self, s_data, panel_params, coord,
 #' @inheritParams geom_slabinterval
 #' @author Matthew Kay
 #' @return A [ggplot2::Geom] or [ggplot2::Stat] representing a dotplot or combined dotplot+interval geometry which can
-#' be added to a [ggplot()] object.
+#' be added to a [`ggplot()`][ggplot2::ggplot] object.
 #' @seealso See the [stat_slabinterval()] family for other
 #' stats built on top of [geom_slabinterval()].
 #' See `vignette("dotsinterval")` for a variety of examples of use.
@@ -459,7 +468,8 @@ GeomDotsinterval = ggproto("GeomDotsinterval", GeomSlabinterval,
   ## parameters --------------------------------------------------------------
 
   param_docs = defaults(list(
-    binwidth = glue_doc('The bin width to use for laying out the dots.
+    binwidth = glue_doc('
+      <[numeric] | [unit]> The bin width to use for laying out the dots.
       One of:
         - `NA` (the default): Dynamically select the bin width based on the
           size of the plot when drawn. This will pick a `binwidth` such that the
@@ -479,18 +489,21 @@ GeomDotsinterval = ggproto("GeomDotsinterval", GeomSlabinterval,
       10% of the viewport size (while still ensuring the tallest stack is less than
       or equal to `scale`).
       '),
-    dotsize = glue_doc('The width of the dots relative to the `binwidth`. The default,
+    dotsize = glue_doc('
+      <scalar [numeric]> The width of the dots relative to the `binwidth`. The default,
       `1.07`, makes dots be just a bit wider than the bin width, which is a
       manually-tuned parameter that tends to work well with the default circular
       shape, preventing gaps between bins from appearing to be too large visually
       (as might arise from dots being *precisely* the `binwidth`). If it is desired
       to have dots be precisely the `binwidth`, set `dotsize = 1`.
       '),
-    stackratio = glue_doc('The distance between the center of the dots in the same
+    stackratio = glue_doc('
+      <scalar [numeric]> The distance between the center of the dots in the same
       stack relative to the dot height. The default, `1`, makes dots in the same
       stack just touch each other.
       '),
-    smooth = glue_doc('Smoother to apply to dot positions.
+    smooth = glue_doc('
+      <[function] | [string][character]> Smoother to apply to dot positions.
       One of:
         - A function that takes a numeric vector of dot positions and returns a
           smoothed version of that vector, such as `smooth_bounded()`,
@@ -503,7 +516,8 @@ GeomDotsinterval = ggproto("GeomDotsinterval", GeomSlabinterval,
       Smoothing is most effective when the smoother is matched to the support of
       the distribution; e.g. using `smooth_bounded(bounds = ...)`.
       '),
-    overflow = glue_doc('How to handle overflow of dots beyond the extent of the geom
+    overflow = glue_doc('
+      <[string][character]> How to handle overflow of dots beyond the extent of the geom
       when a minimum `binwidth` (or an exact `binwidth`) is supplied.
       One of:
         - `"keep"`: Keep the overflow, drawing dots outside the geom bounds.
@@ -518,8 +532,8 @@ GeomDotsinterval = ggproto("GeomDotsinterval", GeomSlabinterval,
       with dots overlapping, consider setting `overflow = "compress"` and supplying
       an exact or minimum dot size using `binwidth`.
       '),
-    layout = glue_doc('The layout method used
-      for the dots: \\itemize{
+    layout = glue_doc('
+      <[string][character]> The layout method used for the dots. One of: \\itemize{
         \\item `"bin"` (default): places dots on the off-axis at the midpoint of
           their bins as in the classic Wilkinson dotplot. This maintains the
           alignment of rows and columns in the dotplot. This layout is slightly
@@ -543,7 +557,8 @@ GeomDotsinterval = ggproto("GeomDotsinterval", GeomSlabinterval,
         \\item `"bar"`: for discrete distributions, lays out duplicate values in
           rectangular bars.
       }'),
-    overlaps = glue_doc('How to handle overlapping dots or bins in the `"bin"`,
+    overlaps = glue_doc('
+      <[string][character]> How to handle overlapping dots or bins in the `"bin"`,
       `"weave"`, and `"hex"` layouts (dots never overlap in the `"swarm"` or `"bar"` layouts).
       For the purposes of this argument, dots are only considered to be overlapping
       if they would be overlapping when `dotsize = 1` and `stackratio = 1`; i.e.
@@ -556,7 +571,8 @@ GeomDotsinterval = ggproto("GeomDotsinterval", GeomSlabinterval,
           dots to their desired positions, subject to the constraint that adjacent
           dots do not overlap.
       }'),
-    verbose = glue_doc('If `TRUE`, print out the bin width of the dotplot. Can be useful
+    verbose = glue_doc('
+      <scalar [logical]> If `TRUE`, print out the bin width of the dotplot. Can be useful
       if you want to start from an automatically-selected bin width and then adjust it
       manually. Bin width is printed both as data units and as normalized parent
       coordinates or `"npc"`s (see [unit()]). Note that if you just want to scale the
@@ -568,6 +584,7 @@ GeomDotsinterval = ggproto("GeomDotsinterval", GeomSlabinterval,
   ), GeomSlabinterval$param_docs),
 
   default_params = defaults(list(
+    subscale = "thickness",
     normalize = "none",
     binwidth = NA,
     dotsize = 1.07,
@@ -580,7 +597,7 @@ GeomDotsinterval = ggproto("GeomDotsinterval", GeomSlabinterval,
   ), GeomSlabinterval$default_params),
 
   hidden_params = union(c(
-    "normalize", "fill_type"
+    "subscale", "normalize", "fill_type"
   ), GeomSlabinterval$hidden_params),
 
 

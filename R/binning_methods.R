@@ -11,17 +11,17 @@
 #'
 #' Bins the provided data values using one of several dotplot algorithms.
 #'
-#' @param x numeric vector of x values
-#' @param y numeric vector of y values
-#' @param binwidth bin width
-#' @param heightratio ratio of bin width to dot height
-#' @param stackratio ratio of dot height to vertical distance between dot
-#' centers
+#' @param x <[numeric]> *x* values.
+#' @param y <[numeric]> *y* values (same length as `x`).
+#' @param binwidth <scalar [numeric]> Bin width.
+#' @param heightratio <scalar [numeric]> Ratio of bin width to dot height
+#' @param stackratio <scalar [numeric]> Ratio of dot height to vertical distance
+#' between dot centers
 #' @eval rd_param_dots_layout()
 #' @eval rd_param_dots_overlaps()
 #' @eval rd_param_slab_side()
-#' @param orientation Whether the dots are laid out horizontally or vertically.
-#' Follows the naming scheme of [geom_slabinterval()]:
+#' @param orientation <[string][character]> Whether the dots are laid out horizontally
+#' or vertically. Follows the naming scheme of [geom_slabinterval()]:
 #'
 #'   - `"horizontal"` assumes the data values for the dotplot are in the `x`
 #'   variable and that dots will be stacked up in the `y` direction.
@@ -75,7 +75,7 @@ bin_dots = function(x, y, binwidth,
   side = match.arg(side)
   orientation = match.arg(orientation)
 
-  d = data.frame(x = x, y = y)
+  d = data_frame0(x = x, y = y)
 
   # after this point `x` and `y` refer to column names in `d` according
   # to the orientation
@@ -132,7 +132,7 @@ bin_dots = function(x, y, binwidth,
       d$row = NULL
     },
     swarm = {
-      stop_if_not_installed("beeswarm", '{.help geom_dots}(layout = "swarm")')
+      stop_if_not_installed("beeswarm", '{.help ggdist::geom_dots}(layout = "swarm")')
 
       swarm_xy = beeswarm::swarmy(d[[x]], d[[y]],
         xsize = h$binwidth, ysize = h$y_spacing,
@@ -193,11 +193,11 @@ bin_dots = function(x, y, binwidth,
 #' Searches for a nice-looking bin width to use to draw a dotplot such that
 #' the height of the dotplot fits within a given space (`maxheight`).
 #'
-#' @param x numeric vector of values
-#' @param maxheight maximum height of the dotplot
-#' @param heightratio ratio of bin width to dot height
-#' @param stackratio ratio of dot height to vertical distance between dot
-#' centers
+#' @param x <[numeric]> Data values.
+#' @param maxheight <scalar [numeric]> Maximum height of the dotplot.
+#' @param heightratio <scalar [numeric]> Ratio of bin width to dot height.
+#' @param stackratio <scalar [numeric]> Ratio of dot height to vertical distance
+#' between dot centers
 #' @eval rd_param_dots_layout()
 #'
 #' @details

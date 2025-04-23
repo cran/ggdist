@@ -9,10 +9,10 @@
 #'
 #' Estimate the bounds of the distribution a sample came from using the CDF of
 #' the order statistics of the sample. Use with the `bounder` argument to [density_bounded()].
-#' @template description-auto-partial
+#' @template description-auto-partial-waivable
 #'
-#' @param x numeric vector containing a sample to estimate the bounds of.
-#' @param p scalar in \eqn{[0,1]}: percentile of the order statistic distribution to use
+#' @param x <[numeric]> Sample to estimate the bounds of.
+#' @param p <scalar [numeric]> in \eqn{[0,1]}: Percentile of the order statistic distribution to use
 #'   as the estimate. `p = 1` will return `range(x)`; `p = 0.5` will give the median
 #'   estimate, `p = 0` will give a very wide estimate (effectively treating the
 #'   distribution as unbounded when used with [density_bounded()]).
@@ -90,7 +90,7 @@ bounder_cdf = auto_partial(name = "bounder_cdf", function(x, p = 0.01) {
 #'
 #' Estimate the bounds of the distribution a sample came from using Cooke's method.
 #' Use with the `bounder` argument to [density_bounded()].
-#' @template description-auto-partial
+#' @template description-auto-partial-waivable
 #'
 #' @inheritParams bounder_cdf
 #'
@@ -158,7 +158,7 @@ bounder_cooke = auto_partial(name = "bounder_cooke", function(x) {
 #'
 #' Estimate the bounds of the distribution a sample came from using the range of the sample.
 #' Use with the `bounder` argument to [density_bounded()].
-#' @template description-auto-partial
+#' @template description-auto-partial-waivable
 #'
 #' @inheritParams bounder_cdf
 #'

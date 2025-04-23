@@ -6,6 +6,9 @@
 \alias{subguide_outside}
 \alias{subguide_integer}
 \alias{subguide_count}
+\alias{subguide_slab}
+\alias{subguide_dots}
+\alias{subguide_spike}
 \title{Axis sub-guide for thickness scales}
 \usage{
 subguide_axis(
@@ -27,12 +30,18 @@ subguide_outside(..., label_side = "outside", just = 1)
 subguide_integer(..., breaks = scales::breaks_extended(Q = c(1, 5, 2, 4, 3)))
 
 subguide_count(..., breaks = scales::breaks_width(1))
+
+subguide_slab(values, ...)
+
+subguide_dots(values, ...)
+
+subguide_spike(values, ...)
 }
 \arguments{
-\item{values}{Values used to construct the scale used for this guide.
+\item{values}{<\link{numeric}> Values used to construct the scale used for this guide.
 Typically provided automatically by \code{\link[=geom_slabinterval]{geom_slabinterval()}}.}
 
-\item{title}{The title of the scale shown on the sub-guide's axis.}
+\item{title}{<\link[=character]{string}> The title of the scale shown on the sub-guide's axis.}
 
 \item{breaks}{One of:
 \itemize{
@@ -42,6 +51,7 @@ Typically provided automatically by \code{\link[=geom_slabinterval]{geom_slabint
 \item A numeric vector of positions
 \item A function that takes the limits as input and returns breaks
 as output (e.g., a function returned by \code{\link[scales:breaks_extended]{scales::extended_breaks()}}).
+Note that for position scales, limits are provided after scale expansion.
 Also accepts rlang \link[rlang:as_function]{lambda} function notation.
 }}
 
@@ -57,7 +67,7 @@ as output. Also accepts rlang \link[rlang:as_function]{lambda} function
 notation.
 }}
 
-\item{position}{Numeric value between \code{0} and \code{1} giving the position of the
+\item{position}{<scalar \link{numeric}> Value between \code{0} and \code{1} giving the position of the
 guide relative to the axis: \code{0} causes the sub-guide to be drawn on the
 left or bottom depending on if \code{orientation} is \code{"horizontal"} or \code{"vertical"},
 and \code{1} causes the sub-guide to be drawn on the top or right depending on
@@ -65,11 +75,11 @@ if \code{orientation} is \code{"horizontal"} or \code{"vertical"}. May also be a
 indicating the position: \code{"top"}, \code{"right"}, \code{"bottom"}, \code{"left"},
 \code{"topright"}, \code{"topleft"}, \code{"bottomright"}, or \code{"bottomleft"}.}
 
-\item{just}{Numeric value between \code{0} and \code{1} giving the justification of the
+\item{just}{<scalar \link{numeric}> Value between \code{0} and \code{1} giving the justification of the
 guide relative to its position: 0 means aligned towards the inside of the
 axis edge, 1 means aligned towards the outside of the axis edge.}
 
-\item{label_side}{Which side of the axis to draw the ticks and labels on.
+\item{label_side}{<\link[=character]{string}> Which side of the axis to draw the ticks and labels on.
 \code{"topright"}, \code{"top"}, and \code{"right"} are synonyms which cause the labels
 to be drawn on the top or the right depending on if \code{orientation} is
 \code{"horizontal"} or \code{"vertical"}. \code{"bottomleft"}, \code{"bottom"}, and \code{"left"}
@@ -81,25 +91,26 @@ depending on if \code{orientation} is \code{"horizontal"} or \code{"vertical"}.
 of the chart, depending on \code{position}, and \code{"outside"} on the side closest
 to the outside of the chart.}
 
-\item{orientation}{Orientation of the geometry this sub-guide is for. One
+\item{orientation}{<\link[=character]{string}> Orientation of the geometry this sub-guide is for. One
 of \code{"horizontal"} (\code{"y"}) or \code{"vertical"} (\code{"x"}). See the \code{orientation}
 parameter to \code{\link[=geom_slabinterval]{geom_slabinterval()}}.}
 
-\item{theme}{A \link[ggplot2:theme]{ggplot2::theme} object used to determine the style that the
+\item{theme}{<\link[ggplot2:theme]{theme}> Theme used to determine the style that the
 sub-guide elements are drawn in. The title label is drawn using the
 \code{"axis.title.x"} or \code{"axis.title.y"} theme setting, and the axis line,
-ticks, and tick labels are drawn using \code{\link[=guide_axis]{guide_axis()}}, so the same theme
+ticks, and tick labels are drawn using \code{\link[ggplot2:guide_axis]{guide_axis()}}, so the same theme
 settings that normally apply to axis guides will be followed.}
 
 \item{...}{Arguments passed to other functions, typically back to
 \code{subguide_axis()} itself.}
 }
 \description{
-This is a sub-guide intended for annotating the \link{thickness} aesthetic
-in \pkg{ggdist}. It can be used with the \code{subguide} parameter of
-\code{\link[=geom_slabinterval]{geom_slabinterval()}}.
+This is a sub-guide intended for annotating the \code{thickness} and dot-count
+subscales in \pkg{ggdist}. It can be used with the \code{subguide} parameter of
+\code{\link[=geom_slabinterval]{geom_slabinterval()}} and \code{\link[=geom_dotsinterval]{geom_dotsinterval()}}.
 
-Supports \link[=automatic-partial-functions]{automatic partial function application}.
+Supports \link[=auto_partial]{automatic partial function application} with
+\link[=waiver]{waived arguments}.
 }
 \details{
 \code{\link[=subguide_inside]{subguide_inside()}} is a shortcut for drawing labels inside of the chart
@@ -114,9 +125,20 @@ labeling counts in \code{\link[=geom_dots]{geom_dots()}}.
 \code{\link[=subguide_count]{subguide_count()}} is a shortcut for drawing labels where \emph{every} whole number
 is labeled, useful for labeling counts in \code{\link[=geom_dots]{geom_dots()}}. If your max count is
 large, \code{\link[=subguide_integer]{subguide_integer()}} may be better.
+
+\code{\link[=subguide_slab]{subguide_slab()}}, \code{\link[=subguide_dots]{subguide_dots()}}, and \code{\link[=subguide_spike]{subguide_spike()}} are aliases
+for \code{\link[=subguide_none]{subguide_none()}} that allow you to change the default subguide used
+for the \code{\link[=geom_slabinterval]{geom_slabinterval()}}, \code{\link[=geom_dotsinterval]{geom_dotsinterval()}}, and \code{\link[=geom_spike]{geom_spike()}}
+families. If you overwrite these in the global environment, you can set
+the corresponding default subguide. For example:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{subguide_slab = ggdist::subguide_inside(position = "right")
+}\if{html}{\out{</div>}}
+
+This will cause \code{\link[=geom_slabinterval]{geom_slabinterval()}}s to default to having a guide on the
+right side of the geom.
 }
 \examples{
-# example code
 library(ggplot2)
 library(distributional)
 
@@ -147,6 +169,16 @@ ggplot(df, aes(xdist = d, y = g)) +
 
 }
 \seealso{
+The \link{thickness} datatype.
+
+The \code{thickness} aesthetic of \code{\link[=geom_slabinterval]{geom_slabinterval()}}.
+
+\code{\link[=scale_thickness_shared]{scale_thickness_shared()}}, for setting a \code{thickness} scale across
+all geometries using the \code{thickness} aesthetic.
+
+\code{\link[=subscale_thickness]{subscale_thickness()}}, for setting a \code{thickness} sub-scale within
+a single \code{\link[=geom_slabinterval]{geom_slabinterval()}}.
+
 Other sub-guides: 
 \code{\link{subguide_none}()}
 }

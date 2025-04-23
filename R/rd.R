@@ -153,7 +153,7 @@ rd_layer_params = function(geom_name, stat = NULL, as_dots = FALSE) {
   )
   params = params[param_names]
 
-  missing_docs = vapply(params, is.null, logical(1))
+  missing_docs = map_lgl_(params, is.null)
   if (any(missing_docs)) {
     cli_abort("Missing docs for params: {param_names[missing_docs]}")
   }
@@ -161,10 +161,11 @@ rd_layer_params = function(geom_name, stat = NULL, as_dots = FALSE) {
   if (length(params)) {
     if (as_dots) {
       glue_doc('
-        @param ...  Other arguments passed to [layer()]. These are often aesthetics, used to set an aesthetic
-          to a fixed value, like `colour = "red"` or `linewidth = 3` (see **Aesthetics**, below). They may also be
-          parameters to the paired geom/stat. When paired with the default geom, [geom_<<geom_name>>()],
-          these include:
+        @param ...  Other arguments passed to [`layer()`][ggplot2::layer]. These
+          are often aesthetics, used to set an aesthetic to a fixed value, like
+          `colour = "red"` or `linewidth = 3` (see **Aesthetics**, below). They
+          may also be parameters to the paired geom/stat. When paired with the
+          default geom, [geom_<<geom_name>>()], these include:
           <<rd_describe_list(params)>>
         ')
     } else {

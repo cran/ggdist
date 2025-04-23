@@ -20,7 +20,7 @@ compute_slab_dots = function(
 
   dist = data$dist
   if (distr_is_missing(dist)) {
-    return(data.frame(.input = NA_real_, f = NA_real_, n = NA_integer_))
+    return(data_frame0(.input = NA_real_, f = NA_real_, n = NA_integer_))
   }
 
   quantiles = quantiles %||% NA
@@ -46,13 +46,13 @@ compute_slab_dots = function(
         .sample, probs, type = quantile_type, na.rm = na.rm, weights = .weights, names = FALSE
       )
       if (compute_mcse) {
-        stop_if_not_installed("posterior", "{.help stat_mcse_dots}")
+        stop_if_not_installed("posterior", "{.help ggdist::stat_mcse_dots}")
         se = posterior::mcse_quantile(.sample, probs, names = FALSE)
       }
     } else {
       input = sort(.sample)
       if (compute_mcse) {
-        stop_if_not_installed("posterior", "{.help stat_mcse_dots}")
+        stop_if_not_installed("posterior", "{.help ggdist::stat_mcse_dots}")
         se = posterior::mcse_quantile(.sample, ppoints(length(input), a = 0.5), names = FALSE)
       }
     }
@@ -64,7 +64,7 @@ compute_slab_dots = function(
     se = 0
   }
 
-  out = data.frame(
+  out = data_frame0(
     .input = input,
     f = 1,
     n = length(input)
@@ -83,7 +83,7 @@ StatDotsinterval = ggproto("StatDotsinterval", StatSlabinterval,
 
   hidden_params = union(c(
     "limits", "n",
-    "p_limits", "slab_type", "outline_bars",
+    "p_limits", "outline_bars",
     "density", "adjust", "trim", "expand", "breaks", "align"
   ), StatSlabinterval$hidden_params),
 
@@ -93,11 +93,11 @@ StatDotsinterval = ggproto("StatDotsinterval", StatSlabinterval,
 
 #' @eval rd_dotsinterval_shortcut_stat("dotsinterval", "dots + point + interval")
 #' @inheritParams stat_slabinterval
-#' @param quantiles Setting this to a value other than `NA`
-#' will produce a quantile dotplot: that is, a dotplot of quantiles from the sample or distribution
-#' (for analytical distributions, the default of `NA` is taken to mean `100` quantiles). The value of
-#' `quantiles` determines the number
-#' of quantiles to plot. See Kay et al. (2016) and Fernandes et al. (2018) for more information on quantile dotplots.
+#' @param quantiles <scalar [logical]> Number of quantiles to plot in the dotplot. Use `NA`
+#' (the default) to plot all data points. Setting this to a value other than `NA` will produce
+#' a quantile dotplot: that is, a dotplot of quantiles from the sample or distribution (for
+#' analytical distributions, the default of `NA` is taken to mean `100` quantiles). See
+#' Kay et al. (2016) and Fernandes et al. (2018) for more information on quantile dotplots.
 #' @export
 stat_dotsinterval = make_stat(StatDotsinterval, geom = "dotsinterval")
 
@@ -115,7 +115,6 @@ StatDots = ggproto("StatDots", StatDotsinterval,
   ), StatDotsinterval$layer_args),
 
   hidden_params = union(c(
-    "show_slab", "show_point", "show_interval",
     "point_interval", ".width"
   ), StatDotsinterval$hidden_params)
 )

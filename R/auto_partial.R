@@ -51,7 +51,7 @@
 #' These function families (except [point_interval()]) also support passing
 #' [waiver]s to their optional arguments: if [waiver()] is passed to any
 #' of these arguments, their default value (or the most
-#' recently-partially-applied non-`waiver` value) is used instead.
+#' recently-partially-applied non-[waiver] value) is used instead.
 #'
 #' Use the [auto_partial()] function to create new functions that support
 #' automatic partial application.
@@ -98,7 +98,7 @@ partial_self = function(name = NULL, waivable = TRUE) {
 
   waivable_arg_names = if (waivable) {
     f_args = formals(f)
-    is_required_arg = vapply(f_args, rlang::is_missing, FUN.VALUE = logical(1))
+    is_required_arg = map_lgl_(f_args, rlang::is_missing)
     names(f_args)[!is_required_arg]
   }
 
@@ -123,10 +123,10 @@ partial_self = function(name = NULL, waivable = TRUE) {
 }
 
 #' @rdname auto_partial
-#' @param f A function
-#' @param name A character string giving the name of the function, to be used
+#' @param f <[function]> Function to automatically partially-apply.
+#' @param name <[string][character]> Name of the function, to be used
 #' when printing.
-#' @param waivable logical: if `TRUE`, optional arguments that get
+#' @param waivable <scalar [logical]> If `TRUE`, optional arguments that get
 #' passed a [waiver()] will keep their default value (or whatever
 #' non-`waiver` value has been most recently partially applied for that
 #' argument).
@@ -158,7 +158,7 @@ auto_partial = function(f, name = NULL, waivable = TRUE) {
   f_args = formals(f)
 
   # find the required arguments
-  is_required_arg = vapply(f_args, rlang::is_missing, FUN.VALUE = logical(1))
+  is_required_arg = map_lgl_(f_args, rlang::is_missing)
   required_arg_names = names(f_args)[is_required_arg]
   required_arg_names = required_arg_names[required_arg_names != "..."]
 
@@ -205,7 +205,7 @@ auto_partial = function(f, name = NULL, waivable = TRUE) {
     }),
     env = environment(f)
   )
-  attr(new_f, "srcref") = attr(f, "srcref")
+  new_f = utils::removeSource(new_f)
 
   new_f
 }
@@ -227,5 +227,55 @@ print.ggdist_partial_function = function(x, ...) {
   invisible(x)
 }
 
+
+# waiver ------------------------------------------------------------------
+
+#' A waived argument
+#'
+#' A flag indicating that the default value of an argument should be used.
+#'
+#' @details
+#' A [waiver()] is a flag passed to a function argument that indicates the
+#' function should use the default value of that argument. It is used in two
+#' cases:
+#'
+#' - \pkg{ggplot2} functions use it to distinguish between "nothing" (`NULL`)
+#'    and a default value calculated elsewhere ([waiver()]).
+#'
+#' - \pkg{ggdist} turns \pkg{ggplot2}'s convention into a standardized method of
+#'    argument-passing: any named argument with a default value in an
+#'    [automatically partially-applied function][auto_partial] can be passed
+#'    [waiver()] when calling the function. This will cause the default value
+#'    (or the most recently partially-applied value) of that argument to be used
+#'    instead.
+#'
+#'    **Note:** due to historical limitations, [waiver()] cannot currently be
+#'    used on arguments to the [point_interval()] family of functions.
+#'
+#' @seealso [auto_partial()], [ggplot2::waiver()]
+#' @examples
+#' f = auto_partial(function(x, y = "b") {
+#'   c(x = x, y = y)
+#' })
+#'
+#' f("a")
+#'
+#' # uses the default value of `y` ("b")
+#' f("a", y = waiver())
+#'
+#' # partially apply `f`
+#' g = f(y = "c")
+#' g
+#'
+#' # uses the last partially-applied value of `y` ("c")
+#' g("a", y = waiver())
+#' @importFrom ggplot2 waiver
 #' @export
-ggplot2::waiver
+waiver = ggplot2::waiver
+
+#' waiver-coalescing operator
+#' @noRd
+`%|W|%` = function(x, y) {
+  if (inherits(x, "waiver")) y
+  else x
+}

@@ -10,13 +10,16 @@ geom_spike(
   stat = "identity",
   position = "identity",
   ...,
+  subguide = "spike",
   orientation = NA,
+  subscale = "thickness",
   normalize = "all",
   arrow = NULL,
-  subguide = "none",
   na.rm = FALSE,
   show.legend = NA,
-  inherit.aes = TRUE
+  inherit.aes = TRUE,
+  check.aes = TRUE,
+  check.param = TRUE
 )
 }
 \arguments{
@@ -40,20 +43,46 @@ the plot data. The return value must be a \code{data.frame}, and
 will be used as the layer data. A \code{function} can be created
 from a \code{formula} (e.g. \code{~ head(.x, 10)}).}
 
-\item{stat}{The statistical transformation to use on the data for this
-layer, either as a \code{ggproto} \code{Geom} subclass or as a string naming the
-stat stripped of the \code{stat_} prefix (e.g. \code{"count"} rather than
-\code{"stat_count"})}
+\item{stat}{The statistical transformation to use on the data for this layer.
+When using a \verb{geom_*()} function to construct a layer, the \code{stat}
+argument can be used the override the default coupling between geoms and
+stats. The \code{stat} argument accepts the following:
+\itemize{
+\item A \code{Stat} ggproto subclass, for example \code{StatCount}.
+\item A string naming the stat. To give the stat as a string, strip the
+function name of the \code{stat_} prefix. For example, to use \code{stat_count()},
+give the stat as \code{"count"}.
+\item For more information and other ways to specify the stat, see the
+\link[ggplot2:layer_stats]{layer stat} documentation.
+}}
 
-\item{position}{Position adjustment, either as a string, or the result of a call to a position adjustment function.
-Setting this equal to \code{"dodge"} (\code{\link[=position_dodge]{position_dodge()}}) or \code{"dodgejust"} (\code{\link[=position_dodgejust]{position_dodgejust()}}) can be useful if
-you have overlapping geometries.}
+\item{position}{<\link[ggplot2:ggplot2-ggproto]{Position} | \link[=character]{string}> Position adjustment,
+either as a string, or the result of a call to a position adjustment function.
+Setting this equal to \code{"dodge"} (\code{\link[ggplot2:position_dodge]{position_dodge()}}) or
+\code{"dodgejust"} (\code{\link[=position_dodgejust]{position_dodgejust()}}) can be useful if you have overlapping geometries.}
 
-\item{...}{Other arguments passed to \code{\link[=layer]{layer()}}. These are often aesthetics, used to set an aesthetic
-to a fixed value, like \code{colour = "red"} or \code{linewidth = 3} (see \strong{Aesthetics}, below). They may also be
-parameters to the paired geom/stat.}
+\item{...}{Other arguments passed to \code{\link[ggplot2:layer]{layer()}}. These are
+often aesthetics, used to set an aesthetic to a fixed value, like \code{colour = "red"}
+or \code{linewidth = 3} (see \strong{Aesthetics}, below). They may also be parameters
+to the paired geom/stat.}
 
-\item{orientation}{Whether this geom is drawn horizontally or vertically. One of:
+\item{subguide}{<\link{function} | \link[=character]{string}> Sub-guide used to annotate the \code{thickness} scale. One of:
+\itemize{
+\item A function that takes a \code{scale} argument giving a \link[ggplot2:ggplot2-ggproto]{ggplot2::Scale}
+object and an \code{orientation} argument giving the orientation of the
+geometry and then returns a \link[grid:grid.grob]{grid::grob} that will draw the axis
+annotation, such as \code{\link[=subguide_axis]{subguide_axis()}} (to draw a traditional axis) or
+\code{\link[=subguide_none]{subguide_none()}} (to draw no annotation). See \code{\link[=subguide_axis]{subguide_axis()}}
+for a list of possibilities and examples.
+\item A string giving the name of such a function when prefixed
+with \code{"subguide_"}; e.g. \code{"axis"} or \code{"none"}. The values \code{"slab"},
+\code{"dots"}, and \code{"spike"} use the default subguide for their geom
+families (no subguide), which can be modified by setting
+\code{\link{subguide_slab}}, \code{\link{subguide_dots}}, or \code{\link{subguide_spike}};
+see the documentation for those functions.
+}}
+
+\item{orientation}{<\link[=character]{string}> Whether this geom is drawn horizontally or vertically. One of:
 \itemize{
 \item \code{NA} (default): automatically detect the orientation based on how the aesthetics
 are assigned. Automatic detection works most of the time.
@@ -68,7 +97,22 @@ For compatibility with the base ggplot naming scheme for \code{orientation}, \co
 for \code{"vertical"} and \code{"y"} as an alias for \code{"horizontal"} (\pkg{ggdist} had an \code{orientation} parameter
 before base ggplot did, hence the discrepancy).}
 
-\item{normalize}{How to normalize heights of functions input to the \code{thickness} aesthetic. One of:
+\item{subscale}{<\link{function} | \link[=character]{string}> Sub-scale used to scale values of the
+\code{thickness} aesthetic within the groups determined by \code{normalize}. One of:
+\itemize{
+\item A function that takes an \code{x} argument giving a numeric vector
+of values to be scaled and then returns a \link{thickness} vector representing
+the scaled values, such as \code{\link[=subscale_thickness]{subscale_thickness()}} or \code{\link[=subscale_identity]{subscale_identity()}}.
+\item A string giving the name of such a function when prefixed
+with \code{"subscale_"}; e.g. \code{"thickness"} or \code{"identity"}. The value
+\code{"thickness"} using the default subscale, which can be modified by
+setting \code{\link{subscale_thickness}}; see the documentation for that
+function.
+}
+For a comprehensive discussion and examples of slab scaling and normalization, see the
+\href{https://mjskay.github.io/ggdist/articles/thickness.html}{\code{thickness} scale article}.}
+
+\item{normalize}{<\link[=character]{string}> Groups within which to scale values of the \code{thickness} aesthetic. One of:
 \itemize{
 \item \code{"all"}: normalize so that the maximum height across all data is \code{1}.
 \item \code{"panels"}: normalize within panels so that the maximum height in each panel is \code{1}.
@@ -82,22 +126,10 @@ only be used with functions whose values are in [0,1], such as CDFs).
 For a comprehensive discussion and examples of slab scaling and normalization, see the
 \href{https://mjskay.github.io/ggdist/articles/thickness.html}{\code{thickness} scale article}.}
 
-\item{arrow}{\code{\link[grid:arrow]{grid::arrow()}} giving the arrow heads to use on the spike, or \code{NULL} for no arrows.}
+\item{arrow}{<\link{arrow} | \link{NULL}> Type of arrow heads to use on the spike, or \code{NULL} for no arrows.}
 
-\item{subguide}{Sub-guide used to annotate the \code{thickness} scale. One of:
-\itemize{
-\item A function that takes a \code{scale} argument giving a \link[ggplot2:ggplot2-ggproto]{ggplot2::Scale}
-object and an \code{orientation} argument giving the orientation of the
-geometry and then returns a \link[grid:grid.grob]{grid::grob} that will draw the axis
-annotation, such as \code{\link[=subguide_axis]{subguide_axis()}} (to draw a traditional axis) or
-\code{\link[=subguide_none]{subguide_none()}} (to draw no annotation). See \code{\link[=subguide_axis]{subguide_axis()}}
-for a list of possibilities and examples.
-\item A string giving the name of such a function when prefixed
-with \code{"subguide"}; e.g. \code{"axis"} or \code{"none"}.
-}}
-
-\item{na.rm}{If \code{FALSE}, the default, missing values are removed with a warning. If \code{TRUE}, missing
-values are silently removed.}
+\item{na.rm}{<scalar \link{logical}> If \code{FALSE}, the default, missing values are removed with a warning. If \code{TRUE},
+missing values are silently removed.}
 
 \item{show.legend}{logical. Should this layer be included in the legends?
 \code{NA}, the default, includes if any aesthetics are mapped.
@@ -109,10 +141,14 @@ display.}
 rather than combining with them. This is most useful for helper functions
 that define both data and aesthetics and shouldn't inherit behaviour from
 the default plot specification, e.g. \code{\link[ggplot2:borders]{borders()}}.}
+
+\item{check.aes, check.param}{If \code{TRUE}, the default, will check that
+supplied parameters and aesthetics are understood by the \code{geom} or
+\code{stat}. Use \code{FALSE} to suppress the checks.}
 }
 \value{
 A \link[ggplot2:ggplot2-ggproto]{ggplot2::Geom} representing a spike geometry which can
-be added to a \code{\link[=ggplot]{ggplot()}} object.
+be added to a \code{\link[ggplot2:ggplot]{ggplot()}} object.
 rd_slabinterval_aesthetics(geom_name),
 }
 \description{

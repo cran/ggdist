@@ -1,3 +1,39 @@
+# ggdist 3.3.3
+
+Major changes:
+
+* Require R > 4.0 due to several dependencies now requiring it.
+* To complement the `subguide`s for `geom_slab()`, there are now `subscale`s,
+  which can be used to adjust the `limits` or the `expand` parameter of the 
+  `thickness` per-geometry sub-scales (in much the same way those 
+  parameters can be set on `scale_thickness_shared()`) (#219).
+* Default subscales and subguides can be set by assigning `subscale_thickness`,
+  `subguide_slab`, `subguide_dots`, and `subguide_spike` in the global 
+  environment (#225).
+* Allow use of square `shape`s in `geom_blur_dots()`.
+* More arguments to `stat_slabinterval()` now use `waiver()`s so that they
+  can be set either in the call to the stat or in the call to the density
+  estimator (#220).
+* Bin edge openness can now be set via the `right_closed` and `outermost_closed`
+  arguments to `density_histogram()` (#238).
+* New helper functions `interval_widths()` and `pretty_widths()` make it 
+  easier to create nicely-spaced sets of nested intervals.
+
+Documentation:
+
+* Almost all parameter documentation (except some inherited from other packages)
+  now includes an annotation listing valid data types for that parameter (#243). 
+
+Bug fixes:
+
+* Stats and geoms now pass down `check.aes` and `check.param` to `layer()` so
+  that aesthetics can be used to carry data to later stages of the pipeline
+  without spurious warnings (#248).
+* Ensure `point_interval(<distribution>)` supports tidy evaluation on the
+  `.point` and `.interval` arguments (#221).
+* `point_interval(<tibble>)` always returns a `tibble()` (#224).
+
+
 # ggdist 3.3.2
 
 Major changes:

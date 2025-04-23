@@ -20,10 +20,12 @@ geom_blur_dots(
   overflow = "warn",
   verbose = FALSE,
   orientation = NA,
-  subguide = "none",
+  subguide = "slab",
   na.rm = FALSE,
   show.legend = NA,
-  inherit.aes = TRUE
+  inherit.aes = TRUE,
+  check.aes = TRUE,
+  check.param = TRUE
 )
 }
 \arguments{
@@ -47,20 +49,30 @@ the plot data. The return value must be a \code{data.frame}, and
 will be used as the layer data. A \code{function} can be created
 from a \code{formula} (e.g. \code{~ head(.x, 10)}).}
 
-\item{stat}{The statistical transformation to use on the data for this
-layer, either as a \code{ggproto} \code{Geom} subclass or as a string naming the
-stat stripped of the \code{stat_} prefix (e.g. \code{"count"} rather than
-\code{"stat_count"})}
+\item{stat}{The statistical transformation to use on the data for this layer.
+When using a \verb{geom_*()} function to construct a layer, the \code{stat}
+argument can be used the override the default coupling between geoms and
+stats. The \code{stat} argument accepts the following:
+\itemize{
+\item A \code{Stat} ggproto subclass, for example \code{StatCount}.
+\item A string naming the stat. To give the stat as a string, strip the
+function name of the \code{stat_} prefix. For example, to use \code{stat_count()},
+give the stat as \code{"count"}.
+\item For more information and other ways to specify the stat, see the
+\link[ggplot2:layer_stats]{layer stat} documentation.
+}}
 
-\item{position}{Position adjustment, either as a string, or the result of a call to a position adjustment function.
-Setting this equal to \code{"dodge"} (\code{\link[=position_dodge]{position_dodge()}}) or \code{"dodgejust"} (\code{\link[=position_dodgejust]{position_dodgejust()}}) can be useful if
-you have overlapping geometries.}
+\item{position}{<\link[ggplot2:ggplot2-ggproto]{Position} | \link[=character]{string}> Position adjustment,
+either as a string, or the result of a call to a position adjustment function.
+Setting this equal to \code{"dodge"} (\code{\link[ggplot2:position_dodge]{position_dodge()}}) or
+\code{"dodgejust"} (\code{\link[=position_dodgejust]{position_dodgejust()}}) can be useful if you have overlapping geometries.}
 
-\item{...}{Other arguments passed to \code{\link[=layer]{layer()}}. These are often aesthetics, used to set an aesthetic
-to a fixed value, like \code{colour = "red"} or \code{linewidth = 3} (see \strong{Aesthetics}, below). They may also be
-parameters to the paired geom/stat.}
+\item{...}{Other arguments passed to \code{\link[ggplot2:layer]{layer()}}. These are
+often aesthetics, used to set an aesthetic to a fixed value, like \code{colour = "red"}
+or \code{linewidth = 3} (see \strong{Aesthetics}, below). They may also be parameters
+to the paired geom/stat.}
 
-\item{blur}{Blur function to apply to dots.
+\item{blur}{<\link{function} | \link[=character]{string}> Blur function to apply to dots.
 One of: \itemize{
 \item A function that takes a numeric vector of distances from the dot
 center, the dot radius, and the standard deviation of the blur and returns
@@ -71,7 +83,7 @@ function name starting with \code{blur_}; e.g. \code{"gaussian"} (the default)
 applies \code{\link[=blur_gaussian]{blur_gaussian()}}.
 }}
 
-\item{binwidth}{The bin width to use for laying out the dots.
+\item{binwidth}{<\link{numeric} | \link{unit}> The bin width to use for laying out the dots.
 One of:
 \itemize{
 \item \code{NA} (the default): Dynamically select the bin width based on the
@@ -93,19 +105,18 @@ dotplot is drawn; \code{unit(c(0, 0.1), "npc")} would make dots that are \emph{a
 10\% of the viewport size (while still ensuring the tallest stack is less than
 or equal to \code{scale}).}
 
-\item{dotsize}{The width of the dots relative to the \code{binwidth}. The default,
+\item{dotsize}{<scalar \link{numeric}> The width of the dots relative to the \code{binwidth}. The default,
 \code{1.07}, makes dots be just a bit wider than the bin width, which is a
 manually-tuned parameter that tends to work well with the default circular
 shape, preventing gaps between bins from appearing to be too large visually
 (as might arise from dots being \emph{precisely} the \code{binwidth}). If it is desired
 to have dots be precisely the \code{binwidth}, set \code{dotsize = 1}.}
 
-\item{stackratio}{The distance between the center of the dots in the same
+\item{stackratio}{<scalar \link{numeric}> The distance between the center of the dots in the same
 stack relative to the dot height. The default, \code{1}, makes dots in the same
 stack just touch each other.}
 
-\item{layout}{The layout method used
-for the dots: \itemize{
+\item{layout}{<\link[=character]{string}> The layout method used for the dots. One of: \itemize{
 \item \code{"bin"} (default): places dots on the off-axis at the midpoint of
 their bins as in the classic Wilkinson dotplot. This maintains the
 alignment of rows and columns in the dotplot. This layout is slightly
@@ -130,7 +141,7 @@ may look better with \code{"bin"}, \code{"weave"}, or \code{"hex"}).
 rectangular bars.
 }}
 
-\item{overlaps}{How to handle overlapping dots or bins in the \code{"bin"},
+\item{overlaps}{<\link[=character]{string}> How to handle overlapping dots or bins in the \code{"bin"},
 \code{"weave"}, and \code{"hex"} layouts (dots never overlap in the \code{"swarm"} or \code{"bar"} layouts).
 For the purposes of this argument, dots are only considered to be overlapping
 if they would be overlapping when \code{dotsize = 1} and \code{stackratio = 1}; i.e.
@@ -144,7 +155,7 @@ dots to their desired positions, subject to the constraint that adjacent
 dots do not overlap.
 }}
 
-\item{smooth}{Smoother to apply to dot positions.
+\item{smooth}{<\link{function} | \link[=character]{string}> Smoother to apply to dot positions.
 One of:
 \itemize{
 \item A function that takes a numeric vector of dot positions and returns a
@@ -159,7 +170,7 @@ applying smoothing.
 Smoothing is most effective when the smoother is matched to the support of
 the distribution; e.g. using \code{smooth_bounded(bounds = ...)}.}
 
-\item{overflow}{How to handle overflow of dots beyond the extent of the geom
+\item{overflow}{<\link[=character]{string}> How to handle overflow of dots beyond the extent of the geom
 when a minimum \code{binwidth} (or an exact \code{binwidth}) is supplied.
 One of:
 \itemize{
@@ -176,7 +187,7 @@ If you find the default layout has dots that are too small, and you are okay
 with dots overlapping, consider setting \code{overflow = "compress"} and supplying
 an exact or minimum dot size using \code{binwidth}.}
 
-\item{verbose}{If \code{TRUE}, print out the bin width of the dotplot. Can be useful
+\item{verbose}{<scalar \link{logical}> If \code{TRUE}, print out the bin width of the dotplot. Can be useful
 if you want to start from an automatically-selected bin width and then adjust it
 manually. Bin width is printed both as data units and as normalized parent
 coordinates or \code{"npc"}s (see \code{\link[=unit]{unit()}}). Note that if you just want to scale the
@@ -184,7 +195,7 @@ selected bin width to fit within a desired area, it is probably easier to use
 \code{scale} than to copy and scale \code{binwidth} manually, and if you just want to
 provide constraints on the bin width, you can pass a length-2 vector to \code{binwidth}.}
 
-\item{orientation}{Whether this geom is drawn horizontally or vertically. One of:
+\item{orientation}{<\link[=character]{string}> Whether this geom is drawn horizontally or vertically. One of:
 \itemize{
 \item \code{NA} (default): automatically detect the orientation based on how the aesthetics
 are assigned. Automatic detection works most of the time.
@@ -199,7 +210,7 @@ For compatibility with the base ggplot naming scheme for \code{orientation}, \co
 for \code{"vertical"} and \code{"y"} as an alias for \code{"horizontal"} (\pkg{ggdist} had an \code{orientation} parameter
 before base ggplot did, hence the discrepancy).}
 
-\item{subguide}{Sub-guide used to annotate the \code{thickness} scale. One of:
+\item{subguide}{<\link{function} | \link[=character]{string}> Sub-guide used to annotate the \code{thickness} scale. One of:
 \itemize{
 \item A function that takes a \code{scale} argument giving a \link[ggplot2:ggplot2-ggproto]{ggplot2::Scale}
 object and an \code{orientation} argument giving the orientation of the
@@ -208,11 +219,15 @@ annotation, such as \code{\link[=subguide_axis]{subguide_axis()}} (to draw a tra
 \code{\link[=subguide_none]{subguide_none()}} (to draw no annotation). See \code{\link[=subguide_axis]{subguide_axis()}}
 for a list of possibilities and examples.
 \item A string giving the name of such a function when prefixed
-with \code{"subguide"}; e.g. \code{"axis"} or \code{"none"}.
+with \code{"subguide_"}; e.g. \code{"axis"} or \code{"none"}. The values \code{"slab"},
+\code{"dots"}, and \code{"spike"} use the default subguide for their geom
+families (no subguide), which can be modified by setting
+\code{\link{subguide_slab}}, \code{\link{subguide_dots}}, or \code{\link{subguide_spike}};
+see the documentation for those functions.
 }}
 
-\item{na.rm}{If \code{FALSE}, the default, missing values are removed with a warning. If \code{TRUE}, missing
-values are silently removed.}
+\item{na.rm}{<scalar \link{logical}> If \code{FALSE}, the default, missing values are removed with a warning. If \code{TRUE},
+missing values are silently removed.}
 
 \item{show.legend}{logical. Should this layer be included in the legends?
 \code{NA}, the default, includes if any aesthetics are mapped.
@@ -224,19 +239,23 @@ display.}
 rather than combining with them. This is most useful for helper functions
 that define both data and aesthetics and shouldn't inherit behaviour from
 the default plot specification, e.g. \code{\link[ggplot2:borders]{borders()}}.}
+
+\item{check.aes, check.param}{If \code{TRUE}, the default, will check that
+supplied parameters and aesthetics are understood by the \code{geom} or
+\code{stat}. Use \code{FALSE} to suppress the checks.}
 }
 \value{
 A \link[ggplot2:ggplot2-ggproto]{ggplot2::Geom} representing a blurry dot geometry which can
-be added to a \code{\link[=ggplot]{ggplot()}} object.
+be added to a \code{\link[ggplot2:ggplot]{ggplot()}} object.
 }
 \description{
 Variant of \code{\link[=geom_dots]{geom_dots()}} for creating blurry dotplots. Accepts an \code{sd}
 aesthetic that gives the standard deviation of the blur applied to the dots.
 Requires a graphics engine supporting radial gradients. Unlike \code{\link[=geom_dots]{geom_dots()}},
-all dots must be circular, so this geom does not support the \code{shape} aesthetic.
+this geom only supports circular and square \code{shape}s.
 }
 \details{
-The \emph{dots} family of stats and geoms are similar to \code{\link[=geom_dotplot]{geom_dotplot()}} but with a number of differences:
+The \emph{dots} family of stats and geoms are similar to \code{\link[ggplot2:geom_dotplot]{ggplot2::geom_dotplot()}} but with a number of differences:
 
 \itemize{
 \item Dots geoms act like slabs in \code{\link[=geom_slabinterval]{geom_slabinterval()}} and can be given x positions (or y positions when
@@ -255,7 +274,7 @@ Stats and geoms in this family include:
 \item \code{\link[=geom_dots]{geom_dots()}}: dotplots on raw data. Ensures the dotplot fits within available space by reducing the size
 of the dots automatically (may result in very small dots).
 \item \code{\link[=geom_swarm]{geom_swarm()}} and \code{\link[=geom_weave]{geom_weave()}}: dotplots on raw data with defaults intended to create "beeswarm" plots.
-Used \code{side = "both"} by default, and sets the default dot size to the same size as \code{\link[=geom_point]{geom_point()}}
+Used \code{side = "both"} by default, and sets the default dot size to the same size as \code{\link[ggplot2:geom_point]{geom_point()}}
 (\code{binwidth = unit(1.5, "mm")}), allowing dots to overlap instead of getting very small.
 \item \code{\link[=stat_dots]{stat_dots()}}: dotplots on raw data, \pkg{distributional} objects, and \code{\link[posterior:rvar]{posterior::rvar()}}s
 \item \code{\link[=geom_dotsinterval]{geom_dotsinterval()}}: dotplot + interval plots on raw data with already-calculated
@@ -321,6 +340,12 @@ the geometry. This is set automatically when using ggdist \code{stat}s.}
 \item{\code{xmax}: Right end of the interval sub-geometry (if \code{orientation = "horizontal"}).}
 \item{\code{ymin}: Lower end of the interval sub-geometry (if \code{orientation = "vertical"}).}
 \item{\code{ymax}: Upper end of the interval sub-geometry (if \code{orientation = "vertical"}).}
+}
+
+\strong{Point-specific aesthetics}
+
+\itemize{
+\item{\code{shape}: Shape type used to draw the \strong{point} sub-geometry.}
 }
 
 \strong{Color aesthetics}

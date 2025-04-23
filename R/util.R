@@ -7,7 +7,7 @@
 # deparse that is guaranteed to return a single string (instead of
 # a list of strings if the expression goes to multiple lines)
 deparse0 = function(expr, width.cutoff = 500, ...) {
-  paste0(deparse(expr, width.cutoff = width.cutoff, ...), collapse = "")
+  paste(deparse(expr, width.cutoff = width.cutoff, ...), collapse = "")
 }
 
 stop0 = function(...) {
@@ -136,6 +136,12 @@ check_na = function(x, na.rm) {
 
 # data frames -------------------------------------------------------------
 
+#' fast data frame creation
+#' @noRd
+data_frame0 = function(...) {
+  vctrs::data_frame(..., .name_repair = "minimal")
+}
+
 #' rename columns using a lookup table
 #' @param data data frame
 #' @param new_names lookup table of new column names, where names are
@@ -182,14 +188,13 @@ map_dfr_ = function(data, fun, ...) {
 row_map_dfr_ = function(data, fun, ...) {
   map_dfr_(seq_len(nrow(data)), function(row_i) {
     # faster version of row_df = data[row_i, , drop = FALSE]
-    row_df = tibble::new_tibble(lapply(data, vctrs::vec_slice, row_i), nrow = 1)
+    row_df = new_data_frame(lapply(data, vctrs::vec_slice, row_i), n = 1L)
     fun(row_df, ...)
   })
 }
 
-pmap_ = function(data, fun) {
-  # this is roughly equivalent to purrr::pmap
-  lapply(vctrs::vec_chop(data), function(row) do.call(fun, lapply(row, `[[`, 1)))
+pmap_ = function(.l, .f, ...) {
+  .mapply(.f, .l, list(...))
 }
 
 ddply_ = function(data, groups, fun, ...) {
@@ -221,7 +226,7 @@ dlply_ = function(data, groups, fun, ...) {
 
     lapply(group_is, function(group_i) {
       # faster version of row_df = data[group_i, , drop = FALSE]
-      row_df = tibble::new_tibble(lapply(data, vctrs::vec_slice, group_i), nrow = length(group_i))
+      row_df = new_data_frame(lapply(data, vctrs::vec_slice, group_i), n = length(group_i))
       fun(row_df, ...)
     })
   } else {
@@ -234,15 +239,15 @@ split_df = function(data, groups) {
 }
 
 map_dbl_ = function(.x, .f, ...) {
-  vapply(.x, .f, FUN.VALUE = numeric(1), ...)
+  vapply(.x, .f, FUN.VALUE = NA_real_, ...)
 }
 
 map_lgl_ = function(.x, .f, ...) {
-  vapply(.x, .f, FUN.VALUE = logical(1), ...)
+  vapply(.x, .f, FUN.VALUE = NA, ...)
 }
 
-map2_ = function(.x, .y, .f) {
-  .mapply(.f, list(.x, .y), NULL)
+map2_ = function(.x, .y, .f, ...) {
+  .mapply(.f, list(.x, .y), list(...))
 }
 
 map2_chr_ = function(.x, .y, .f) {

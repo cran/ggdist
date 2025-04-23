@@ -57,7 +57,9 @@ AbstractGeom = ggproto("AbstractGeom", Geom,
   # arguments passed to the geom_XXX() constructor and the underlying layer() call
   layer_args = list(
     show.legend = NA,
-    inherit.aes = TRUE
+    inherit.aes = TRUE,
+    check.aes = TRUE,
+    check.param = TRUE
   ),
 
 
@@ -65,7 +67,7 @@ AbstractGeom = ggproto("AbstractGeom", Geom,
 
   param_docs = list(
     orientation = glue_doc('
-      Whether this geom is drawn horizontally or vertically. One of:
+      <[string][character]> Whether this geom is drawn horizontally or vertically. One of:
       \\itemize{
         \\item `NA` (default): automatically detect the orientation based on how the aesthetics
           are assigned. Automatic detection works most of the time.
@@ -82,8 +84,8 @@ AbstractGeom = ggproto("AbstractGeom", Geom,
       '),
 
     na.rm = glue_doc('
-      If `FALSE`, the default, missing values are removed with a warning. If `TRUE`, missing
-      values are silently removed.
+      <scalar [logical]> If `FALSE`, the default, missing values are removed with a warning. If `TRUE`,
+      missing values are silently removed.
       ')
   ),
 
@@ -143,7 +145,7 @@ AbstractGeom = ggproto("AbstractGeom", Geom,
 
   ## other methods -----------------------------------------------------------
 
-  use_defaults = function(self, data, params = list(), modifiers = aes()) {
+  use_defaults = function(self, data, params = list(), modifiers = aes(), ...) {
     # we must provide our own check for Geom$rename_size because our fallbacks
     # from default_aes to default_key_aes require us to be able to have a non-missing
     # (but NULL) linewidth aesthetic in default_aes, which ggplot2::Geom$use_defaults
@@ -154,7 +156,7 @@ AbstractGeom = ggproto("AbstractGeom", Geom,
     }
     rename_size = self$rename_size
     self$rename_size = FALSE
-    out = ggproto_parent(Geom, self)$use_defaults(data, params, modifiers)
+    out = ggproto_parent(Geom, self)$use_defaults(data, params, modifiers, ...)
     self$rename_size = rename_size
     out
   }
@@ -222,7 +224,7 @@ make_geom = function(geom,
     }),                                                        # nocov end
     env = parent.frame()
   )
-  attr(body(new_f), "srcref") = NULL
+  new_f = utils::removeSource(new_f)
 
   new_f
 }

@@ -25,7 +25,7 @@ knitr::opts_chunk$set(
 )
 
 # graphics device
-if (requireNamespace("ragg", quietly = TRUE) && in_pkgdown) {
+if (requireNamespace("ragg", quietly = TRUE)) {
   knitr::opts_chunk$set(
     dev = "ragg_png"
   )
@@ -405,14 +405,14 @@ data.frame(alpha = seq(5, 100, length.out = 10)) %>%
   )
 
 ## ----priors_fake, eval=FALSE----------------------------------------------------------------------
-#  # NB these priors are made up!
-#  priors = c(
-#    prior(normal(1, 0.5), class = b),
-#    prior(gamma(2, 2), class = phi),
-#    # lb = 0 sets a lower bound of 0, i.e. a half-Normal distribution
-#    prior(normal(0, 1), class = sigma, lb = 0)
-#  )
-#  priors
+# # NB these priors are made up!
+# priors = c(
+#   prior(normal(1, 0.5), class = b),
+#   prior(gamma(2, 2), class = phi),
+#   # lb = 0 sets a lower bound of 0, i.e. a half-Normal distribution
+#   prior(normal(0, 1), class = sigma, lb = 0)
+# )
+# priors
 
 ## ----priors, echo=FALSE---------------------------------------------------------------------------
 # we want to avoid a brms dependency, so we fake it above and
@@ -811,10 +811,10 @@ df %>%
 df %>%
   ggplot(aes(fill = group, color = group, x = value)) +
   stat_slab(alpha = .3) +
-  stat_pointinterval(position = position_dodge(width = .4, preserve = "single")) +
+  stat_pointinterval(position = position_dodgejust(width = .2), justification = 0.1) +
   labs(
     title = "stat_slab() and stat_pointinterval()",
-    subtitle = "with position_dodge() applied to the intervals",
+    subtitle = "with position_dodgejust() applied to the intervals",
     y = NULL
   ) +
   scale_y_continuous(breaks = NULL)

@@ -20,25 +20,28 @@ breaks_FD(x, weights = NULL, digits = 5)
 breaks_quantiles(x, weights = NULL, max_n = "Scott", min_width = 0.5)
 }
 \arguments{
-\item{x}{A numeric vector giving a sample.}
+\item{x}{<\link{numeric}> Sample values.}
 
-\item{weights}{A numeric vector of \code{length(x)} giving sample weights.}
+\item{weights}{<\link{numeric} | \link{NULL}> Optional weights to apply to \code{x}, which
+will be normalized to sum to 1.}
 
-\item{width}{For \code{\link[=breaks_fixed]{breaks_fixed()}}, the desired bin width.}
+\item{width}{<scalar \link{numeric}> For \code{\link[=breaks_fixed]{breaks_fixed()}}, the desired bin width.}
 
-\item{digits}{For \code{\link[=breaks_FD]{breaks_FD()}}, the number of significant digits to keep when
+\item{digits}{<scalar \link{numeric}> For \code{\link[=breaks_FD]{breaks_FD()}}, the number of significant digits to keep when
 rounding in the Freedman-Diaconis algorithm. For an explanation of this
 parameter, see the documentation of the corresponding parameter in
 \code{\link[grDevices:nclass]{grDevices::nclass.FD()}}.}
 
-\item{max_n}{For \code{\link[=breaks_quantiles]{breaks_quantiles()}}, either a scalar numeric giving the
+\item{max_n}{<scalar \link{numeric} | \link{function} | \link[=character]{string}>
+For \code{\link[=breaks_quantiles]{breaks_quantiles()}}, either a scalar numeric giving the
 maximum number of bins, or another breaks function (or string giving the
 suffix of the name of a function prefixed with \code{"breaks_"}) that will
 return the maximum number of bins. \code{\link[=breaks_quantiles]{breaks_quantiles()}} will construct
 \emph{at most} \code{max_n} bins.}
 
-\item{min_width}{For \code{\link[=breaks_quantiles]{breaks_quantiles()}}, a scalar numeric between \code{0} and
-\code{1} giving the minimum bin width as a proportion of \code{diff(range(x)) / max_n}.}
+\item{min_width}{<scalar \link{numeric}> For \code{\link[=breaks_quantiles]{breaks_quantiles()}}, a numeric
+between \code{0} and \code{1} giving the minimum bin width as a proportion of
+\code{diff(range(x)) / max_n}.}
 }
 \value{
 Either a single number (giving the number of bins) or a vector
@@ -48,7 +51,8 @@ giving the edges between bins.
 Methods for determining breaks (bins) in histograms, as used in the \code{breaks}
 argument to \code{\link[=density_histogram]{density_histogram()}}.
 
-Supports \link[=automatic-partial-functions]{automatic partial function application}.
+Supports \link[=auto_partial]{automatic partial function application} with
+\link[=waiver]{waived arguments}.
 }
 \details{
 These functions take a sample and its weights and return a value suitable for
@@ -71,7 +75,7 @@ into adjacent bins.
 library(ggplot2)
 
 set.seed(1234)
-x = rnorm(200, 1, 2)
+x = rnorm(2000, 1, 2)
 
 # Let's compare the different break-selection algorithms on this data:
 ggplot(data.frame(x), aes(x)) +
@@ -100,6 +104,13 @@ ggplot(data.frame(x), aes(x)) +
     aes(y = "breaks_FD()\nor 'FD'"),
     density = "histogram",
     breaks = "FD",
+    outline_bars = TRUE,
+    color = "black",
+  ) +
+  stat_slab(
+    aes(y = "breaks_quantiles()\nor 'quantiles'"),
+    density = "histogram",
+    breaks = "quantiles",
     outline_bars = TRUE,
     color = "black",
   ) +

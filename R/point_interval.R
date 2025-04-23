@@ -13,7 +13,9 @@ globalVariables(c("y", "ymin", "ymax"))
 #' Translates draws from distributions in a (possibly grouped) data frame into point and
 #' interval summaries (or set of point and interval summaries, if there are
 #' multiple groups in a grouped data frame).
+#' @template description-auto-partial
 #'
+#' @details
 #' If `.data` is a data frame, then `...` is a list of bare names of
 #' columns (or expressions derived from columns) of `.data`, on which
 #' the point and interval summaries are derived. Column expressions are processed
@@ -39,7 +41,7 @@ globalVariables(c("y", "ymin", "ymax"))
 #' corresponding to the interval. This behavior allows `point_interval`
 #' and its derived functions (like `median_qi`, `mean_qi`, `mode_hdi`, etc)
 #' to be easily used to plot intervals in ggplot stats using methods like
-#' [stat_eye()], [stat_halfeye()], or [stat_summary()].
+#' [stat_eye()], [stat_halfeye()], or [`stat_summary()`][ggplot2::stat_summary].
 #'
 #' `median_qi`, `mode_hdi`, etc are short forms for
 #' `point_interval(..., .point = median, .interval = qi)`, etc.
@@ -61,47 +63,48 @@ globalVariables(c("y", "ymin", "ymax"))
 #' `ll` and `ul` yield lower limits and upper limits, respectively (where the opposite
 #' limit is set to either `Inf` or `-Inf`).
 #'
-#' @param .data Data frame (or grouped data frame as returned by [dplyr::group_by()])
-#' that contains draws to summarize.
-#' @param ... Bare column names or expressions that, when evaluated in the context of
+#' @param .data <[data.frame] | [grouped_df][dplyr::grouped_df]> Data frame (or grouped
+#' data frame as returned by [dplyr::group_by()]) that contains draws to summarize.
+#' @param ... <bare [language]> Column names or expressions that, when evaluated in the context of
 #' `.data`, represent draws to summarize. If this is empty, then by default all
 #' columns that are not group columns and which are not in `.exclude` (by default
 #' `".chain"`, `".iteration"`, `".draw"`, and `".row"`) will be summarized.
 #' These columns can be numeric, \pkg{distributional} objects, `posterior::rvar`s,
 #' or list columns of numeric values to summarise.
-#' @param .width vector of probabilities to use that determine the widths of the resulting intervals.
-#' If multiple probabilities are provided, multiple rows per group are generated, each with
-#' a different probability interval (and value of the corresponding `.width` column).
+#' @param .width <[numeric]> vector of probabilities to use that determine the widths of
+#' the resulting intervals. If multiple probabilities are provided, multiple rows per
+#' group are generated, each with a different probability interval (and value of the
+#' corresponding `.width` column).
 #' @param .prob Deprecated. Use `.width` instead.
-#' @param .point Point summary function, which takes a vector and returns a single
-#' value, e.g. [mean()], [median()], or [Mode()].
-#' @param .interval Interval function, which takes a vector and a probability
+#' @param .point <[function]> Point summary function, which takes a vector and returns a single
+#' value, e.g. [`mean`], [`median`], or [`Mode`].
+#' @param .interval <[function]> Interval function, which takes a vector and a probability
 #' (`.width`) and returns a two-element vector representing the lower and upper
-#' bound of an interval; e.g. [qi()], [hdi()]
-#' @param .simple_names When `TRUE` and only a single column / vector is to be summarized, use the
-#' name `.lower` for the lower end of the interval and `.upper` for the
+#' bound of an interval; e.g. [`qi`], [`hdi`]
+#' @param .simple_names <scalar [logical]> When `TRUE` and only a single column / vector
+#' is to be summarized, use the name `.lower` for the lower end of the interval and `.upper` for the
 #' upper end. If `.data` is a vector and this is `TRUE`, this will also set the column name
 #' of the point summary to `.value`. When `FALSE` and `.data` is a data frame,
 #' names the lower and upper intervals for each column `x` `x.lower` and `x.upper`.
 #' When `FALSE` and `.data` is a vector, uses the naming scheme `y`, `ymin`
 #' and `ymax` (for use with ggplot).
-#' @param .exclude A character vector of names of columns to be excluded from summarization
-#' if no column names are specified to be summarized. Default ignores several meta-data column
+#' @param .exclude <[character]> Vector of names of columns to be excluded from summarization
+#' if no column names are specified to be summarized in `...`. Default ignores several meta-data column
 #' names used in \pkg{ggdist} and \pkg{tidybayes}.
-#' @param na.rm logical value indicating whether `NA` values should be stripped before the computation proceeds.
+#' @param na.rm <scalar [logical]> Should `NA` values be stripped before the computation proceeds?
 #' If `FALSE` (the default), any vectors to be summarized that contain `NA` will result in
 #' point and interval summaries equal to `NA`.
-#' @param x vector to summarize (for interval functions: `qi` and `hdi`)
-#' @param density For [hdi()] and [Mode()], the kernel density estimator to use, either as
-#' a function (e.g. [`density_bounded`], [`density_unbounded`]) or as a string giving the
-#' suffix to a function that starts with `density_` (e.g. `"bounded"` or `"unbounded"`). The
-#' default, `"bounded"`, uses the bounded density estimator of [density_bounded()], which
-#' itself estimates the bounds of the distribution, and tends to work well on both bounded
-#' and unbounded data.
-#' @param n For [hdi()] and [Mode()], the number of points to use to estimate highest-density
-#' intervals or modes.
-#' @param weights For [Mode()], an optional vector, which (if not `NULL`) is of the same length
-#' as `x` and provides weights for each element of `x`.
+#' @param x <[numeric]> Vector to summarize (for interval functions: [qi()], [hdi()], etc)
+#' @param density <[function] | [string][character]> For [hdi()] and [Mode()], the kernel
+#' density estimator to use, either as a function (e.g. [`density_bounded`], [`density_unbounded`])
+#' or as a string giving the suffix to a function that starts with `density_` (e.g. `"bounded"`
+#' or `"unbounded"`). The default, `"bounded"`, uses the bounded density estimator of
+#' [density_bounded()], which itself estimates the bounds of the distribution, and tends to
+#' work well on both bounded and unbounded data.
+#' @param n <scalar [numeric]> For [hdi()] and [Mode()], the number of points to use to estimate
+#' highest-density intervals or modes.
+#' @param weights <[numeric] | [NULL]> For [Mode()], an optional vector, which (if not `NULL`)
+#' is of the same length as `x` and provides weights for each element of `x`.
 #' @return A data frame containing point summaries and intervals, with at least one column corresponding
 #' to the point summary, one to the lower end of the interval, one to the upper end of the interval, the
 #' width of the interval (`.width`), the type of point summary (`.point`), and the type of interval (`.interval`).
@@ -162,8 +165,16 @@ point_interval = function(
 
 #' @rdname point_interval
 #' @export
-point_interval.default = function(.data, ..., .width = .95, .point = median, .interval = qi, .simple_names = TRUE,
-  na.rm = FALSE, .exclude = c(".chain", ".iteration", ".draw", ".row"), .prob
+point_interval.default = function(
+  .data,
+  ...,
+  .width = .95,
+  .point = median,
+  .interval = qi,
+  .simple_names = TRUE,
+  na.rm = FALSE,
+  .exclude = c(".chain", ".iteration", ".draw", ".row"),
+  .prob
 ) {
   .width = .Deprecated_argument_alias(.width, .prob)
   data = .data    # to avoid conflicts with tidy eval's `.data` pronoun
@@ -226,7 +237,7 @@ point_interval.default = function(.data, ..., .width = .95, .point = median, .in
         map_dfr_(seq_len(nrow(row)), function(j) {
           # get row of `data` with grouping factors
           # faster version of row_j = row[j, , drop = FALSE]
-          row_j = tibble::new_tibble(lapply(row, vctrs::vec_slice, j), nrow = 1)
+          row_j = new_data_frame(lapply(row, vctrs::vec_slice, j), n = 1L)
           row.names(row_j) = NULL
           draws_j = draws[[j]]
 
@@ -312,6 +323,12 @@ point_interval.default = function(.data, ..., .width = .95, .point = median, .in
 
 #' @rdname point_interval
 #' @export
+point_interval.tbl_df = function(.data, ...) {
+  as_tibble(NextMethod(), .name_repair = "minimal")
+}
+
+#' @rdname point_interval
+#' @export
 point_interval.numeric = function(.data, ..., .width = .95, .point = median, .interval = qi, .simple_names = FALSE,
   na.rm = FALSE, .exclude = c(".chain", ".iteration", ".draw", ".row"), .prob
 ) {
@@ -322,7 +339,7 @@ point_interval.numeric = function(.data, ..., .width = .95, .point = median, .in
 
   result = map_dfr_(.width, function(p) {
     interval = .interval(data, .width = p, na.rm = na.rm)
-    data.frame(
+    data_frame0(
       y = .point(data, na.rm = na.rm),
       ymin = interval[, 1],
       ymax = interval[, 2],
@@ -341,16 +358,19 @@ point_interval.numeric = function(.data, ..., .width = .95, .point = median, .in
 }
 
 #' @rdname point_interval
+#' @importFrom rlang eval_tidy expr
 #' @export
 point_interval.rvar = function(
   .data, ...,
   .width = .95, .point = median, .interval = qi, .simple_names = TRUE, na.rm = FALSE
 ) {
   x = .data
-  # using substitute here so that names of .point / .interval are passed down correctly
-  eval(substitute(point_interval(
+  # using eval_tidy here so that names of .point / .interval are passed down correctly
+  eval_tidy(expr(point_interval(
     tibble(.value = x), ...,
-    .width = .width, .point = .point, .interval = .interval, .simple_names = .simple_names, na.rm = na.rm
+    .width = .width,
+    .point = {{ .point }}, .interval = {{ .interval }},
+    .simple_names = .simple_names, na.rm = na.rm
   )))
 }
 
@@ -523,7 +543,7 @@ Mode.default = function(x, na.rm = FALSE, ..., density = density_bounded(trim = 
       ux[which.max(tabulate(match(x, ux)))]
     } else {
       ux = unique(x)
-      ux_weights = vapply(split(weights, factor(x, ux)), sum, numeric(1))
+      ux_weights = map_dbl_(split(weights, factor(x, ux)), sum)
       ux[which.max(ux_weights)]
     }
   } else {
@@ -560,12 +580,13 @@ Mode.distribution = function(x, na.rm = FALSE, ...) {
       d = density(x, at = at)[[1]]
       at[which.max(d)]
     } else {
+      #TODO: when #114 / distributional#72 is fixed, pass na.rm to quantile below
+      limits = range(quantile(x, c(0, 1)))
       optim(
         median(x, na.rm = na.rm),
         function(q) -density(x, at = q, na.rm = na.rm),
-        #TODO: when #114 / distributional#72 is fixed, pass na.rm to quantile below
-        lower = quantile(x, 0),
-        upper = quantile(x, 1),
+        lower = limits[[1]],
+        upper = limits[[2]],
         method = "L-BFGS-B"
       )$par
     }

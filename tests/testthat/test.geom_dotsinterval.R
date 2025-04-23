@@ -112,6 +112,7 @@ test_that("coordinate transformations work", {
 
 test_that("scale transformations work", {
   skip_if_no_vdiffr()
+  skip_if_mac()
 
 
   p = data.frame(x = dist_sample(list(qlnorm(ppoints(20))))) %>%
@@ -179,7 +180,7 @@ test_that("stat_dist_dots works on NA data", {
     vdiffr::expect_doppelganger("stat_dist_dots with na.rm = FALSE",
       p + stat_dist_dots(na.rm = FALSE, quantiles = 20)
     ),
-    "Removed 1 row"
+    "Removed 20 rows"
   )
 
   vdiffr::expect_doppelganger("stat_dist_dots with na.rm = TRUE",

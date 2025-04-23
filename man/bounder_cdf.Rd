@@ -7,9 +7,9 @@
 bounder_cdf(x, p = 0.01)
 }
 \arguments{
-\item{x}{numeric vector containing a sample to estimate the bounds of.}
+\item{x}{<\link{numeric}> Sample to estimate the bounds of.}
 
-\item{p}{scalar in \eqn{[0,1]}: percentile of the order statistic distribution to use
+\item{p}{<scalar \link{numeric}> in \eqn{[0,1]}: Percentile of the order statistic distribution to use
 as the estimate. \code{p = 1} will return \code{range(x)}; \code{p = 0.5} will give the median
 estimate, \code{p = 0} will give a very wide estimate (effectively treating the
 distribution as unbounded when used with \code{\link[=density_bounded]{density_bounded()}}).}
@@ -22,7 +22,8 @@ of the distribution that \code{x} came from.
 Estimate the bounds of the distribution a sample came from using the CDF of
 the order statistics of the sample. Use with the \code{bounder} argument to \code{\link[=density_bounded]{density_bounded()}}.
 
-Supports \link[=automatic-partial-functions]{automatic partial function application}.
+Supports \link[=auto_partial]{automatic partial function application} with
+\link[=waiver]{waived arguments}.
 }
 \details{
 \code{\link[=bounder_cdf]{bounder_cdf()}} uses the distribution of the order statistics of

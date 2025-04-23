@@ -6,57 +6,6 @@
 
 # thickness handling functions -------------------------------------------------------
 
-#' normalize thickness values to between 0 and 1
-#' @noRd
-normalize_thickness = function(x) UseMethod("normalize_thickness")
-
-#' @export
-normalize_thickness.NULL = function(x) {
-  NULL
-}
-
-#' @export
-normalize_thickness.default = function(x) {
-  lower = NA_real_
-  upper = NA_real_
-
-  finite_thickness = x[is.finite(x)]
-  if (length(finite_thickness) > 0) {
-    max_finite_thickness = max(finite_thickness)
-    min_finite_thickness = min(finite_thickness, 0)
-    if (max_finite_thickness > min_finite_thickness) {
-      lower = min_finite_thickness
-      upper = max_finite_thickness
-      x = (x - lower) / (upper - lower)
-    }
-  }
-  # infinite values get plotted at the max height (e.g. for point masses)
-  if (length(x) > 0) {
-    x[x == Inf] = 1
-  }
-
-  thickness(x, lower, upper)
-}
-
-#' @export
-normalize_thickness.ggdist_thickness = function(x) {
-  # thickness values passed directly into the geom (e.g. by
-  # scale_thickness_shared()) are not normalized again.
-
-  # infinite values get plotted at the max height (e.g. for point masses)
-  if (length(x) > 0) {
-    field(x, "x")[field(x, "x") == Inf] = 1
-  }
-  x
-}
-
-#' @export
-normalize_thickness.data.frame = function(x) {
-  x$thickness = normalize_thickness(x$thickness)
-  x
-}
-
-
 #' rescale the slab data (ymin / ymax) to be within the confines of the bounding box
 #' we do this *again* here (rather than in setup_data) because
 #' position_dodge doesn't work if we only do it up there:
@@ -70,7 +19,7 @@ normalize_thickness.data.frame = function(x) {
 #'     in the output giving the parameters of the transformation
 #' @noRd
 rescale_slab_thickness = function(
-  s_data, orientation, normalize, na.rm,
+  s_data, orientation, na.rm,
   name = "geom_slabinterval"
 ) {
   define_orientation_variables(orientation)
@@ -81,7 +30,7 @@ rescale_slab_thickness = function(
   s_data = ggplot2::remove_missing(s_data, na.rm, c(height, "justification", "scale"), name = name, finite = TRUE)
   # side is a character vector, thus need finite = FALSE for it; x/y can be Inf here
   s_data = ggplot2::remove_missing(s_data, na.rm, c(x, y, "side"), name = name)
-  if (nrow(s_data) == 0) return(list(data = s_data, subguide_params = data.frame()))
+  if (nrow(s_data) == 0) return(list(data = s_data, subguide_params = data_frame0()))
 
   min_height = min(s_data[[height]])
 
@@ -100,7 +49,7 @@ rescale_slab_thickness = function(
 
     thickness_scale = d$scale[[1]] * min_height
 
-    subguide_params = data.frame(
+    subguide_params = data_frame0(
       group = d$group[[1]],
       side = d$size[[1]],
       justification = d$justification[[1]],
@@ -144,14 +93,15 @@ rescale_slab_thickness = function(
 
 # drawing functions -------------------------------------------------------
 
-draw_slabs = function(self, s_data, panel_params, coord,
-  orientation, normalize, fill_type, na.rm, subguide,
-  ...
+draw_slabs = function(
+  self, s_data, panel_params, coord, orientation,
+  ...,
+  fill_type, na.rm, subguide
 ) {
   define_orientation_variables(orientation)
 
   c(s_data, subguide_params) %<-% rescale_slab_thickness(
-    s_data, orientation, normalize, na.rm, name = "geom_slabinterval"
+    s_data, orientation, na.rm, name = "geom_slabinterval"
   )
   s_data = self$override_slab_aesthetics(s_data)
 
@@ -223,11 +173,11 @@ draw_slabs = function(self, s_data, panel_params, coord,
     }
   })
 
-  subguide_grobs = if (identical(subguide, "none")) {
+  subguide_fun = match_function(subguide, "subguide_")
+  subguide_grobs = if (identical(subguide_fun(numeric()), zeroGrob())) {
     # quick exit, also avoid errors for multiple non-equal axes when not drawing them
     list()
   } else {
-    subguide_fun = match_function(subguide, "subguide_")
     subguide_params = coord$transform(subguide_params, panel_params)
     dlply_(subguide_params, c(y, "side", "justification", "scale"), function(d) {
       d$group = NULL
@@ -404,7 +354,7 @@ transform_size = function(size, size_domain, size_range) {
 #' specify the endpoints of the interval. A scaling factor for interval line width and point size is applied
 #' through the `interval_size_domain`, `interval_size_range`, and `fatten_point` parameters.
 #' These scaling factors are designed to give multiple uncertainty intervals reasonable
-#' scaling at the default settings for [scale_size_continuous()].
+#' scaling at the default settings for [`scale_size_continuous()`][ggplot2::scale_size_continuous].
 #'
 #' As a combination geom, this geom expects a `datatype` aesthetic specifying which part of the geom a given
 #' row in the input data corresponds to: `"slab"` or `"interval"`. However, specifying this aesthetic
@@ -426,14 +376,16 @@ transform_size = function(size, size_domain, size_range) {
 #' @eval rd_layer_params("slabinterval")
 #' @eval rd_slabinterval_aesthetics()
 #' @inheritParams ggplot2::layer
-#' @param ...  Other arguments passed to [layer()]. These are often aesthetics, used to set an aesthetic
-#' to a fixed value, like `colour = "red"` or `linewidth = 3` (see **Aesthetics**, below). They may also be
-#' parameters to the paired geom/stat.
-#' @param position Position adjustment, either as a string, or the result of a call to a position adjustment function.
-#' Setting this equal to `"dodge"` ([position_dodge()]) or `"dodgejust"` ([position_dodgejust()]) can be useful if
-#' you have overlapping geometries.
+#' @param ...  Other arguments passed to [`layer()`][ggplot2::layer]. These are
+#' often aesthetics, used to set an aesthetic to a fixed value, like `colour = "red"`
+#' or `linewidth = 3` (see **Aesthetics**, below). They may also be parameters
+#' to the paired geom/stat.
+#' @param position <[Position][ggplot2::Position] | [string][character]> Position adjustment,
+#' either as a string, or the result of a call to a position adjustment function.
+#' Setting this equal to `"dodge"` ([`position_dodge()`][ggplot2::position_dodge]) or
+#' `"dodgejust"` ([position_dodgejust()]) can be useful if you have overlapping geometries.
 #' @return A [ggplot2::Geom] representing a slab or combined slab+interval geometry which can
-#' be added to a [ggplot()] object.
+#' be added to a [`ggplot()`][ggplot2::ggplot] object.
 #' @author Matthew Kay
 #' @seealso See [geom_lineribbon()] for a combination geom designed for fit curves plus probability bands.
 #' See [geom_dotsinterval()] for a combination geom designed for plotting dotplots with intervals.
@@ -643,8 +595,24 @@ GeomSlabinterval = ggproto("GeomSlabinterval", AbstractGeom,
 
   param_docs = defaults(list(
     # SLAB PARAMS
+    subscale = glue_doc('
+      <[function] | [string][character]> Sub-scale used to scale values of the
+      `thickness` aesthetic within the groups determined by `normalize`. One of:
+      \\itemize{
+        \\item A function that takes an `x` argument giving a numeric vector
+          of values to be scaled and then returns a [thickness] vector representing
+          the scaled values, such as [subscale_thickness()] or [subscale_identity()].
+        \\item A string giving the name of such a function when prefixed
+          with `"subscale_"`; e.g. `"thickness"` or `"identity"`. The value
+          `"thickness"` using the default subscale, which can be modified by
+          setting [`subscale_thickness`]; see the documentation for that
+          function.
+      }
+      For a comprehensive discussion and examples of slab scaling and normalization, see the
+      [`thickness` scale article](https://mjskay.github.io/ggdist/articles/thickness.html).
+      '),
     normalize = glue_doc('
-      How to normalize heights of functions input to the `thickness` aesthetic. One of:
+      <[string][character]> Groups within which to scale values of the `thickness` aesthetic. One of:
       \\itemize{
         \\item `"all"`: normalize so that the maximum height across all data is `1`.
         \\item `"panels"`: normalize within panels so that the maximum height in each panel is `1`.
@@ -659,7 +627,8 @@ GeomSlabinterval = ggproto("GeomSlabinterval", AbstractGeom,
       [`thickness` scale article](https://mjskay.github.io/ggdist/articles/thickness.html).
       '),
     fill_type = glue_doc('
-      What type of fill to use when the fill color or alpha varies within a slab. One of:
+      <[string][character]> What type of fill to use when the fill color or alpha varies within a slab.
+      One of:
       \\itemize{
         \\item `"segments"`: breaks up the slab geometry into segments for each unique combination of fill color and
           alpha value. This approach is supported by all graphics devices and works well for sharp cutoff values,
@@ -681,38 +650,40 @@ GeomSlabinterval = ggproto("GeomSlabinterval", AbstractGeom,
 
     # INTERVAL PARAMS
     interval_size_domain = glue_doc('
-      A length-2 numeric vector giving the minimum and maximum of the values of the `size` and `linewidth` aesthetics
+      <length-2 [numeric]> Minimum and maximum of the values of the `size` and `linewidth` aesthetics
       that will be translated into actual sizes for intervals drawn according to `interval_size_range` (see the
       documentation for that argument.)
       '),
     interval_size_range = glue_doc('
-      A length-2 numeric vector. This geom scales the raw size aesthetic values when drawing interval and point
-      sizes, as they tend to be too thick when using the default settings of [scale_size_continuous()], which give
-      sizes with a range of `c(1, 6)`. The `interval_size_domain` value indicates the input domain of raw size
-      values (typically this should be equal to the value of the `range` argument of the [scale_size_continuous()]
-      function), and `interval_size_range` indicates the desired output range of the size values (the min and max of
-      the actual sizes used to draw intervals). Most of the time it is not recommended to change the value of this
-      argument, as it may result in strange scaling of legends; this argument is a holdover from earlier versions
-      that did not have size aesthetics targeting the point and interval separately. If you want to adjust the
-      size of the interval or points separately, you can also use the `linewidth` or `point_size`
-      aesthetics; see [sub-geometry-scales].
+      <length-2 [numeric]> This geom scales the raw size aesthetic values when
+      drawing interval and point sizes, as they tend to be too thick when using
+      the default settings of [`scale_size_continuous()`][ggplot2::scale_size_continuous],
+      which give sizes with a range of `c(1, 6)`. The `interval_size_domain` value indicates the
+      input domain of raw size values (typically this should be equal to the value of the `range`
+      argument of the [`scale_size_continuous()`][ggplot2::scale_size_continuous] function), and
+      `interval_size_range` indicates the desired output range of the size values (the min and max
+      of the actual sizes used to draw intervals). Most of the time it is not recommended to change
+      the value of this argument, as it may result in strange scaling of legends; this argument is
+      a holdover from earlier versions that did not have size aesthetics targeting the point and
+      interval separately. If you want to adjust the size of the interval or points separately,
+      you can also use the `linewidth` or `point_size` aesthetics; see [sub-geometry-scales].
       '),
     fatten_point = glue_doc('
-      A multiplicative factor used to adjust the size of the point relative to the size of the
-      thickest interval line. If you wish to specify point sizes directly, you can also use the `point_size`
-      aesthetic and [scale_point_size_continuous()] or [scale_point_size_discrete()]; sizes
-      specified with that aesthetic will not be adjusted using `fatten_point`.
+      <scalar [numeric]> A multiplicative factor used to adjust the size of the point relative to the
+      size of the thickest interval line. If you wish to specify point sizes directly, you can also use
+      the `point_size` aesthetic and [scale_point_size_continuous()] or [scale_point_size_discrete()];
+      sizes specified with that aesthetic will not be adjusted using `fatten_point`.
       '),
-    arrow = '[grid::arrow()] giving the arrow heads to use on the interval, or `NULL` for no arrows.',
+    arrow = '<[arrow] | [NULL]> Type of arrow heads to use on the interval, or `NULL` for no arrows.',
 
     # SUB_GEOMETRY FLAGS
-    show_slab = 'Should the slab portion of the geom be drawn?',
-    show_point = 'Should the point portion of the geom be drawn?',
-    show_interval = 'Should the interval portion of the geom be drawn?',
+    show_slab = '<scalar [logical]> Should the slab portion of the geom be drawn?',
+    show_point = '<scalar [logical]> Should the point portion of the geom be drawn?',
+    show_interval = '<scalar [logical]> Should the interval portion of the geom be drawn?',
 
     # GUIDES
     subguide = glue_doc('
-      Sub-guide used to annotate the `thickness` scale. One of:
+      <[function] | [string][character]> Sub-guide used to annotate the `thickness` scale. One of:
       \\itemize{
         \\item A function that takes a `scale` argument giving a [ggplot2::Scale]
           object and an `orientation` argument giving the orientation of the
@@ -721,13 +692,18 @@ GeomSlabinterval = ggproto("GeomSlabinterval", AbstractGeom,
           [subguide_none()] (to draw no annotation). See [subguide_axis()]
           for a list of possibilities and examples.
         \\item A string giving the name of such a function when prefixed
-          with `"subguide"`; e.g. `"axis"` or `"none"`.
+          with `"subguide_"`; e.g. `"axis"` or `"none"`. The values `"slab"`,
+          `"dots"`, and `"spike"` use the default subguide for their geom
+          families (no subguide), which can be modified by setting
+          [`subguide_slab`], [`subguide_dots`], or [`subguide_spike`];
+          see the documentation for those functions.
       }
       ')
   ), AbstractGeom$param_docs),
 
   default_params = list(
     orientation = NA,
+    subscale = "thickness",
     normalize = "all",
     fill_type = "segments",
     interval_size_domain = c(1, 6),
@@ -737,7 +713,7 @@ GeomSlabinterval = ggproto("GeomSlabinterval", AbstractGeom,
     show_slab = TRUE,
     show_point = TRUE,
     show_interval = TRUE,
-    subguide = "none",
+    subguide = "slab",
     na.rm = FALSE
   ),
 
@@ -800,11 +776,12 @@ GeomSlabinterval = ggproto("GeomSlabinterval", AbstractGeom,
     # must do this here: not setup_data, so it happens after the thickness scale
     # has been applied; and not draw_panel, because normalization may be applied
     # across panels.
+    subscale_fun = match_function(params$subscale, "subscale_")
     switch(params$normalize,
       all = {
         # normalize so max height across all data is 1
         # this preserves slabs across groups in slab plots
-        data = normalize_thickness(data)
+        data = apply_subscale(data, subscale = subscale_fun)
       },
       panels = ,
       xy = ,
@@ -815,11 +792,12 @@ GeomSlabinterval = ggproto("GeomSlabinterval", AbstractGeom,
           xy = c("PANEL", y),
           groups = c("PANEL", y, "group")
         )
-        data = ddply_(data, normalization_groups, normalize_thickness)
+        data = ddply_(data, normalization_groups, apply_subscale, subscale = subscale_fun)
       },
       none = {
         # ensure thickness is a thickness-type vector so it is not normalized again
-        data$thickness = normalize_thickness(as_thickness(data$thickness))
+        # TODO: deprecate this and direct people to use `subscale = "identity"` to turn off scaling
+        data$thickness = apply_subscale(data$thickness, subscale = subscale_identity)
       },
       stop0('`normalize` must be "all", "panels", "xy", groups", or "none", not "', params$normalize, '"')
     )
@@ -857,10 +835,10 @@ GeomSlabinterval = ggproto("GeomSlabinterval", AbstractGeom,
       # thickness values were provided, draw the slabs
       s_data = data[data$datatype == "slab",]
       if (nrow(s_data) > 0) {
-        self$draw_slabs(s_data, panel_params, coord,
-          orientation = orientation,
-          na.rm = na.rm,
-          ...
+        self$draw_slabs(
+          s_data, panel_params, coord, orientation,
+          ...,
+          na.rm = na.rm
         )
       }
     }

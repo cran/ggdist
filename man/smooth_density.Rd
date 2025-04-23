@@ -18,9 +18,9 @@ smooth_bounded(
 smooth_unbounded(x, density = "unbounded", trim = FALSE, ...)
 }
 \arguments{
-\item{x}{a numeric vector}
+\item{x}{<\link{numeric}> Values to smooth.}
 
-\item{density}{Density estimator to use for smoothing. One of:
+\item{density}{<\link{function} | \link[=character]{string}> Density estimator to use for smoothing. One of:
 \itemize{
 \item A function which takes a numeric vector and returns a list with elements
 \code{x} (giving grid points for the density estimator) and \code{y} (the
@@ -31,10 +31,11 @@ following this format, including \code{\link[=density_unbounded]{density_unbound
 e.g. \code{"bounded"} for \verb{[density_bounded()]}.
 }}
 
-\item{bounds}{length-2 vector of min and max bounds. If a bound is \code{NA}, then
+\item{bounds}{<length-2 \link{numeric}> Min and max bounds. If a bound is \code{NA}, then
 that bound is estimated from the data using the method specified by \code{bounder}.}
 
-\item{bounder}{Method to use to find missing (\code{NA}) \code{bounds}. A function that
+\item{bounder}{<\link{function} | \link[=character]{string}> Method to use to find missing
+(\code{NA}) \code{bounds}. A function that
 takes a numeric vector of values and returns a length-2 vector of the estimated
 lower and upper bound of the distribution. Can also be a string giving the
 suffix of the name of such a function that starts with \code{"bounder_"}. Useful
@@ -47,7 +48,8 @@ See \code{\link[=bounder_cooke]{bounder_cooke()}}.
 \item \code{"range"}: Use the range of \code{x} (i.e the \code{min} or \code{max}). See \code{\link[=bounder_range]{bounder_range()}}.
 }}
 
-\item{trim}{Should the density estimate be trimmed to the bounds of the data?}
+\item{trim}{<scalar \link{logical}> Passed to \code{density}: Should the density estimate be trimmed to the
+range of the data? Default \code{FALSE}.}
 
 \item{...}{Arguments passed to the density estimator specified by \code{density}.}
 }
@@ -62,7 +64,8 @@ Smooths \code{x} values using a density estimator, returning new \code{x} of the
 length. Can be used with a dotplot (e.g. \code{\link{geom_dots}}\code{(smooth = ...)}) to create
 "density dotplots".
 
-Supports \link[=automatic-partial-functions]{automatic partial function application}.
+Supports \link[=auto_partial]{automatic partial function application} with
+\link[=waiver]{waived arguments}.
 }
 \details{
 Applies a kernel density estimator (KDE) to \code{x}, then uses weighted quantiles

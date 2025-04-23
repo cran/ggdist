@@ -14,7 +14,9 @@ geom_lineribbon(
   orientation = NA,
   na.rm = FALSE,
   show.legend = NA,
-  inherit.aes = TRUE
+  inherit.aes = TRUE,
+  check.aes = TRUE,
+  check.param = TRUE
 )
 }
 \arguments{
@@ -38,32 +40,50 @@ the plot data. The return value must be a \code{data.frame}, and
 will be used as the layer data. A \code{function} can be created
 from a \code{formula} (e.g. \code{~ head(.x, 10)}).}
 
-\item{stat}{The statistical transformation to use on the data for this
-layer, either as a \code{ggproto} \code{Geom} subclass or as a string naming the
-stat stripped of the \code{stat_} prefix (e.g. \code{"count"} rather than
-\code{"stat_count"})}
+\item{stat}{The statistical transformation to use on the data for this layer.
+When using a \verb{geom_*()} function to construct a layer, the \code{stat}
+argument can be used the override the default coupling between geoms and
+stats. The \code{stat} argument accepts the following:
+\itemize{
+\item A \code{Stat} ggproto subclass, for example \code{StatCount}.
+\item A string naming the stat. To give the stat as a string, strip the
+function name of the \code{stat_} prefix. For example, to use \code{stat_count()},
+give the stat as \code{"count"}.
+\item For more information and other ways to specify the stat, see the
+\link[ggplot2:layer_stats]{layer stat} documentation.
+}}
 
-\item{position}{Position adjustment, either as a string naming the adjustment
-(e.g. \code{"jitter"} to use \code{position_jitter}), or the result of a call to a
-position adjustment function. Use the latter if you need to change the
-settings of the adjustment.}
+\item{position}{A position adjustment to use on the data for this layer. This
+can be used in various ways, including to prevent overplotting and
+improving the display. The \code{position} argument accepts the following:
+\itemize{
+\item The result of calling a position function, such as \code{position_jitter()}.
+This method allows for passing extra arguments to the position.
+\item A string naming the position adjustment. To give the position as a
+string, strip the function name of the \code{position_} prefix. For example,
+to use \code{position_jitter()}, give the position as \code{"jitter"}.
+\item For more information and other ways to specify the position, see the
+\link[ggplot2:layer_positions]{layer position} documentation.
+}}
 
-\item{...}{Other arguments passed to \code{\link[=layer]{layer()}}. These are often aesthetics, used to set an aesthetic
-to a fixed value, like \code{colour = "red"} or \code{linewidth = 3} (see \strong{Aesthetics}, below). They may also be
-parameters to the paired geom/stat.}
+\item{...}{Other arguments passed to \code{\link[ggplot2:layer]{layer()}}. These are
+often aesthetics, used to set an aesthetic to a fixed value, like \code{colour = "red"}
+or \code{linewidth = 3} (see \strong{Aesthetics}, below). They may also be parameters
+to the paired geom/stat.}
 
-\item{step}{Should the line/ribbon be drawn as a step function? One of:
+\item{step}{<scalar \link{logical} | \link[=character]{string}> Should the line/ribbon be drawn
+as a step function? One of:
 \itemize{
 \item \code{FALSE} (default): do not draw as a step function.
 \item \code{"mid"} (or \code{TRUE}): draw steps midway between adjacent x values.
 \item \code{"hv"}: draw horizontal-then-vertical steps.
 \item \code{"vh"}: draw as vertical-then-horizontal steps.
 }
-\code{TRUE} is an alias for \code{"mid"} because for a step function with ribbons, \code{"mid"} is probably what you want
-(for the other two step approaches the ribbons at either the very first or very last x value will not be
-visible).}
+\code{TRUE} is an alias for \code{"mid"}, because for a step function with ribbons
+\code{"mid"} is reasonable default (for the other two step approaches the ribbons
+at either the very first or very last x value will not be visible).}
 
-\item{orientation}{Whether this geom is drawn horizontally or vertically. One of:
+\item{orientation}{<\link[=character]{string}> Whether this geom is drawn horizontally or vertically. One of:
 \itemize{
 \item \code{NA} (default): automatically detect the orientation based on how the aesthetics
 are assigned. Automatic detection works most of the time.
@@ -78,8 +98,8 @@ For compatibility with the base ggplot naming scheme for \code{orientation}, \co
 for \code{"vertical"} and \code{"y"} as an alias for \code{"horizontal"} (\pkg{ggdist} had an \code{orientation} parameter
 before base ggplot did, hence the discrepancy).}
 
-\item{na.rm}{If \code{FALSE}, the default, missing values are removed with a warning. If \code{TRUE}, missing
-values are silently removed.}
+\item{na.rm}{<scalar \link{logical}> If \code{FALSE}, the default, missing values are removed with a warning. If \code{TRUE},
+missing values are silently removed.}
 
 \item{show.legend}{logical. Should this layer be included in the legends?
 \code{NA}, the default, includes if any aesthetics are mapped.
@@ -91,20 +111,25 @@ display.}
 rather than combining with them. This is most useful for helper functions
 that define both data and aesthetics and shouldn't inherit behaviour from
 the default plot specification, e.g. \code{\link[ggplot2:borders]{borders()}}.}
+
+\item{check.aes, check.param}{If \code{TRUE}, the default, will check that
+supplied parameters and aesthetics are understood by the \code{geom} or
+\code{stat}. Use \code{FALSE} to suppress the checks.}
 }
 \value{
 A \link[ggplot2:ggplot2-ggproto]{ggplot2::Geom} representing a combined line + multiple-ribbon geometry which can
-be added to a \code{\link[=ggplot]{ggplot()}} object.
+be added to a \code{\link[ggplot2:ggplot]{ggplot()}} object.
 }
 \description{
-A combination of \code{\link[=geom_line]{geom_line()}} and \code{\link[=geom_ribbon]{geom_ribbon()}} with default aesthetics
-designed for use with output from \code{\link[=point_interval]{point_interval()}}.
+A combination of \code{\link[ggplot2:geom_path]{geom_line()}} and \code{\link[ggplot2:geom_ribbon]{geom_ribbon()}}
+with default aesthetics designed for use with output from \code{\link[=point_interval]{point_interval()}}.
 }
 \details{
-\code{\link[=geom_lineribbon]{geom_lineribbon()}} is a combination of a \code{\link[=geom_line]{geom_line()}} and \code{\link[=geom_ribbon]{geom_ribbon()}} designed for use
-with output from \code{\link[=point_interval]{point_interval()}}. This geom sets some default aesthetics equal to the \code{.width}
-column generated by the \code{\link[=point_interval]{point_interval()}} family of functions, making them
-often more convenient than a vanilla \code{\link[=geom_ribbon]{geom_ribbon()}} + \code{\link[=geom_line]{geom_line()}}.
+\code{\link[=geom_lineribbon]{geom_lineribbon()}} is a combination of a \code{\link[ggplot2:geom_path]{geom_line()}} and
+\code{\link[ggplot2:geom_ribbon]{geom_ribbon()}} designed for use with output from \code{\link[=point_interval]{point_interval()}}.
+This geom sets some default aesthetics equal to the \code{.width} column generated by the
+\code{\link[=point_interval]{point_interval()}} family of functions, making them often more convenient than a vanilla
+\code{\link[ggplot2:geom_ribbon]{geom_ribbon()}} + \code{\link[ggplot2:geom_path]{geom_line()}}.
 
 Specifically, \code{\link[=geom_lineribbon]{geom_lineribbon()}} acts as if its default aesthetics are
 \code{aes(fill = forcats::fct_rev(ordered(.width)))}.
@@ -188,8 +213,8 @@ tibble(
 \seealso{
 See \code{\link[=stat_lineribbon]{stat_lineribbon()}} for a version that does summarizing of samples into points and intervals
 within ggplot. See \code{\link[=geom_pointinterval]{geom_pointinterval()}} for a similar geom intended
-for point summaries and intervals. See \code{\link[=geom_ribbon]{geom_ribbon()}} and \code{\link[=geom_line]{geom_line()}} for the geoms this is
-based on.
+for point summaries and intervals. See \code{\link[ggplot2:geom_path]{geom_line()}} and
+\code{\link[ggplot2:geom_ribbon]{geom_ribbon()}} and  for the geoms this is based on.
 }
 \author{
 Matthew Kay

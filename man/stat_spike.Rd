@@ -14,18 +14,19 @@ stat_spike(
   p_limits = c(NA, NA),
   density = "bounded",
   adjust = waiver(),
-  trim = TRUE,
-  expand = FALSE,
+  trim = waiver(),
   breaks = waiver(),
-  align = "none",
-  outline_bars = FALSE,
-  slab_type = NULL,
+  align = waiver(),
+  outline_bars = waiver(),
+  expand = FALSE,
   limits = NULL,
-  n = 501,
+  n = waiver(),
   orientation = NA,
   na.rm = FALSE,
   show.legend = NA,
-  inherit.aes = TRUE
+  inherit.aes = TRUE,
+  check.aes = TRUE,
+  check.param = TRUE
 )
 }
 \arguments{
@@ -49,18 +50,50 @@ the plot data. The return value must be a \code{data.frame}, and
 will be used as the layer data. A \code{function} can be created
 from a \code{formula} (e.g. \code{~ head(.x, 10)}).}
 
-\item{geom}{Use to override the default connection between \code{\link[=stat_spike]{stat_spike()}} and \code{\link[=geom_spike]{geom_spike()}}}
+\item{geom}{<\link[ggplot2:ggplot2-ggproto]{Geom} | \link[=character]{string}> Use to override the default
+connection between \code{\link[=stat_spike]{stat_spike()}} and \code{\link[=geom_spike]{geom_spike()}}}
 
-\item{position}{Position adjustment, either as a string, or the result of a call to a position adjustment function.
-Setting this equal to \code{"dodge"} (\code{\link[=position_dodge]{position_dodge()}}) or \code{"dodgejust"} (\code{\link[=position_dodgejust]{position_dodgejust()}}) can be useful if
-you have overlapping geometries.}
+\item{position}{<\link[ggplot2:ggplot2-ggproto]{Position} | \link[=character]{string}> Position adjustment,
+either as a string, or the result of a call to a position adjustment function.
+Setting this equal to \code{"dodge"} (\code{\link[ggplot2:position_dodge]{position_dodge()}}) or
+\code{"dodgejust"} (\code{\link[=position_dodgejust]{position_dodgejust()}}) can be useful if you have overlapping geometries.}
 
-\item{...}{Other arguments passed to \code{\link[=layer]{layer()}}. These are often aesthetics, used to set an aesthetic
-to a fixed value, like \code{colour = "red"} or \code{linewidth = 3} (see \strong{Aesthetics}, below). They may also be
-parameters to the paired geom/stat. When paired with the default geom, \code{\link[=geom_spike]{geom_spike()}},
-these include:
+\item{...}{Other arguments passed to \code{\link[ggplot2:layer]{layer()}}. These
+are often aesthetics, used to set an aesthetic to a fixed value, like
+\code{colour = "red"} or \code{linewidth = 3} (see \strong{Aesthetics}, below). They
+may also be parameters to the paired geom/stat. When paired with the
+default geom, \code{\link[=geom_spike]{geom_spike()}}, these include:
 \describe{
-\item{\code{normalize}}{How to normalize heights of functions input to the \code{thickness} aesthetic. One of:
+\item{\code{subguide}}{<\link{function} | \link[=character]{string}> Sub-guide used to annotate the \code{thickness} scale. One of:
+\itemize{
+\item A function that takes a \code{scale} argument giving a \link[ggplot2:ggplot2-ggproto]{ggplot2::Scale}
+object and an \code{orientation} argument giving the orientation of the
+geometry and then returns a \link[grid:grid.grob]{grid::grob} that will draw the axis
+annotation, such as \code{\link[=subguide_axis]{subguide_axis()}} (to draw a traditional axis) or
+\code{\link[=subguide_none]{subguide_none()}} (to draw no annotation). See \code{\link[=subguide_axis]{subguide_axis()}}
+for a list of possibilities and examples.
+\item A string giving the name of such a function when prefixed
+with \code{"subguide_"}; e.g. \code{"axis"} or \code{"none"}. The values \code{"slab"},
+\code{"dots"}, and \code{"spike"} use the default subguide for their geom
+families (no subguide), which can be modified by setting
+\code{\link{subguide_slab}}, \code{\link{subguide_dots}}, or \code{\link{subguide_spike}};
+see the documentation for those functions.
+}}
+\item{\code{subscale}}{<\link{function} | \link[=character]{string}> Sub-scale used to scale values of the
+\code{thickness} aesthetic within the groups determined by \code{normalize}. One of:
+\itemize{
+\item A function that takes an \code{x} argument giving a numeric vector
+of values to be scaled and then returns a \link{thickness} vector representing
+the scaled values, such as \code{\link[=subscale_thickness]{subscale_thickness()}} or \code{\link[=subscale_identity]{subscale_identity()}}.
+\item A string giving the name of such a function when prefixed
+with \code{"subscale_"}; e.g. \code{"thickness"} or \code{"identity"}. The value
+\code{"thickness"} using the default subscale, which can be modified by
+setting \code{\link{subscale_thickness}}; see the documentation for that
+function.
+}
+For a comprehensive discussion and examples of slab scaling and normalization, see the
+\href{https://mjskay.github.io/ggdist/articles/thickness.html}{\code{thickness} scale article}.}
+\item{\code{normalize}}{<\link[=character]{string}> Groups within which to scale values of the \code{thickness} aesthetic. One of:
 \itemize{
 \item \code{"all"}: normalize so that the maximum height across all data is \code{1}.
 \item \code{"panels"}: normalize within panels so that the maximum height in each panel is \code{1}.
@@ -73,21 +106,11 @@ only be used with functions whose values are in [0,1], such as CDFs).
 }
 For a comprehensive discussion and examples of slab scaling and normalization, see the
 \href{https://mjskay.github.io/ggdist/articles/thickness.html}{\code{thickness} scale article}.}
-\item{\code{arrow}}{\code{\link[grid:arrow]{grid::arrow()}} giving the arrow heads to use on the spike, or \code{NULL} for no arrows.}
-\item{\code{subguide}}{Sub-guide used to annotate the \code{thickness} scale. One of:
-\itemize{
-\item A function that takes a \code{scale} argument giving a \link[ggplot2:ggplot2-ggproto]{ggplot2::Scale}
-object and an \code{orientation} argument giving the orientation of the
-geometry and then returns a \link[grid:grid.grob]{grid::grob} that will draw the axis
-annotation, such as \code{\link[=subguide_axis]{subguide_axis()}} (to draw a traditional axis) or
-\code{\link[=subguide_none]{subguide_none()}} (to draw no annotation). See \code{\link[=subguide_axis]{subguide_axis()}}
-for a list of possibilities and examples.
-\item A string giving the name of such a function when prefixed
-with \code{"subguide"}; e.g. \code{"axis"} or \code{"none"}.
-}}
+\item{\code{arrow}}{<\link{arrow} | \link{NULL}> Type of arrow heads to use on the spike, or \code{NULL} for no arrows.}
 }}
 
-\item{at}{The points at which to evaluate the PDF and CDF of the distribution. One of:
+\item{at}{<\link{numeric} | \link{function} | \link{character} | \link{list}> The points at which to
+evaluate the PDF and CDF of the distribution. One of:
 \itemize{
 \item \link{numeric} vector: points to evaluate the PDF and CDF of the distributions at.
 \item function or character vector: function (or names of functions) which,
@@ -101,14 +124,16 @@ a spike at \code{0}, the median, and the endpoints of the \code{qi} of the distr
 
 The values of \code{at} are also converted into a character vector which is supplied
 as a computed variable (also called \code{at}) generated by this \code{stat}, which can be
-mapped onto aesthetics using \code{\link[=after_stat]{after_stat()}}. Non-empty names can be used to override
-the values of the computed variable; e.g. \code{at = c(zero = 0, "median", mode = "Mode")}
-will generate a computed variable with the values \code{c("zero", "median", "mode")} that
-is evaluated at \code{0}, the median, and the mode of the distribution.}
+mapped onto aesthetics using \code{\link[ggplot2:aes_eval]{after_stat()}}. Non-empty names
+can be used to override the values of the computed variable; e.g.
+\code{at = c(zero = 0, "median", mode = "Mode")} will generate a computed variable with
+the values \code{c("zero", "median", "mode")} that is evaluated at \code{0}, the median, and
+the mode of the distribution.}
 
-\item{p_limits}{Probability limits (as a vector of size 2) used to determine the lower and upper
-limits of \emph{theoretical} distributions (distributions from \emph{samples} ignore this parameter and determine
-their limits based on the limits of the sample). E.g., if this is \code{c(.001, .999)}, then a slab is drawn
+\item{p_limits}{<length-2 \link{numeric}> Probability limits. Used to determine the lower and upper
+limits of \emph{analytical} distributions (distributions from \emph{samples} ignore this parameter and determine
+their limits based on the limits of the sample and the value of the \code{trim} parameter).
+E.g., if this is \code{c(.001, .999)}, then a slab is drawn
 for the distribution from the quantile at \code{p = .001} to the quantile at \code{p = .999}. If the lower
 (respectively upper) limit is \code{NA}, then the lower (upper) limit will be the minimum (maximum) of the
 distribution's support if it is finite, and \code{0.001} (\code{0.999}) if it is not finite. E.g., if
@@ -116,7 +141,7 @@ distribution's support if it is finite, and \code{0.001} (\code{0.999}) if it is
 \code{c(0, .999)} since the gamma distribution is defined on \verb{(0, Inf)}; whereas on a normal distribution
 it would be equivalent to \code{c(.001, .999)} since the normal distribution is defined on \verb{(-Inf, Inf)}.}
 
-\item{density}{Density estimator for sample data. One of:
+\item{density}{<\link{function} | \link[=character]{string}> Density estimator for sample data. One of:
 \itemize{
 \item A function which takes a numeric vector and returns a list with elements
 \code{x} (giving grid points for the density estimator) and \code{y} (the
@@ -130,19 +155,12 @@ Defaults to \code{"bounded"}, i.e. \code{\link[=density_bounded]{density_bounded
 the data and then uses a bounded density estimator based on the reflection method.
 }}
 
-\item{adjust}{Passed to \code{density}: the bandwidth for the density estimator for sample data
-is adjusted by multiplying it by this value. See e.g. \code{\link[=density_bounded]{density_bounded()}} for more information.
-Default (\code{waiver()}) defers to the default of the density estimator, which is usually \code{1}.}
+\item{adjust}{<scalar \link{numeric} | \link{waiver}> Passed to \code{density} (e.g. \code{\link[=density_bounded]{density_bounded()}}): Value to multiply the bandwidth of the density estimator by. Default \code{\link[=waiver]{waiver()}} defers to the default of the density estimator, which is usually \code{1}.}
 
-\item{trim}{For sample data, should the density estimate be trimmed to the range of the
-data? Passed on to the density estimator; see the \code{density} parameter. Default \code{TRUE}.}
+\item{trim}{<scalar \link{logical} | \link{waiver}> Passed to \code{density} (e.g. \code{\link[=density_bounded]{density_bounded()}}): Should the density estimate be trimmed to the range of the data? Default \code{\link[=waiver]{waiver()}} defers to the default of the density estimator, which is usually \code{TRUE}.}
 
-\item{expand}{For sample data, should the slab be expanded to the limits of the scale? Default \code{FALSE}.
-Can be length two to control expansion to the lower and upper limit respectively.}
-
-\item{breaks}{Determines the breakpoints defining bins. Defaults to \code{"Scott"}.
-Similar to (but not exactly the same as) the \code{breaks} argument to \code{\link[graphics:hist]{graphics::hist()}}.
-One of:
+\item{breaks}{<\link{numeric} | \link{function} | \link[=character]{string} | \link{waiver}> Passed to \code{density} (e.g. \code{\link[=density_histogram]{density_histogram()}}): Determines the breakpoints defining bins. Default \code{\link[=waiver]{waiver()}} defers to the default of the density estimator, which is usually \code{"Scott"}. Similar to (but not exactly the same as) the \code{breaks}
+argument to \code{\link[graphics:hist]{graphics::hist()}}. One of:
 \itemize{
 \item A scalar (length-1) numeric giving the number of bins
 \item A vector numeric giving the breakpoints between histogram bins
@@ -154,48 +172,49 @@ number of bins or a vector of breakpoints
 \code{\link[graphics:hist]{graphics::hist()}}, as well as \code{\link[=breaks_fixed]{breaks_fixed()}} for manually setting
 the bin width. See \link{breaks}.
 }
-
 For example, \code{breaks = "Sturges"} will use the \code{\link[=breaks_Sturges]{breaks_Sturges()}} algorithm,
 \code{breaks = 9} will create 9 bins, and \code{breaks = breaks_fixed(width = 1)} will
 set the bin width to \code{1}.}
 
-\item{align}{Determines how to align the breakpoints defining bins. Default
-(\code{"none"}) performs no alignment. One of:
+\item{align}{<scalar \link{numeric} | \link{function} | \link[=character]{string} | \link{waiver}> Passed to \code{density} (e.g. \code{\link[=density_histogram]{density_histogram()}}): Determines how to align the breakpoints defining bins. Default \code{\link[=waiver]{waiver()}} defers to the default of the density estimator, which is usually \code{"none"} (performs no alignment). One of:
 \itemize{
-\item A scalar (length-1) numeric giving an offset that is subtracted from the breaks.
-The offset must be between \code{0} and the bin width.
-\item A function taking a sorted vector of \code{breaks} (bin edges) and returning
-an offset to subtract from the breaks.
+\item A scalar (length-1) numeric giving an offset that is subtracted
+from the breaks. The offset must be between \code{0} and the bin width.
+\item A function taking a sorted vector of \code{breaks} (bin edges) and
+returning an offset to subtract from the breaks.
 \item A string giving the suffix of a function that starts with
 \code{"align_"} used to determine the alignment, such as \code{\link[=align_none]{align_none()}},
 \code{\link[=align_boundary]{align_boundary()}}, or \code{\link[=align_center]{align_center()}}.
 }
+For example, \code{align = "none"} will provide no alignment,
+\code{align = align_center(at = 0)} will center a bin on \code{0}, and
+\code{align = align_boundary(at = 0)} will align a bin edge on \code{0}.}
 
-For example, \code{align = "none"} will provide no alignment, \code{align = align_center(at = 0)}
-will center a bin on \code{0}, and \code{align = align_boundary(at = 0)} will align a bin
-edge on \code{0}.}
+\item{outline_bars}{<scalar \link{logical} | \link{waiver}> Passed to \code{density} (e.g. \code{\link[=density_histogram]{density_histogram()}}) and also
+used for discrete analytical distributions (whose slabs are drawn as histograms). Determines
+if outlines in between the bars are drawn. If \code{\link[=waiver]{waiver()}} or \code{FALSE}
+(the default), the outline is drawn only along the tops of the bars. If \code{TRUE}, outlines in between
+bars are also drawn (though you may have to set the \code{slab_color} or \code{color} aesthetic to
+see the outlines).}
 
-\item{outline_bars}{For sample data (if \code{density} is \code{"histogram"}) and for discrete analytical
-distributions (whose slabs are drawn as histograms), determines
-if outlines in between the bars are drawn when the \code{slab_color} aesthetic is used. If \code{FALSE}
-(the default), the outline is drawn only along the tops of the bars; if \code{TRUE}, outlines in between
-bars are also drawn. See \code{\link[=density_histogram]{density_histogram()}}.}
+\item{expand}{<\link{logical}> For sample data, should the slab be expanded to the limits of the scale? Default \code{FALSE}.
+Can be a length-two logical vector to control expansion to the lower and upper limit respectively.}
 
-\item{slab_type}{(deprecated) The type of slab function to calculate: probability density (or mass) function
-(\code{"pdf"}), cumulative distribution function (\code{"cdf"}), or complementary CDF (\code{"ccdf"}). Instead of using
-\code{slab_type} to change \code{f} and then mapping \code{f} onto an aesthetic, it is now recommended to simply map the
-corresponding computed variable (e.g. \code{pdf}, \code{cdf}, or  \code{1 - cdf}) directly onto the desired aesthetic.}
+\item{limits}{<length-2 \link{numeric}> Manually-specified limits for the slab, as
+a vector of length two. These limits are combined with those computed based on
+\code{p_limits} as well as the limits defined by the scales of the plot to
+determine the limits used to draw the slab functions: these limits specify
+the maximal limits; i.e., if specified, the limits will not be wider than
+these (but may be narrower). Use \code{NA} to leave a limit alone; e.g.
+\code{limits = c(0, NA)} will ensure that the lower limit does not go below 0, but
+let the upper limit be determined by either \code{p_limits} or the scale settings.}
 
-\item{limits}{Manually-specified limits for the slab, as a vector of length two. These limits are combined with those
-computed based on \code{p_limits} as well as the limits defined by the scales of the plot to determine the
-limits used to draw the slab functions: these limits specify the maximal limits; i.e., if specified, the limits
-will not be wider than these (but may be narrower). Use \code{NA} to leave a limit alone; e.g.
-\code{limits = c(0, NA)} will ensure that the lower limit does not go below 0, but let the upper limit
-be determined by either \code{p_limits} or the scale settings.}
+\item{n}{<scalar \link{numeric}> Number of points at which to evaluate the function that defines the slab. Also
+passed to \code{density} (e.g. \code{\link[=density_bounded]{density_bounded()}}). Default \code{waiver()} uses the value \code{501}
+for analytical distributions and defers to the default of the density estimator for
+sample-based distributions, which is also usually \code{501}.}
 
-\item{n}{Number of points at which to evaluate the function that defines the slab.}
-
-\item{orientation}{Whether this geom is drawn horizontally or vertically. One of:
+\item{orientation}{<\link[=character]{string}> Whether this geom is drawn horizontally or vertically. One of:
 \itemize{
 \item \code{NA} (default): automatically detect the orientation based on how the aesthetics
 are assigned. Automatic detection works most of the time.
@@ -210,20 +229,25 @@ For compatibility with the base ggplot naming scheme for \code{orientation}, \co
 for \code{"vertical"} and \code{"y"} as an alias for \code{"horizontal"} (\pkg{ggdist} had an \code{orientation} parameter
 before base ggplot did, hence the discrepancy).}
 
-\item{na.rm}{If \code{FALSE}, the default, missing values are removed with a warning. If \code{TRUE}, missing
-values are silently removed.}
+\item{na.rm}{<scalar \link{logical}> If \code{FALSE}, the default, missing values are removed with a warning. If \code{TRUE},
+missing values are silently removed.}
 
-\item{show.legend}{Should this layer be included in the legends? Default is \code{c(size = FALSE)}, unlike most geoms,
-to match its common use cases. \code{FALSE} hides all legends, \code{TRUE} shows all legends, and \code{NA} shows only
-those that are mapped (the default for most geoms).}
+\item{show.legend}{<\link{logical}> Should this layer be included in the legends? Default is \code{c(size = FALSE)},
+unlike most geoms, to match its common use cases. \code{FALSE} hides all legends, \code{TRUE} shows all legends,
+and \code{NA} shows only those that are mapped (the default for most geoms). It can also be a named logical
+vector to finely select the aesthetics to display.}
 
 \item{inherit.aes}{If \code{FALSE}, overrides the default aesthetics,
 rather than combining with them. This is most useful for helper functions
 that define both data and aesthetics and shouldn't inherit behaviour from
 the default plot specification, e.g. \code{\link[ggplot2:borders]{borders()}}.}
+
+\item{check.aes, check.param}{If \code{TRUE}, the default, will check that
+supplied parameters and aesthetics are understood by the \code{geom} or
+\code{stat}. Use \code{FALSE} to suppress the checks.}
 }
 \value{
-A \link[ggplot2:ggplot2-ggproto]{ggplot2::Stat} representing a spike geometry which can be added to a \code{\link[=ggplot]{ggplot()}} object.
+A \link[ggplot2:ggplot2-ggproto]{ggplot2::Stat} representing a spike geometry which can be added to a \code{\link[ggplot2:ggplot]{ggplot()}} object.
 }
 \description{
 Stat for drawing "spikes" (optionally with points on them) at specific points
@@ -244,9 +268,9 @@ this is not recommended as it does not work as well with orientation detection.
 These aesthetics can be used as follows:
 \itemize{
 \item \code{xdist}, \code{ydist}, and \code{dist} can be any distribution object from the \href{https://pkg.mitchelloharawild.com/distributional/}{distributional}
-package (\code{\link[=dist_normal]{dist_normal()}}, \code{\link[=dist_beta]{dist_beta()}}, etc) or can be a \code{\link[posterior:rvar]{posterior::rvar()}} object.
-Since these functions are vectorized,
-other columns can be passed directly to them in an \code{\link[=aes]{aes()}} specification; e.g.
+package (\code{\link[distributional:dist_normal]{dist_normal()}}, \code{\link[distributional:dist_beta]{dist_beta()}}, etc)
+or can be a \code{\link[posterior:rvar]{posterior::rvar()}} object. Since these functions are vectorized,
+other columns can be passed directly to them in an \code{\link[ggplot2:aes]{aes()}} specification; e.g.
 \code{aes(dist = dist_normal(mu, sigma))} will work if \code{mu} and \code{sigma} are columns in the
 input data frame.
 \item \code{dist} can be a character vector giving the distribution name. Then the  \code{arg1}, ... \code{arg9}
@@ -276,12 +300,15 @@ These \code{stat}s support the following aesthetics:
 (when \code{orientation = "vertical"} with sample data).}
 \item{\code{weight}: When using samples (i.e. the \code{x} and \code{y} aesthetics, not \code{xdist} or \code{ydist}), optional
 weights to be applied to each draw.}
-\item{\code{xdist}: When using analytical distributions, distribution to map on the x axis: a \pkg{distributional}
-object (e.g. \code{\link[=dist_normal]{dist_normal()}}) or a \code{\link[posterior:rvar]{posterior::rvar()}} object.}
-\item{\code{ydist}: When using analytical distributions, distribution to map on the y axis: a \pkg{distributional}
-object (e.g. \code{\link[=dist_normal]{dist_normal()}}) or a \code{\link[posterior:rvar]{posterior::rvar()}} object.}
+\item{\code{xdist}: When using analytical distributions, distribution to map on the x axis:
+a \pkg{distributional} object (e.g. \code{\link[distributional:dist_normal]{dist_normal()}})
+or a \code{\link[posterior:rvar]{posterior::rvar()}} object.}
+\item{\code{ydist}: When using analytical distributions, distribution to map on the y axis:
+a \pkg{distributional} object (e.g. \code{\link[distributional:dist_normal]{dist_normal()}})
+or a \code{\link[posterior:rvar]{posterior::rvar()}} object.}
 \item{\code{dist}: When using analytical distributions, a name of a distribution (e.g. \code{"norm"}), a
-\pkg{distributional} object (e.g. \code{\link[=dist_normal]{dist_normal()}}), or a \code{\link[posterior:rvar]{posterior::rvar()}} object. See \strong{Details}.}
+\pkg{distributional} object (e.g. \code{\link[distributional:dist_normal]{dist_normal()}}), or a
+\code{\link[posterior:rvar]{posterior::rvar()}} object. See \strong{Details}.}
 \item{\code{args}: Distribution arguments (\code{args} or \code{arg1}, ... \code{arg9}). See \strong{Details}.}
 }
 
@@ -344,8 +371,8 @@ Learn more about the sub-geom override aesthetics (like \code{interval_color}) i
 \section{Computed Variables}{
 
 The following variables are computed by this stat and made available for
-use in aesthetic specifications (\code{\link[=aes]{aes()}}) using the \code{\link[=after_stat]{after_stat()}}
-function or the \code{after_stat} argument of \code{\link[=stage]{stage()}}:
+use in aesthetic specifications (\code{\link[ggplot2:aes]{aes()}}) using the \code{\link[ggplot2:aes_eval]{after_stat()}}
+function or the \code{after_stat} argument of \code{\link[ggplot2:aes_eval]{stage()}}:
 \itemize{
 \item \code{x} or \code{y}: For slabs, the input values to the slab function.
 For intervals, the point summary from the interval function. Whether it is \code{x} or \code{y} depends on \code{orientation}

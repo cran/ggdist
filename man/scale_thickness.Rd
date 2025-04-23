@@ -4,7 +4,6 @@
 \alias{scale_thickness}
 \alias{scale_thickness_shared}
 \alias{scale_thickness_identity}
-\alias{thickness}
 \title{Slab thickness scale (ggplot2 scale)}
 \usage{
 scale_thickness_shared(
@@ -15,12 +14,11 @@ scale_thickness_shared(
   renormalize = FALSE,
   oob = scales::oob_keep,
   guide = "none",
+  expand = c(0, 0),
   ...
 )
 
 scale_thickness_identity(..., guide = "none")
-
-thickness(x = double(), lower = NA_real_, upper = NA_real_)
 }
 \arguments{
 \item{name}{The name of the scale. Used as the axis or legend title. If
@@ -36,6 +34,7 @@ omitted.}
 \item A numeric vector of positions
 \item A function that takes the limits as input and returns breaks
 as output (e.g., a function returned by \code{\link[scales:breaks_extended]{scales::extended_breaks()}}).
+Note that for position scales, limits are provided after scale expansion.
 Also accepts rlang \link[rlang:as_function]{lambda} function notation.
 }}
 
@@ -64,7 +63,7 @@ If the purpose is to zoom, use the limit argument in the coordinate system
 (see \code{\link[ggplot2:coord_cartesian]{coord_cartesian()}}).
 }}
 
-\item{renormalize}{When mapping values to the \code{thickness} scale, should those
+\item{renormalize}{<scalar \link{logical}> When mapping values to the \code{thickness} scale, should those
 values be allowed to be renormalized by geoms (e.g. via the \code{normalize} parameter
 to \code{\link[=geom_slabinterval]{geom_slabinterval()}})? The default is \code{FALSE}: if \code{scale_thickness_shared()}
 is in use, the geom-specific \code{normalize} parameter is ignored (this is achieved
@@ -87,6 +86,16 @@ bounds values with \code{NA}.
 
 \item{guide}{A function used to create a guide or its name. See
 \code{\link[ggplot2:guides]{guides()}} for more information.}
+
+\item{expand}{<\link{numeric}> Vector of limit expansion constants of length
+2 or 4, following the same format used by the \code{expand} argument of
+\code{\link[ggplot2:continuous_scale]{continuous_scale()}}. The default is not to expand the limits.
+You can use the convenience function \code{\link[ggplot2:expansion]{expansion()}} to generate the
+expansion values; expanding the lower limit is usually not recommended
+(because with most \code{thickness} scales the lower limit is the baseline
+and represents \code{0}), so a typical usage might be something like
+\code{expand = expansion(c(0, 0.05))} to expand the top end of the scale
+by 5\%.}
 
 \item{...}{
   Arguments passed on to \code{\link[ggplot2:continuous_scale]{ggplot2::continuous_scale}}
@@ -118,12 +127,6 @@ diverging and n colour gradients (i.e., \code{\link[ggplot2:scale_colour_gradien
 \code{\link[ggplot2:scale_colour_gradientn]{scale_colour_gradientn()}}). The \code{rescaler} is ignored by position
 scales, which always use \code{\link[scales:rescale]{scales::rescale()}}. Also accepts rlang
 \link[rlang:as_function]{lambda} function notation.}
-    \item{\code{expand}}{For position scales, a vector of range expansion constants used to add some
-padding around the data to ensure that they are placed some distance
-away from the axes. Use the convenience function \code{\link[ggplot2:expansion]{expansion()}}
-to generate the values for the \code{expand} argument. The defaults are to
-expand the scale by 5\% on each side for continuous variables, and by
-0.6 units on each side for discrete variables.}
     \item{\code{na.value}}{Missing values will be replaced with this value.}
     \item{\code{transform}}{For continuous scales, the name of a transformation object
 or the object itself. Built-in transformations include "asn", "atanh",
@@ -144,17 +147,10 @@ You can create your own transformation with \code{\link[scales:new_transform]{sc
     \item{\code{call}}{The \code{call} used to construct the scale for reporting messages.}
     \item{\code{super}}{The super class to use for the constructed scale}
   }}
-
-\item{x}{An object (typically a \code{numeric()}) to be converted to a \code{thickness()}
-object.}
-
-\item{lower}{The original lower bounds of thickness values before scaling.}
-
-\item{upper}{The original upper bounds of thickness values before scaling.}
 }
 \value{
 A \link[ggplot2:ggplot2-ggproto]{ggplot2::Scale} representing a scale for the \code{thickness}
-aesthetic for \code{ggdist} geoms. Can be added to a \code{\link[=ggplot]{ggplot()}} object.
+aesthetic for \code{ggdist} geoms. Can be added to a \code{\link[ggplot2:ggplot]{ggplot()}} object.
 }
 \description{
 This \pkg{ggplot2} scale linearly scales all \code{thickness} values of geoms
@@ -179,14 +175,6 @@ alternative approach: when added to a chart, all geoms will use the same
 is ignored. This is achieved by "marking" thickness values as already
 normalized by wrapping them in the \code{\link[=thickness]{thickness()}} data type (this can be
 disabled by setting \code{renormalize = TRUE}).
-
-\code{\link[=thickness]{thickness()}} is used by \code{\link[=scale_thickness_shared]{scale_thickness_shared()}} to create \code{numeric()}-like
-objects marked as being in units of slab "thickness". Unlike regular \code{numeric()}s,
-\code{thickness()} values mapped onto the \code{thickness} aesthetic are not rescaled by
-\code{\link[=scale_thickness_shared]{scale_thickness_shared()}} or \code{\link[=geom_slabinterval]{geom_slabinterval()}}. In most cases \code{thickness()}
-is not useful directly; though it can be used to mark values that should not be
-rescaled---see the definitions of \code{\link[=stat_ccdfinterval]{stat_ccdfinterval()}} and \code{\link[=stat_gradientinterval]{stat_gradientinterval()}}
-for some usages.
 
 Note: while a slightly more typical name for \code{scale_thickness_shared()} might
 be \code{scale_thickness_continuous()}, the latter name would cause this scale
@@ -225,7 +213,12 @@ prior_post \%>\%
 
 }
 \seealso{
+The \link{thickness} datatype.
+
 The \code{thickness} aesthetic of \code{\link[=geom_slabinterval]{geom_slabinterval()}}.
+
+\code{\link[=subscale_thickness]{subscale_thickness()}}, for setting a \code{thickness} sub-scale within
+a single \code{\link[=geom_slabinterval]{geom_slabinterval()}}.
 
 Other ggdist scales: 
 \code{\link{scale_colour_ramp}},

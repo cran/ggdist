@@ -32,7 +32,7 @@ rd_dotsinterval_shortcut_geom = function(
     rd_layer_params(geom_name, as_dots = FALSE),
     glue_doc('
       @return A [ggplot2::Geom] representing a <<chart_type>> geometry which can
-      be added to a [ggplot()] object.
+      be added to a [`ggplot()`][ggplot2::ggplot] object.
       '),
     '@template details-dotsinterval-family',
     '@template references-quantile-dotplots',
@@ -101,14 +101,14 @@ rd_dotsinterval_shortcut_stat = function(
     '@inheritParams geom_dotsinterval',
     rd_layer_params(geom_name, stat, as_dots = TRUE),
     glue_doc('
-      @param geom Use to override the default connection between
-      [stat_<<stat_name>>()] and [geom_<<geom_name>>()]'),
+      @param geom <[Geom][ggplot2::Geom] | [string][character]> Use to override
+      the default connection between [stat_<<stat_name>>()] and [geom_<<geom_name>>()]'),
     '@template details-dotsinterval-family',
     '@template references-quantile-dotplots',
     '@template details-x-y-xdist-ydist',
     glue_doc('
       @return A [ggplot2::Stat] representing a <<chart_type>> geometry which can
-      be added to a [ggplot()] object.'),
+      be added to a [`ggplot()`][ggplot2::ggplot] object.'),
     rd_slabinterval_computed_variables(stat),
     rd_dotsinterval_aesthetics(geom_name, stat),
     glue_doc('

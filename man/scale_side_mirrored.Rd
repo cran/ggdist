@@ -7,7 +7,7 @@
 scale_side_mirrored(start = "topright", ..., aesthetics = "side")
 }
 \arguments{
-\item{start}{The side to start from. Can be any valid value of the \code{side} aesthetic
+\item{start}{<\link[=character]{string}> The side to start from. Can be any valid value of the \code{side} aesthetic
 except \code{"both"}.}
 
 \item{...}{
@@ -65,7 +65,8 @@ missing values be displayed as? Does not apply to position scales
 where \code{NA} is always placed at the far right.}
     \item{\code{drop}}{Should unused factor levels be omitted from the scale?
 The default, \code{TRUE}, uses the levels that appear in the data;
-\code{FALSE} uses all the levels in the factor.}
+\code{FALSE} includes the levels in the factor. Please note that to display
+every level in a legend, the layer should use \code{show.legend = TRUE}.}
     \item{\code{guide}}{A function used to create a guide or its name. See
 \code{\link[ggplot2:guides]{guides()}} for more information.}
     \item{\code{position}}{For position scales, The position of the axis.
@@ -74,11 +75,11 @@ The default, \code{TRUE}, uses the levels that appear in the data;
     \item{\code{super}}{The super class to use for the constructed scale}
   }}
 
-\item{aesthetics}{Names of aesthetics to set scales for.}
+\item{aesthetics}{<\link{character}> Names of aesthetics to set scales for.}
 }
 \value{
 A \link[ggplot2:ggplot2-ggproto]{ggplot2::Scale} representing a scale for the \code{side}
-aesthetic for \pkg{ggdist} geoms. Can be added to a \code{\link[=ggplot]{ggplot()}} object.
+aesthetic for \pkg{ggdist} geoms. Can be added to a \code{\link[ggplot2:ggplot]{ggplot()}} object.
 }
 \description{
 This scale creates mirrored slabs for the \code{side} aesthetic of the \code{\link[=geom_slabinterval]{geom_slabinterval()}}
